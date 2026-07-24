@@ -1,0 +1,8 @@
+[package]
+name = "hotaru_rt_embassy_downstream_smoke"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+hotaru_rt_embassy = { path = "../..", default-features = false, features = ["embedded", "spawn_local"] }

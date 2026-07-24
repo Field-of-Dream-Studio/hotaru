@@ -446,7 +446,10 @@ macro_rules! define_runtime_worker_pool {
             static JOB_QUEUE: $crate::__private::EmbassyJobQueue<JOB_QUEUE_CAPACITY, RawMutex> =
                 $crate::__private::EmbassyJobQueue::new();
 
-            #[$crate::__private::embassy_executor::task(pool_size = WORKER_COUNT)]
+            #[$crate::__private::embassy_executor::task(
+                pool_size = WORKER_COUNT,
+                embassy_executor = $crate::__private::embassy_executor,
+            )]
             async fn hotaru_job_worker() {
                 $crate::__private::run_queued_jobs(&JOB_QUEUE).await;
             }
