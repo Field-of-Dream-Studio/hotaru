@@ -1,25 +1,54 @@
 //! App-level `combine()`: two independently assembled server blueprints are
 //! merged into one app before serving. Left side wins every conflict.
 //!
-//! Combining is not possible for `LServer!`/`endpoint!` statics: the static
-//! holds its own `Arc` handle forever, so `try_combine` (which needs sole
-//! ownership) always refuses. Blueprints that are meant to be combined must
-//! be built and routed with the plain function API, as done here.
+//! Blueprint statics are the auto-reg target instead of a shared `APP`
+//! static: the `endpoint!` hook binds each constructor into its Blueprint at
+//! load time, then `main()` builds two independent `Arc<Server>` values from
+//! them and combines them dynamically. `try_combine` still needs unique
+//! ownership of each built `Arc<Server>`, which the builder provides fresh.
 //!
 //! Run `cargo run -p combine_example`, then:
 //!   curl http://127.0.0.1:3005/hello   -> served by blueprint A (collision: A wins)
 //!   curl http://127.0.0.1:3005/world   -> served by blueprint B (adopted subtree)
 
-use std::future::Future;
+use std::sync::LazyLock;
 
 use hotaru::http::*;
-use hotaru::hotaru_core::executable::ExecutableBinding;
-use hotaru::hotaru_http::HttpError;
 use hotaru::prelude::*;
 
+static BLUEPRINT_A: LazyLock<Blueprint<TcpTransport, InboundOnly>> = LazyLock::new(|| {
+    Blueprint::new()
+        .with_protocol(HTTP::server(HttpSafety::default()))
+        .expect("blueprint A protocol")
+});
+
+static BLUEPRINT_B: LazyLock<Blueprint<TcpTransport, InboundOnly>> = LazyLock::new(|| {
+    Blueprint::new()
+        .with_protocol(HTTP::server(HttpSafety::default()))
+        .expect("blueprint B protocol")
+});
+
+endpoint! {
+    BLUEPRINT_A: "/hello", pub hello_a<HTTP> {
+        response_templates::normal_response(200u16, "hello from blueprint A (left wins)\n")
+    }
+}
+
+endpoint! {
+    BLUEPRINT_B: "/hello", pub hello_b<HTTP> {
+        response_templates::normal_response(200u16, "hello from blueprint B (should never be served)\n")
+    }
+}
+
+endpoint! {
+    BLUEPRINT_B: "/world", pub world<HTTP> {
+        response_templates::normal_response(200u16, "world from blueprint B (adopted subtree)\n")
+    }
+}
+
 fn main() {
-    let a = blueprint_a();
-    let b = blueprint_b();
+    let a = build_server(&BLUEPRINT_A, "127.0.0.1:3005");
+    let b = build_server(&BLUEPRINT_B, "127.0.0.1:9999");
 
     // While another handle to A exists, the merge is refused and both apps
     // come back untouched inside the error.
@@ -39,52 +68,10 @@ fn main() {
     run_server!(app);
 }
 
-/// Blueprint A — the "main" app: real binding, its own `/hello`.
-fn blueprint_a() -> Arc<Server> {
-    let app = Server::new()
-        .binding("127.0.0.1:3005")
-        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
-        .build();
-    app.url::<HTTP, _, _>("/hello", "hello_a", handler(hello_a), ParamsClone::default())
-        .unwrap();
-    app
-}
-
-/// Blueprint B — a feature module: `/world` is adopted; its `/hello` and
-/// binding lose to A's.
-fn blueprint_b() -> Arc<Server> {
-    let app = Server::new()
-        .binding("127.0.0.1:9999")
-        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
-        .build();
-    app.url::<HTTP, _, _>("/hello", "hello_b", handler(hello_b), ParamsClone::default())
-        .unwrap();
-    app.url::<HTTP, _, _>("/world", "world", handler(world), ParamsClone::default())
-        .unwrap();
-    app
-}
-
-async fn hello_a(mut ctx: HttpReqCtx) -> Result<HttpReqCtx, HttpError> {
-    normal_response(200u16, "hello from blueprint A (left wins)\n").apply_to(&mut ctx)?;
-    Ok(ctx)
-}
-
-async fn hello_b(mut ctx: HttpReqCtx) -> Result<HttpReqCtx, HttpError> {
-    normal_response(200u16, "hello from blueprint B (should never be served)\n")
-        .apply_to(&mut ctx)?;
-    Ok(ctx)
-}
-
-async fn world(mut ctx: HttpReqCtx) -> Result<HttpReqCtx, HttpError> {
-    normal_response(200u16, "world from blueprint B (adopted subtree)\n").apply_to(&mut ctx)?;
-    Ok(ctx)
-}
-
-/// Wraps a plain `async fn` into the binding shape `url` expects.
-fn handler<F, Fut>(f: F) -> ExecutableBinding<HttpReqCtx>
-where
-    F: Fn(HttpReqCtx) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = Result<HttpReqCtx, HttpError>> + Send + 'static,
-{
-    ExecutableBinding::new().with_handler(Arc::new(f))
+fn build_server(blueprint: &Blueprint<TcpTransport, InboundOnly>, binding: &str) -> Arc<Server> {
+    Server::new()
+        .binding(binding)
+        .apply(blueprint)
+        .expect("apply blueprint")
+        .build()
 }

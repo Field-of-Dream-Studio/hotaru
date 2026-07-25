@@ -3,7 +3,7 @@ use proc_macro::{Delimiter, Ident, Literal, Span, TokenStream, TokenTree};
 
 use crate::helper::{
     ensure_string_literal, expect_any_ident, expect_end, expect_group_consume_return_inner,
-    expect_string_literal_consume, generate_compile_error, into_peekable_iter,
+    expect_string_literal_consume, generate_compile_error, into_peekable_iter, use_core,
 };
 
 /// How core should interpret the URL literal when the definition is bound.
@@ -12,6 +12,25 @@ pub(crate) enum UrlMode {
     #[default]
     Pattern,
     Literal,
+}
+
+impl UrlMode {
+    /// Emit the fully qualified variant path used by `AccessPointDef::with_url_mode`:
+    ///
+    /// ```ignore
+    /// ::hotaru_core::executable::def::UrlMode::Pattern
+    /// ::hotaru_core::executable::def::UrlMode::Literal
+    /// ```
+    ///
+    /// `use_core` handles the direct/facade path prefix; only the trailing
+    /// variant identifier is per-value.
+    pub(crate) fn expand(self) -> TokenStream {
+        let variant = match self {
+            UrlMode::Pattern => "Pattern",
+            UrlMode::Literal => "Literal",
+        };
+        use_core(&["executable", "def", "UrlMode", variant])
+    }
 }
 
 /// Syntax-level registration address.

@@ -2,7 +2,7 @@ use super::RouteAddress;
 
 use core::iter::Peekable;
 
-use proc_macro::{Span, TokenStream, TokenTree};
+use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
 use crate::{
     config::{Cloneable, Config},
@@ -57,7 +57,51 @@ impl APParts {
         (self.address, self.middlewares, self.config)
     }
 
-    /// Parses an isolated route address and its following inline clauses. (Trans and Attr) 
+    /// Emit the shared builder suffix chained onto every AP constructor call:
+    ///
+    /// ```ignore
+    /// .with_url_mode(::hotaru_core::executable::def::UrlMode::Pattern)
+    /// .with_middlewares({ /* MWChain::expand_middleware_chain */ })
+    /// .with_config({ /* Config::expand */ })
+    /// ```
+    pub(crate) fn expand_suffix(self) -> TokenStream {
+        let (address, middlewares, config) = self.into_parts();
+
+        let mut out = TokenStream::new();
+
+        // .with_url_mode(<UrlMode variant path>)
+        out.extend([
+            TokenTree::Punct(Punct::new('.', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("with_url_mode", Span::call_site())),
+            TokenTree::Group(Group::new(
+                Delimiter::Parenthesis,
+                address.url_mode().expand(),
+            )),
+        ]);
+
+        // .with_middlewares({ /* MWChain::expand_middleware_chain */ })
+        // `expand_middleware_chain` already returns a `{ ... }` brace group.
+        out.extend([
+            TokenTree::Punct(Punct::new('.', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("with_middlewares", Span::call_site())),
+            TokenTree::Group(Group::new(
+                Delimiter::Parenthesis,
+                middlewares.expand_middleware_chain(),
+            )),
+        ]);
+
+        // .with_config({ /* Config::expand */ })
+        // `Config::expand` also returns a `{ ... }` brace group.
+        out.extend([
+            TokenTree::Punct(Punct::new('.', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("with_config", Span::call_site())),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, config.expand())),
+        ]);
+
+        out
+    }
+
+    /// Parses an isolated route address and its following inline clauses. (Trans and Attr)
     pub(crate) fn from_stream(
         address_fragment: TokenStream,
         tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
