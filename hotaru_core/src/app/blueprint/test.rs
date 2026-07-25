@@ -444,11 +444,10 @@ fn protocol_def_constructor_is_public() {
 // ---------------------------------------------------------------------------
 // Stage-7.2 timeout preservation tests.
 //
-// Design note (deviation from plan text): 0.8 splits the shared
-// `operation_timeout` field on the builder into two role-specific fields —
-// `AppBuilder.max_frame_process_timeout` for server, `AppBuilder.request_timeout`
-// for client. Both defaults resolve to 5 seconds. No `usize` compat setter
-// exists; callers use `TimeoutSetting` uniformly.
+// Design note: 0.8 keeps two role-specific builder fields —
+// `AppBuilder.max_frame_process_timeout` (server) and `.request_timeout`
+// (client) — mirroring `OperationalConfig` 1:1. Both defaults resolve to 5s.
+// All timeout APIs take `TimeoutSetting`; no `usize` compat setter exists.
 // ---------------------------------------------------------------------------
 
 mod timeouts {
@@ -462,7 +461,7 @@ mod timeouts {
 
     use super::ConfiguredBlueprint;
 
-    fn timeout_variants() -> [TimeoutSetting; 4] {
+    fn variants() -> [TimeoutSetting; 4] {
         [
             TimeoutSetting::Inherit,
             TimeoutSetting::Disabled,
@@ -471,59 +470,50 @@ mod timeouts {
         ]
     }
 
-    /// T17 — Server `apply_configured` preserves every `TimeoutSetting` variant
-    /// on the frame-processing side.
+    /// T17+T18 — `apply_configured` copies the configured timeout into the
+    /// matching builder field losslessly for every `TimeoutSetting` variant,
+    /// on both roles.
     #[test]
-    fn server_apply_configured_preserves_frame_process_timeout_losslessly() {
-        for input in timeout_variants() {
-            let configured = ConfiguredBlueprint::new(Blueprint::<TestTransport, InboundOnly>::new())
-                .with_operational(OperationalConfig::from_server_parts(
-                    1,
-                    TimeoutSetting::Inherit,
-                    input,
-                ));
-            let builder = AppBuilder::<ServerRole, TestTransport, PhantomRt>::new()
-                .apply_configured(&configured)
-                .expect("apply_configured must succeed on empty blueprint");
-            let output = builder
-                .get_max_frame_process_timeout()
-                .expect("apply_configured must populate the frame-processing field");
+    fn apply_configured_preserves_role_timeouts_losslessly() {
+        for input in variants() {
+            let configured_server =
+                ConfiguredBlueprint::new(Blueprint::<TestTransport, InboundOnly>::new())
+                    .with_operational(OperationalConfig::from_server_parts(
+                        1,
+                        TimeoutSetting::Inherit,
+                        input,
+                    ));
+            let server = AppBuilder::<ServerRole, TestTransport, PhantomRt>::new()
+                .apply_configured(&configured_server)
+                .expect("server apply_configured");
             assert!(
-                matches_timeout(output, input),
-                "expected {input:?}, got {output:?}"
+                matches_timeout(
+                    server.get_max_frame_process_timeout().unwrap(),
+                    input,
+                ),
+                "server frame timeout: expected {input:?}",
             );
-        }
-    }
 
-    /// T18 — Client `apply_configured` preserves every `TimeoutSetting` variant
-    /// on the request-timeout side.
-    #[test]
-    fn client_apply_configured_preserves_request_timeout_losslessly() {
-        for input in timeout_variants() {
             let mut operational = OperationalConfig::default();
             operational.set_request_timeout(input);
-            let configured =
+            let configured_client =
                 ConfiguredBlueprint::new(Blueprint::<TestTransport, OutboundOnly>::new())
                     .with_operational(operational);
-            let builder = AppBuilder::<ClientRole, TestTransport, PhantomRt>::new()
-                .apply_configured(&configured)
-                .expect("apply_configured must succeed on empty blueprint");
-            let output = builder
-                .get_request_timeout()
-                .expect("apply_configured must populate the request-timeout field");
+            let client = AppBuilder::<ClientRole, TestTransport, PhantomRt>::new()
+                .apply_configured(&configured_client)
+                .expect("client apply_configured");
             assert!(
-                matches_timeout(output, input),
-                "expected {input:?}, got {output:?}"
+                matches_timeout(client.get_request_timeout().unwrap(), input),
+                "client request timeout: expected {input:?}",
             );
         }
     }
 
-    /// T18b — An explicit setter beats a configured default for both roles.
-    /// `apply_configured` only fills fields that are still `None`, so a setter
-    /// called before or after wins.
+    /// T18b — An explicit setter beats a configured default. Setter-before and
+    /// setter-after go through the same code path (`apply_configured` only
+    /// fills `None` fields), so one order suffices per role.
     #[test]
-    fn explicit_setter_beats_configured_default_for_both_roles() {
-        // Server: setter after apply_configured — setter overwrites unconditionally.
+    fn explicit_setter_beats_configured_default() {
         let configured_server =
             ConfiguredBlueprint::new(Blueprint::<TestTransport, InboundOnly>::new())
                 .with_operational(OperationalConfig::from_server_parts(
@@ -533,24 +523,13 @@ mod timeouts {
                 ));
         let server = AppBuilder::<ServerRole, TestTransport, PhantomRt>::new()
             .apply_configured(&configured_server)
-            .expect("apply_configured must succeed")
+            .expect("server apply_configured")
             .max_frame_process_timeout(TimeoutSetting::Seconds(3));
         assert!(matches_timeout(
             server.get_max_frame_process_timeout().unwrap(),
             TimeoutSetting::Seconds(3),
         ));
 
-        // Server: setter before apply_configured — apply_configured sees Some, no-op.
-        let server = AppBuilder::<ServerRole, TestTransport, PhantomRt>::new()
-            .max_frame_process_timeout(TimeoutSetting::Seconds(3))
-            .apply_configured(&configured_server)
-            .expect("apply_configured must succeed");
-        assert!(matches_timeout(
-            server.get_max_frame_process_timeout().unwrap(),
-            TimeoutSetting::Seconds(3),
-        ));
-
-        // Client: setter beats configured request_timeout, same story.
         let mut operational = OperationalConfig::default();
         operational.set_request_timeout(TimeoutSetting::Seconds(11));
         let configured_client =
@@ -558,29 +537,11 @@ mod timeouts {
                 .with_operational(operational);
         let client = AppBuilder::<ClientRole, TestTransport, PhantomRt>::new()
             .apply_configured(&configured_client)
-            .expect("apply_configured must succeed")
+            .expect("client apply_configured")
             .request_timeout(TimeoutSetting::Seconds(3));
         assert!(matches_timeout(
             client.get_request_timeout().unwrap(),
             TimeoutSetting::Seconds(3),
-        ));
-    }
-
-    /// T18c — With neither explicit setter nor configured default, both roles
-    /// resolve to 5 seconds when the builder is unwrapped at `build()`.
-    #[test]
-    fn role_defaults_resolve_to_five_seconds() {
-        assert!(matches_timeout(
-            AppBuilder::<ServerRole, TestTransport, PhantomRt>::new()
-                .get_max_frame_process_timeout()
-                .unwrap_or(TimeoutSetting::Seconds(5)),
-            TimeoutSetting::Seconds(5),
-        ));
-        assert!(matches_timeout(
-            AppBuilder::<ClientRole, TestTransport, PhantomRt>::new()
-                .get_request_timeout()
-                .unwrap_or(TimeoutSetting::Seconds(5)),
-            TimeoutSetting::Seconds(5),
         ));
     }
 
@@ -592,5 +553,111 @@ mod timeouts {
             (TimeoutSetting::Fixed(x), TimeoutSetting::Fixed(y)) => x == y,
             _ => false,
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stage-7.1 App::apply tests (T15, T16).
+// ---------------------------------------------------------------------------
+
+mod apply {
+    use core::marker::PhantomData;
+
+    use crate::app::common::{OperationalConfig, RuntimeConfig};
+    use crate::app::instance::{App, InboundOnly, InboundState};
+    use crate::app::registry::ProtocolRegistryKind;
+    use crate::app::runtime::test_support::PhantomRt;
+    use crate::connection::test_support::TestTransport;
+    use crate::executable::middleware::AsyncMiddlewareChain;
+    use crate::prelude::Arc;
+    use crate::url::UrlRoot;
+
+    use super::{
+        Blueprint, BlueprintError, Endpoint, TestCtx, TestProto, endpoint,
+    };
+
+    fn built_server_with_proto0()
+    -> Arc<App<TestTransport, PhantomRt, InboundOnly>> {
+        Arc::new(App::<TestTransport, PhantomRt, InboundOnly> {
+            registry: ProtocolRegistryKind::single(
+                TestProto::<0>,
+                Arc::new(UrlRoot::new()),
+                AsyncMiddlewareChain::<TestCtx>::new(),
+            ),
+            inbound_state: InboundState {
+                binding: (),
+                inbound: Default::default(),
+            },
+            outbound_state: (),
+            runtime: Arc::new(RuntimeConfig::new()),
+            config: OperationalConfig::default(),
+            _rt: PhantomData,
+            _target: PhantomData,
+        })
+    }
+
+    fn blueprint_with(defs: Vec<Endpoint<TestProto<0>>>) -> Blueprint<TestTransport, InboundOnly> {
+        let bp = Blueprint::<TestTransport, InboundOnly>::new()
+            .with_protocol(TestProto::<0>)
+            .unwrap();
+        bp.extend(defs).unwrap();
+        bp
+    }
+
+    /// T15 — Applying to a built App registers each retained route into the
+    /// existing protocol entry, and a second apply rebinds the same names in
+    /// place rather than creating a fresh protocol instance.
+    #[test]
+    fn app_apply_registers_and_reapplies_in_place() {
+        let app = built_server_with_proto0();
+        let entry_ptr =
+            app.registry.entry::<TestProto<0>>().unwrap() as *const _;
+
+        let bp = blueprint_with(vec![endpoint("/a", "a"), endpoint("/b", "b")]);
+        app.apply(&bp).expect("first apply");
+
+        let after_first = app.registry.entry::<TestProto<0>>().unwrap();
+        assert!(after_first.access_points.contains("a"));
+        assert!(after_first.access_points.contains("b"));
+        assert_eq!(after_first.access_points.len(), 2);
+        assert_eq!(after_first as *const _, entry_ptr, "entry must not be swapped");
+
+        // Second apply — rebind semantics: same names, no duplicates.
+        app.apply(&bp).expect("second apply");
+        let after_second = app.registry.entry::<TestProto<0>>().unwrap();
+        assert_eq!(after_second.access_points.len(), 2);
+        assert_eq!(
+            after_second as *const _, entry_ptr,
+            "entry pointer must remain stable across reapply"
+        );
+    }
+
+    /// T16 — Full preflight: a blueprint carrying a protocol the App does
+    /// not own is rejected before any group mutates the App.
+    #[test]
+    fn app_apply_rejects_missing_protocol_before_mutating() {
+        let app = built_server_with_proto0();
+        let entry = app.registry.entry::<TestProto<0>>().unwrap();
+        assert_eq!(entry.access_points.len(), 0);
+
+        // Blueprint has proto 0 (matches app) AND proto 1 (missing).
+        let bp = Blueprint::<TestTransport, InboundOnly>::new()
+            .with_protocol(TestProto::<0>)
+            .unwrap()
+            .with_protocol(TestProto::<1>)
+            .unwrap();
+        bp.extend(vec![endpoint("/a", "a")]).unwrap();
+
+        let error = app.apply(&bp).expect_err("missing protocol must be rejected");
+        assert!(matches!(error, BlueprintError::ProtocolNotFound(_)));
+
+        // Preflight ran before any mutation — the matching-proto group must
+        // not have been applied.
+        let entry = app.registry.entry::<TestProto<0>>().unwrap();
+        assert_eq!(
+            entry.access_points.len(),
+            0,
+            "preflight failure must leave the App untouched"
+        );
     }
 }
