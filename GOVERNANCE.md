@@ -51,35 +51,104 @@ A Family Maintainer conducting QA for the Project Maintainer acts only as the
 independent questioner for that change and does not acquire project-wide
 authority.
 
-### Pull request integration routes
+### Branch tiers and integration routes
 
-Every change reaches the canonical repository's default branch through one of
-two routes:
+Every change to the canonical repository flows through one of two routes:
 
-| Route | Final PR owner | Records and QA |
+| Route | When to use | Records and QA |
 | --- | --- | --- |
-| Standalone canonical PR | The Contributor or Maintainer who submits the complete change | The PR owner completes the Update Report and answers the live QA; the questioner assigned by the QA order above completes and keeps the QA record. |
-| Maintainer-staged integration | An authorized Component or Family Maintainer collects related contributions in a maintainer-controlled branch or fork, then submits a consolidated canonical PR | The integrating Maintainer completes one consolidated Update Report and answers the live QA; the questioner assigned by the integrating Maintainer's role completes and keeps the QA record. |
-
-Contributors who prefer not to run the canonical PR themselves — for
-example when the Update Report or live QA is a barrier — may ask a
-Component or Family Maintainer to use the maintainer-staged route. The
-contributor's authored work is still credited, but the Update Report and
-live QA belong to the integrating Maintainer. Individual maintainers may
-publish their own rules for accepting such requests.
-
-A merge into a staging branch or fork is not acceptance into Hotaru. The
-integrating Maintainer must personally review, understand, explain, modify,
-test, and debug every change in the consolidated PR. Original contributors
-remain credited and accountable for their authored work; the integrating
-Maintainer assumes additional responsibility for its design and integration.
-The final PR must link the staged contributions and identify their authors.
+| Standalone canonical PR | A complete, self-contained change submitted directly to `master` by its Contributor or Maintainer | The PR owner completes the Update Report and answers the live QA; the questioner assigned by the QA order above completes and keeps the QA record. |
+| Theme branch integration | Related contributions collected by the Project Maintainer or a Family Maintainer in a theme branch, then submitted as a consolidated canonical PR to `master` | The theme branch owner completes a consolidated Update Report and answers the live QA; the questioner assigned by the QA order above completes and keeps the QA record. |
 
 The person who completes any required form must understand the code covered by
 that form and is responsible for the accuracy and technical judgment recorded
-in it. A family may also require records for intermediate contributions. These
-routes do not alter the rules against self-approval or the approval required
-for cross-family changes.
+in it. These routes do not alter the rules against self-approval or the
+approval required for cross-family changes.
+
+**Any merge whose target is a `theme:xxx` branch or `master` requires an
+Update Report and live QA.** The questioner is assigned by the QA order above.
+
+#### Personal working branches
+
+A personal working branch is any branch created by a Contributor or Maintainer
+for their own work. There are no naming requirements. A personal working branch
+may target either a `theme:xxx` branch or `master` directly.
+
+A contributor who cannot complete the Update Report or live QA may ask another
+Contributor or Maintainer to carry the work inside their own personal working
+branch. The original contributor's authored work is still credited; the person
+submitting the PR owns the Update Report and live QA for everything they
+include. The code standards that apply to all contributions are defined in the
+[Code standards](./CONTRIBUTING.md#code-standards) section of `CONTRIBUTING.md`.
+
+#### Theme branches
+
+Only the Project Maintainer and Family Maintainers may open theme branches.
+The Project Maintainer opens theme branches that span multiple families; a
+Family Maintainer opens theme branches within their family. Theme branch names
+must carry the prefix `theme:` (for example, `theme:0.9-update`). Theme
+branches may nest at any depth; nesting should match the actual development
+structure.
+
+Theme branches accept only two kinds of commits:
+
+- merge commits from personal working branch or nested theme PRs, with
+  authorship preserved — squash merges are forbidden; and
+- a single merge commit syncing from `master`, made once when the theme branch
+  is ready to merge, not continuously during development.
+
+Direct commits to a `theme:xxx` branch or to `master` are forbidden; all
+changes must arrive through a pull request. A direct commit discovered during
+record completeness review is a policy violation that blocks the merge until it
+is resolved by the theme branch owner.
+
+A merge of a personal working branch into a `theme:xxx` branch is not
+acceptance into Hotaru. The theme branch owner must personally review,
+understand, explain, modify, test, and debug every change they integrate. The
+final consolidated PR must link all staged contributions and identify their
+authors.
+
+#### Conducting a theme merge review
+
+The review of a theme merge targets three bounded objects rather than the full
+diff:
+
+1. **Record completeness.** `git log --first-parent --no-merges` on the theme
+   branch must produce no output. Each merge commit is traced to its PR and
+   Update Report. Any unaccounted-for commit blocks the merge until resolved.
+
+2. **Merge residuals.** `git show --remerge-diff <merge-commit>` on each merge
+   commit reveals what human conflict resolution added beyond the automatic
+   result. These are the only lines not covered by any prior review.
+
+3. **Integration seams.** Full CI on the final theme branch state. The live QA
+   session probes the owner on which entries interact and what semantic
+   conflicts were resolved during integration.
+
+The Update Report for a theme merge covers integration decisions and risks.
+Entry-level content is referenced by linking to constituent PR forms and is
+not rewritten.
+
+**Live QA sequence for a theme merge:**
+
+1. The theme branch owner submits the consolidated Update Report in advance.
+2. The questioner reads the report and independently reviews the diff.
+3. The questioner prepares questions privately.
+4. Live session: the questioner asks; the owner answers. The questioner may
+   probe any area, including depth of understanding beyond recorded doubts.
+5. The questioner keeps the record.
+
+For a theme that spans multiple families, the assigned questioner leads and
+keeps the record; affected Family or Component Maintainers co-question within
+their areas. Cross-family approval still applies.
+
+#### Hotfix path
+
+A change that must reach `master` outside the normal theme cycle — for example
+a critical security fix — may bypass theme staging. The Project Coordinator
+contacts the responsible Component Maintainer directly. The Component
+Maintainer conducts an expedited live QA using the standard form, assessing
+each affected module individually. The merge decision follows the QA outcome.
 
 Printable source files and compiled PDFs for the Update Report and live QA are
 kept in [`governance/forms/`](./governance/forms/).

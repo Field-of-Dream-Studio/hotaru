@@ -4,7 +4,8 @@ use crate::url::UrlError;
 /// Contextual error returned by `App::insert` / `App::extend` (and by the
 /// `App::bind(constructor)` wrapper that funnels through `insert`). Carries
 /// the offending route identity so a large blueprint can name which item
-/// failed; `batch_index` is populated only on the `extend` path.
+/// failed; `batch_index` is populated only on the `extend` path. 
+/// This is only for binding AccessPoints. Not for binding ports 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BindError {
     route_name: String,
