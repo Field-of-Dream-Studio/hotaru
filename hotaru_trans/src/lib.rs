@@ -1,10 +1,16 @@
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
-// Procedural macros for Hotaru framework
-// Entry points will be moved here from hotaru_trans
+// Procedural macros for Hotaru framework.
+pub(crate) mod ap;
 pub(crate) mod call;
+#[allow(dead_code)]
+pub(crate) mod config;
 pub(crate) mod middleware;
-pub(crate) mod url;
+// `mod url` is the pre-cutover implementation. Stage 10.1 switched the six
+// proc-macro entrypoints to `ap::*`. The old module stays in the source tree
+// for one stage as rollback insurance; Stage 11 deletes it. Uncomment to
+// re-enable temporarily.
+// pub(crate) mod url;
 
 pub(crate) mod helper;
 pub(crate) mod outer_attr;
@@ -23,33 +29,33 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "trans")] {
         #[proc_macro]
         pub fn endpoint(input: TokenStream) -> TokenStream {
-            url::endpoint_trans(input)
+            ap::Endpoint::from_trans_input(input)
         }
 
         #[proc_macro]
         pub fn outpoint(input: TokenStream) -> TokenStream {
-            url::outpoint_trans(input)
+            ap::Outpoint::from_trans_input(input)
         }
     } else if #[cfg(feature = "attr")] {
         #[proc_macro_attribute]
         pub fn endpoint(attr: TokenStream, input: TokenStream) -> TokenStream {
-            url::endpoint_attr(attr, input)
+            ap::Endpoint::from_attr_input(attr, input)
         }
 
         #[proc_macro_attribute]
         pub fn outpoint(attr: TokenStream, input: TokenStream) -> TokenStream {
-            url::outpoint_attr(attr, input)
+            ap::Outpoint::from_attr_input(attr, input)
         }
     } else {
         // default: semi-trans
         #[proc_macro_attribute]
         pub fn endpoint(_attr: TokenStream, input: TokenStream) -> TokenStream {
-            url::endpoint_semi_trans(input)
+            ap::Endpoint::from_semi_trans_input(input)
         }
 
         #[proc_macro_attribute]
         pub fn outpoint(_attr: TokenStream, input: TokenStream) -> TokenStream {
-            url::outpoint_semi_trans(input)
+            ap::Outpoint::from_semi_trans_input(input)
         }
     }
 }
@@ -116,6 +122,27 @@ pub fn run_server_no_block_until(input: TokenStream) -> TokenStream {
     )
     .parse()
     .expect("run_server_no_block_until! expansion")
+}
+
+/// `mw_chain!` — parse a middleware chain into a `MWChain` value.
+#[proc_macro]
+pub fn mw_chain(input: TokenStream) -> TokenStream {
+    match middleware::parse_mw_chain(&mut input.into_iter().peekable()) {
+        Ok(ts) => ts,
+        Err(err) => err,
+    }
+}
+
+/// `params!([value, ...])` — build a non-cloneable `Params` value.
+#[proc_macro]
+pub fn params(input: TokenStream) -> TokenStream {
+    config::parse_and_expand(input, config::Cloneable::No)
+}
+
+/// `params_clone!([value, ...])` — build a cloneable `ParamsClone` value.
+#[proc_macro]
+pub fn params_clone(input: TokenStream) -> TokenStream {
+    config::parse_and_expand(input, config::Cloneable::Yes)
 }
 
 // Splits `input` at the first top-level comma. Used by the two `_until`
