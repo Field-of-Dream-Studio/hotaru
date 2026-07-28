@@ -27,4 +27,7 @@ fn main() {
     let cloned = params.clone();
     assert_eq!(cloned.get::<SharedConfig>().unwrap().retries, 2);
     assert_eq!(cloned.get::<String>().unwrap(), "shared");
+    
+    // issue17
+    let issue17 = params!([std::collections::HashMap::<u32, String>::new()]);
 }
