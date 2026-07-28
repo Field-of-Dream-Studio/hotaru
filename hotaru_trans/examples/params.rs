@@ -29,5 +29,5 @@ fn main() {
     assert_eq!(cloned.get::<String>().unwrap(), "shared");
     
     // issue17
-    let issue17 = params!([std::collections::HashMap::<u32, String>::new()]);
+    let issue17 = params!([std::collections::HashMap::<fn(u32) -> Option<u64>, String>::new()]);
 }

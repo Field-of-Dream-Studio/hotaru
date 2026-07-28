@@ -1,6 +1,6 @@
 use core::iter::Peekable;
 
-use proc_macro::{Delimiter, Span, TokenStream, TokenTree};
+use proc_macro::{Delimiter, Spacing, Span, TokenStream, TokenTree};
 
 use crate::generate_compile_error;
 
@@ -22,7 +22,6 @@ impl Config {
     }
 }
 
-// TODO: also consider the edge case: "->"
 fn split_config_entries<T: AsRef<str>>(
     tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
     error: T,
@@ -33,9 +32,15 @@ fn split_config_entries<T: AsRef<str>>(
             let mut current = TokenStream::new();
             let mut inside_tokens = group.stream().into_iter().peekable();
             let mut angle_depth: usize = 0;
+            let mut is_prev_minus: bool = false;
             loop {
                 match inside_tokens.next() {
+                    Some(TokenTree::Punct(punct)) if punct.as_char() == '-' && punct.spacing() == Spacing::Joint => {
+                        is_prev_minus = true;
+                        current.extend(core::iter::once(punct));
+                    }
                     Some(TokenTree::Punct(punct)) if punct.as_char() == '<' => {
+                        is_prev_minus = false;
                         match inside_tokens.peek() {
                             Some(TokenTree::Punct(p)) if p.as_char() == '=' => {},
                             _ => angle_depth += 1,
@@ -43,20 +48,29 @@ fn split_config_entries<T: AsRef<str>>(
                         current.extend(core::iter::once(punct))
                     }
                     Some(TokenTree::Punct(punct)) if punct.as_char() == '>' => {
-                        match inside_tokens.peek() {
-                            Some(TokenTree::Punct(p)) if p.as_char() == '=' => {},
-                            _ => angle_depth -= 1,
+                        if is_prev_minus {
+                            is_prev_minus = false;
+                        }
+                        else {
+                            match inside_tokens.peek() {
+                                Some(TokenTree::Punct(p)) if p.as_char() == '=' => {},
+                                _ => angle_depth -= 1,
+                            }
                         }
                         current.extend(core::iter::once(punct))
                     }
                     Some(TokenTree::Punct(punct)) if punct.as_char() == ',' && angle_depth == 0 => {
+                        is_prev_minus = false;
                         if current.is_empty() {
                             return Err(generate_compile_error(punct.span(), error.as_ref()));
                         }
                         array.push(current);
                         current = TokenStream::new();
                     }
-                    Some(token) => current.extend(core::iter::once(token)),
+                    Some(token) => {
+                        is_prev_minus = false;
+                        current.extend(core::iter::once(token))
+                    }
                     None => {
                         if !current.is_empty() {
                             array.push(current);
