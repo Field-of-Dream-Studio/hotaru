@@ -16,7 +16,7 @@ use crate::{
 };
 
 use super::{
-    node::{PartialState, StepName, UrlNode},
+    node::{PartialState, StepName, UrlNode, WalkCursor},
     parser::parse,
 };
 
@@ -69,43 +69,18 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
     ///
     /// If the iterator is exhausted on entry the root endpoint is returned.
     fn walk<'a>(
-        self: Arc<Self>,
-        mut path: Iter<'a, &str>,
+      self: Arc<Self>,
+     path: Iter<'a, &str>,
     ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
-        let this_segment = match path.next() {
-            Some(s) => *s,
-            None => {
-                let endpoint = self.endpoint.read().clone();
-                return Box::pin(async move { endpoint });
-            }
-        };
-
-        Box::pin(async move {
-            let mut state = PartialState::NotStart;
-
-            while !state.is_end() {
-                let (matched_child, next_state) = self.children.match_step(this_segment, state);
-                state = next_state;
-
-                let Some(child) = matched_child else {
-                    continue;
-                };
-
-                if path.len() >= 1 && !child.path().is_any_path() {
-                    if let Some(result) = child
-                        .clone()
-                        .walk(path.clone(), PartialState::NotStart)
-                        .await
-                    {
-                        return Some(result);
-                    }
-                } else {
-                    return Some(child);
-                }
-            }
-
-            None
-        })
+      let segments: Vec<&str> = path.cloned().collect();
+       if segments.is_empty() {
+           let endpoint = self.endpoint.read().clone();
+           return Box::pin(async move { endpoint });
+       }
+       Box::pin(async move {
+           let mut cursor = WalkCursor::from_root(self);
+           cursor.find_next(&segments)
+       })
     }
 }
 

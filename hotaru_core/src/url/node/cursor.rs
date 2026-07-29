@@ -132,6 +132,16 @@ where
         None
     }
 
+    pub fn from_node_with_state(node: Arc<UrlNode<C, TS>>, state: PartialState) -> Self {
+        Self {
+            frames: vec![WalkFrame {
+                node: FrameNode::Node(node),
+                state,
+            }],
+        }
+    }
+
+
     /// Read-only view of the stack (for debug / breadcrumb building).
     pub fn frames(&self) -> &[WalkFrame<C, TS>] {
         &self.frames

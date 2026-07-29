@@ -182,38 +182,14 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
     /// If a future design introduces dynamic route creation or cyclic node graphs,
     /// depth validation should be revisited at that layer.
     pub fn walk<'a>(
-        self: Arc<Self>,
-        mut path: Iter<'a, &str>,
-        mut state: PartialState,
+      self: Arc<Self>,
+       path: Iter<'a, &str>,
+       state: PartialState,
     ) -> MaybeSendBoxFuture<'a, Option<Arc<Self>>> {
-        let this_segment = match path.next() {
-            Some(segment) => *segment,
-            None => return Box::pin(async move { Some(self) }),
-        };
-
-        Box::pin(async move {
-            while !state.is_end() {
-                let (matched_child, next_state) = self.children.match_step(this_segment, state);
-                state = next_state;
-
-                let Some(child) = matched_child else {
-                    continue;
-                };
-
-                if path.len() >= 1 && !child.path().is_any_path() {
-                    if let Some(result) = child
-                        .clone()
-                        .walk(path.clone(), PartialState::NotStart)
-                        .await
-                    {
-                        return Some(result);
-                    }
-                } else {
-                    return Some(child);
-                }
-            }
-
-            None
+       let segments: Vec<&str> = path.cloned().collect();
+       Box::pin(async move {
+            let mut cursor = WalkCursor::from_node_with_state(self, state);
+            cursor.find_next(&segments)
         })
     }
 
