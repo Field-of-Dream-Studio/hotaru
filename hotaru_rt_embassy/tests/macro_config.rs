@@ -13,6 +13,11 @@ hotaru_rt_embassy::define_runtime_worker_pool!(
 
 fn assert_runtime<Rt: hotaru_rt_embassy::__private::hotaru_core::app::runtime::RuntimeSpec>() {}
 
+static STORAGE: hotaru_rt_embassy::EmbassyRuntimeStorage<
+    4,
+    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+> = hotaru_rt_embassy::EmbassyRuntimeStorage::new();
+
 #[test]
 fn generated_runtime_uses_configured_capacities() {
     assert_runtime::<TestRuntime>();
@@ -25,4 +30,9 @@ fn generated_runtime_accepts_custom_raw_mutex() {
     assert_runtime::<CustomRawMutexRuntime>();
     assert_eq!(CustomRawMutexRuntime::WORKER_COUNT, 1);
     assert_eq!(CustomRawMutexRuntime::JOB_QUEUE_CAPACITY, 2);
+}
+
+#[test]
+fn runtime_storage_owns_state_and_queue_together() {
+    let _ = &STORAGE;
 }

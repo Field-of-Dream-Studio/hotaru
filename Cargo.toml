@@ -4,6 +4,7 @@ members = [
     "hotaru_core",
     "hotaru_rt_tokio",
     "hotaru_rt_embassy",
+    "hotaru_rt_embassy/tests/downstream_smoke",
     "hotaru_io_tokio",
     "hotaru_io_futures",
     "hotaru_io_embedded",

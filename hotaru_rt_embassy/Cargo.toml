@@ -36,3 +36,13 @@ spawn_local = ["hotaru_core/spawn_local"]
 # `spawn_local` refinements: atomic/spin lock backend or local Rc/RefCell internals.
 spawn_local_atomic = ["spawn_local", "hotaru_core/spawn_local_atomic"]
 spawn_local_no_atomic = ["spawn_local", "hotaru_core/spawn_local_no_atomic"]
+
+[[example]]
+name = "runtime_tutorial"
+path = "examples/runtime_tutorial.rs"
+required-features = ["std"]
+
+[[example]]
+name = "app_tutorial"
+path = "examples/app_tutorial.rs"
+required-features = ["std"]
