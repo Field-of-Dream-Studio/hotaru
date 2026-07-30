@@ -11,7 +11,6 @@ categories = ["development-tools::procedural-macro-helpers", "web-programming"]
 keywords = ["hotaru", "macros", "proc-macro", "web-framework", "dsl"]
 
 [dependencies]
-hotaru_lib = { path = "../hotaru_lib", version = "=0.8.3" }
 hotaru_core = { path = "../hotaru_core", version = "=0.8.4" }
 cfg-if = "1.0" 
 ctor = { version = "0.4.0", optional = true }
@@ -21,12 +20,13 @@ proc-macro2 = "1"
 hotaru_http = { path = "../hotaru_http", version = "=0.8.4" }
 
 [features]
-default = ["trans"]
-external-ctor = ["ctor"] 
-trans = [] 
-semi-trans = [] 
-attr = [] 
-facade = [] 
+default = ["trans", "auto-reg"]
+external-ctor = ["ctor"]
+trans = []
+semi-trans = []
+attr = []
+facade = []
+auto-reg = []
 
 [lib]
 proc-macro = true

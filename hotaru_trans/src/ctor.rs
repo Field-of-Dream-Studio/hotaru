@@ -1,51 +1,49 @@
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
-/// Generate constructor attribute for automatic registration
-/// By default uses built-in #[hotaru::hotaru_trans::ctor]
-/// Enable "external-ctor" feature to use #[ctor::ctor] from ctor crate instead
+#[cfg(not(feature = "external-ctor"))]
+use crate::helper::use_trans;
+
+/// Generate constructor attribute for automatic registration.
+///
+/// Two cases select from these attribute paths:
+/// - `external-ctor`      → `#[ctor::ctor]`
+/// - builtin (any facade) → `#[<use_trans>::ctor]`, i.e. either
+///                          `#[::hotaru_trans::ctor]` (direct) or
+///                          `#[::hotaru::hrt::ctor]` (facade).
 pub fn gen_ctor() -> TokenStream {
     #[cfg(feature = "external-ctor")]
     {
-        // Use external ctor crate: #[ctor::ctor]
-        let mut ctor_macro = TokenStream::new();
-        ctor_macro.extend(vec![
-            TokenTree::Punct(Punct::new('#', Spacing::Alone)),
-            TokenTree::Group(Group::new(Delimiter::Bracket, {
-                let mut attr = TokenStream::new();
-                attr.extend(vec![
-                    TokenTree::Ident(Ident::new("ctor", Span::call_site())),
-                    TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                    TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("ctor", Span::call_site())),
-                ]);
-                attr
-            })),
+        // #[ctor::ctor] — no leading `::`; the `ctor` crate is a direct
+        // dependency named `ctor` in the consumer's Cargo graph.
+        let mut inner = TokenStream::new();
+        inner.extend([
+            TokenTree::Ident(Ident::new("ctor", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("ctor", Span::call_site())),
         ]);
-        ctor_macro
+        wrap_hash_bracket(inner)
     }
 
     #[cfg(not(feature = "external-ctor"))]
     {
-        // Use built-in hotaru::::ctor
-        let mut ctor_macro = TokenStream::new();
-        ctor_macro.extend(vec![
-            TokenTree::Punct(Punct::new('#', Spacing::Alone)),
-            TokenTree::Group(Group::new(Delimiter::Bracket, {
-                let mut attr = TokenStream::new();
-                attr.extend(vec![
-                    TokenTree::Ident(Ident::new("hotaru", Span::call_site())),
-                    TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                    TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("hrt", Span::call_site())),
-                    TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                    TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("ctor", Span::call_site())),
-                ]);
-                attr
-            })),
-        ]);
-        ctor_macro
+        // #[<use_trans>::ctor] — use_trans emits the correct absolute path
+        // for the current facade/direct build.
+        wrap_hash_bracket(use_trans(&["ctor"]))
     }
+}
+
+/// Wrap `inner` in `#[ ... ]`.
+///
+/// Kept as a free helper because `gen_ctor` is a stateless factory —
+/// there is no receiver to hang it on.
+fn wrap_hash_bracket(inner: TokenStream) -> TokenStream {
+    let mut out = TokenStream::new();
+    out.extend([
+        TokenTree::Punct(Punct::new('#', Spacing::Alone)),
+        TokenTree::Group(Group::new(Delimiter::Bracket, inner)),
+    ]);
+    out
 }
 
 pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
