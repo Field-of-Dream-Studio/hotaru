@@ -137,6 +137,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Avoid an Xtensa LLVM register-spill crash while compiling `core`.
+      CARGO_PROFILE_DEV_DEBUG: 0
     steps:
       - uses: actions/checkout@v4
       - name: Set up Rust for Xtensa
