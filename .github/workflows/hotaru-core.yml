@@ -127,3 +127,26 @@ jobs:
             --target ${{ matrix.target }} \
             --no-default-features \
             --features "${{ matrix.features }}"
+
+  # ESP8266 uses Espressif's Xtensa Rust fork rather than a target distributed
+  # by stable rustup. This is a compile-only compatibility probe: it checks the
+  # public Embassy worker-pool macro from a downstream no_std crate, but does
+  # not claim HAL, timer-driver, Wi-Fi, linker, flashing, or hardware coverage.
+  esp8266-embassy:
+    name: ESP8266 / Embassy downstream compile probe
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust for Xtensa
+        uses: esp-rs/xtensa-toolchain@v1.7.0
+        with:
+          default: true
+          ldproxy: false
+      - name: Check hotaru_rt_embassy for ESP8266
+        run: |
+          cargo +esp check \
+            -Zbuild-std=core,alloc \
+            -p hotaru_rt_embassy_downstream_smoke \
+            --target xtensa-esp8266-none-elf
