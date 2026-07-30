@@ -1,6 +1,6 @@
 use core::iter::Peekable;
 
-use proc_macro::{Delimiter, Spacing, Span, TokenStream, TokenTree};
+use proc_macro::{TokenStream, TokenTree};
 
 use crate::helper::expect_array_consume;
 
