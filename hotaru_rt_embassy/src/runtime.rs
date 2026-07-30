@@ -17,68 +17,42 @@ use crate::mutex::EmbassyRawMutex;
 /// A boxed Hotaru job ready to be driven by an Embassy worker.
 pub type EmbassyJob = BoxFuture<'static, ()>;
 
-/// Global job queue storage for one configured Embassy runtime.
+/// Static state and job queue owned by one configured Embassy runtime.
 ///
-/// The capacity is a const generic so the macro-generated runtime can keep the
-/// queue static without baking a fixed size into this backend.
-pub struct EmbassyJobQueue<const N: usize, M = EmbassyRawMutex>
+/// Keeping both resources in one value prevents callers from accidentally
+/// pairing the initialization state of one runtime with another runtime's
+/// queue. The capacity remains a const generic so macro-generated runtimes can
+/// allocate all scheduler storage statically.
+pub struct EmbassyRuntimeStorage<const N: usize, M = EmbassyRawMutex>
 where
     M: RawMutex,
 {
-    inner: Channel<M, EmbassyJob, N>,
+    initialized: critical_section::Mutex<Cell<bool>>,
+    queue: Channel<M, EmbassyJob, N>,
 }
 
-// SAFETY: the queue is used as a global scheduler handoff. Under `spawn_send`
-// `Channel` is naturally `Sync` when the selected raw mutex is `Sync`; under
-// `spawn_local`, callers must use the single Embassy executor contract already
-// required by this backend.
+// SAFETY: under `spawn_local`, this storage is used only by tasks running on
+// one Embassy executor. It must not be shared with another executor, thread,
+// or interrupt context when `M` is a non-Sync mutex such as `NoopRawMutex`.
 #[cfg(feature = "spawn_local")]
-unsafe impl<const N: usize, M> Sync for EmbassyJobQueue<N, M> where M: RawMutex {}
+unsafe impl<const N: usize, M> Sync for EmbassyRuntimeStorage<N, M> where M: RawMutex {}
 
-impl<const N: usize, M> EmbassyJobQueue<N, M>
+impl<const N: usize, M> EmbassyRuntimeStorage<N, M>
 where
-    M: RawMutex,
+    M: RawMutex + 'static,
 {
-    /// Create an empty job queue.
+    /// Create uninitialized runtime storage with an empty job queue.
     pub const fn new() -> Self {
         Self {
-            inner: Channel::new(),
+            initialized: critical_section::Mutex::new(Cell::new(false)),
+            queue: Channel::new(),
         }
-    }
-
-    fn try_send(&'static self, job: EmbassyJob) -> Result<(), EmbassyJoinError> {
-        self.inner
-            .try_send(job)
-            .map_err(|_| EmbassyJoinError::QueueFull)
-    }
-
-    async fn receive(&'static self) -> EmbassyJob {
-        self.inner.receive().await
-    }
-}
-
-impl<const N: usize, M> Default for EmbassyJobQueue<N, M>
-where
-    M: RawMutex,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Initialization flag for one configured Embassy runtime.
-pub struct EmbassyRuntimeState(critical_section::Mutex<Cell<bool>>);
-
-impl EmbassyRuntimeState {
-    /// Create an uninitialized runtime state.
-    pub const fn new() -> Self {
-        Self(critical_section::Mutex::new(Cell::new(false)))
     }
 
     /// Mark the runtime as initialized, returning true only for the first call.
     pub fn initialize_once(&'static self) -> bool {
         critical_section::with(|cs| {
-            let initialized = self.0.borrow(cs);
+            let initialized = self.initialized.borrow(cs);
             let start_workers = !initialized.get();
             initialized.set(true);
             start_workers
@@ -87,11 +61,36 @@ impl EmbassyRuntimeState {
 
     /// Returns whether the runtime has already been initialized.
     pub fn is_initialized(&'static self) -> bool {
-        critical_section::with(|cs| self.0.borrow(cs).get())
+        critical_section::with(|cs| self.initialized.borrow(cs).get())
+    }
+
+    /// Run one worker for this runtime forever.
+    pub async fn run_queued_jobs(&'static self) {
+        loop {
+            let job = self.queue.receive().await;
+            job.await;
+        }
+    }
+
+    /// Queue a detached task on this runtime.
+    pub fn spawn_task<F>(&'static self, future: F) -> Result<(), EmbassyJoinError>
+    where
+        F: Future<Output = ()> + MaybeSend + 'static,
+    {
+        if !self.is_initialized() {
+            return Err(EmbassyJoinError::SpawnerNotInitialized);
+        }
+
+        self.queue
+            .try_send(Box::pin(future))
+            .map_err(|_| EmbassyJoinError::QueueFull)
     }
 }
 
-impl Default for EmbassyRuntimeState {
+impl<const N: usize, M> Default for EmbassyRuntimeStorage<N, M>
+where
+    M: RawMutex + 'static,
+{
     fn default() -> Self {
         Self::new()
     }
@@ -145,6 +144,7 @@ where
 }
 
 /// Awaitable handle returned by a configured Embassy runtime.
+/// The generic parameter M is currently not using an object.
 pub struct EmbassyJoinHandle<T, M = EmbassyRawMutex>
 where
     T: MaybeSend + 'static,
@@ -220,106 +220,53 @@ pub fn to_embassy_duration(duration: Duration) -> embassy_time::Duration {
         .unwrap_or(embassy_time::Duration::MAX)
 }
 
-/// Run one configured runtime worker forever.
-pub async fn run_queued_jobs<const N: usize, M>(queue: &'static EmbassyJobQueue<N, M>)
-where
-    M: RawMutex + 'static,
-{
-    loop {
-        let job = queue.receive().await;
-        job.await;
-    }
-}
-
-/// Queue a detached task onto one configured runtime.
-pub fn spawn_task<F, const N: usize>(
-    state: &'static EmbassyRuntimeState,
-    queue: &'static EmbassyJobQueue<N>,
-    future: F,
-) -> Result<(), EmbassyJoinError>
-where
-    F: Future<Output = ()> + MaybeSend + 'static,
-{
-    spawn_task_with_mutex(state, queue, future)
-}
-
-/// Queue a detached task onto one configured runtime with a custom raw mutex.
-pub fn spawn_task_with_mutex<F, const N: usize, M>(
-    state: &'static EmbassyRuntimeState,
-    queue: &'static EmbassyJobQueue<N, M>,
-    future: F,
-) -> Result<(), EmbassyJoinError>
-where
-    F: Future<Output = ()> + MaybeSend + 'static,
-    M: RawMutex + 'static,
-{
-    if !state.is_initialized() {
-        return Err(EmbassyJoinError::SpawnerNotInitialized);
-    }
-
-    queue.try_send(Box::pin(future))
-}
-
-/// Queue a task and return a join handle for its output.
-pub fn spawn_join<F, const N: usize>(
-    state: &'static EmbassyRuntimeState,
-    queue: &'static EmbassyJobQueue<N>,
-    future: F,
-) -> EmbassyJoinHandle<F::Output>
-where
-    F: Future + MaybeSend + 'static,
-    F::Output: MaybeSend + 'static,
-{
-    spawn_join_with_mutex(state, queue, future)
-}
-
-/// Queue a task onto one configured runtime with a custom raw mutex.
 #[cfg(feature = "spawn_send")]
-pub fn spawn_join_with_mutex<F, const N: usize, M>(
-    state: &'static EmbassyRuntimeState,
-    queue: &'static EmbassyJobQueue<N, M>,
-    future: F,
-) -> EmbassyJoinHandle<F::Output, M>
+impl<const N: usize, M> EmbassyRuntimeStorage<N, M>
 where
-    F: Future + MaybeSend + 'static,
-    F::Output: MaybeSend + 'static,
     M: RawMutex + Send + Sync + 'static,
 {
-    let signal = Arc::new(Signal::<M, F::Output>::new());
-    let task_signal = Arc::clone(&signal);
-    let task = async move {
-        let output = future.await;
-        task_signal.signal(output);
-    };
+    /// Queue a task and return a join handle for its output.
+    pub fn spawn_join<F>(&'static self, future: F) -> EmbassyJoinHandle<F::Output, M>
+    where
+        F: Future + MaybeSend + 'static,
+        F::Output: MaybeSend + 'static,
+    {
+        let signal = Arc::new(Signal::<M, F::Output>::new());
+        let task_signal = Arc::clone(&signal);
+        let task = async move {
+            let output = future.await;
+            task_signal.signal(output);
+        };
 
-    match spawn_task_with_mutex(state, queue, task) {
-        Ok(()) => EmbassyJoinHandle::waiting(signal),
-        Err(error) => EmbassyJoinHandle::failed(error),
+        match self.spawn_task(task) {
+            Ok(()) => EmbassyJoinHandle::waiting(signal),
+            Err(error) => EmbassyJoinHandle::failed(error),
+        }
     }
 }
 
-/// Queue a task onto one configured runtime with a custom raw mutex.
 #[cfg(feature = "spawn_local")]
-pub fn spawn_join_with_mutex<F, const N: usize, M>(
-    state: &'static EmbassyRuntimeState,
-    queue: &'static EmbassyJobQueue<N, M>,
-    future: F,
-) -> EmbassyJoinHandle<F::Output, M>
+impl<const N: usize, M> EmbassyRuntimeStorage<N, M>
 where
-    F: Future + MaybeSend + 'static,
-    F::Output: MaybeSend + 'static,
     M: RawMutex + 'static,
 {
-    let signal = Arc::new(Signal::<M, F::Output>::new());
-    let task_signal = Arc::clone(&signal);
-    let task = async move {
-        let output = future.await;
-        task_signal.signal(output);
-    };
+    /// Queue a task and return a join handle for its output.
+    pub fn spawn_join<F>(&'static self, future: F) -> EmbassyJoinHandle<F::Output, M>
+    where
+        F: Future + MaybeSend + 'static,
+        F::Output: MaybeSend + 'static,
+    {
+        let signal = Arc::new(Signal::<M, F::Output>::new());
+        let task_signal = Arc::clone(&signal);
+        let task = async move {
+            let output = future.await;
+            task_signal.signal(output);
+        };
 
-    match spawn_task_with_mutex(state, queue, task) {
-        Ok(()) => EmbassyJoinHandle::waiting(signal),
-        Err(error) => EmbassyJoinHandle::failed(error),
+        match self.spawn_task(task) {
+            Ok(()) => EmbassyJoinHandle::waiting(signal),
+            Err(error) => EmbassyJoinHandle::failed(error),
+        }
     }
 }
 
@@ -339,9 +286,10 @@ where
 
 /// Define a configured Embassy-backed Hotaru runtime.
 ///
-/// Hotaru's runtime trait schedules through static methods, so the Embassy job
-/// queue is intentionally global for each generated runtime type. All fixed
-/// capacities are supplied by the macro caller:
+/// Hotaru's runtime trait schedules through static methods, so one combined
+/// runtime storage value is intentionally global for each generated runtime
+/// type. The value keeps initialization state and its job queue together. All
+/// fixed capacities are supplied by the macro caller:
 ///
 /// ```ignore
 /// hotaru_rt_embassy::define_runtime_worker_pool!(
@@ -441,17 +389,17 @@ macro_rules! define_runtime_worker_pool {
                 );
             };
 
-            static RUNTIME_STATE: $crate::__private::EmbassyRuntimeState =
-                $crate::__private::EmbassyRuntimeState::new();
-            static JOB_QUEUE: $crate::__private::EmbassyJobQueue<JOB_QUEUE_CAPACITY, RawMutex> =
-                $crate::__private::EmbassyJobQueue::new();
+            static RUNTIME: $crate::__private::EmbassyRuntimeStorage<
+                JOB_QUEUE_CAPACITY,
+                RawMutex,
+            > = $crate::__private::EmbassyRuntimeStorage::new();
 
             #[$crate::__private::embassy_executor::task(
                 pool_size = WORKER_COUNT,
                 embassy_executor = $crate::__private::embassy_executor,
             )]
             async fn hotaru_job_worker() {
-                $crate::__private::run_queued_jobs(&JOB_QUEUE).await;
+                RUNTIME.run_queued_jobs().await;
             }
 
             impl $runtime {
@@ -465,7 +413,7 @@ macro_rules! define_runtime_worker_pool {
                 /// Call this once from the Embassy entry task before using Hotaru APIs
                 /// that spawn tasks.
                 pub fn init(spawner: $crate::__private::embassy_executor::Spawner) {
-                    if RUNTIME_STATE.initialize_once() {
+                    if RUNTIME.initialize_once() {
                         for _ in 0..WORKER_COUNT {
                             spawner.spawn(
                                 hotaru_job_worker()
@@ -477,7 +425,7 @@ macro_rules! define_runtime_worker_pool {
 
                 /// Returns whether this generated runtime has been initialized.
                 pub fn is_initialized() -> bool {
-                    RUNTIME_STATE.is_initialized()
+                    RUNTIME.is_initialized()
                 }
             }
 
@@ -493,7 +441,8 @@ macro_rules! define_runtime_worker_pool {
                         + $crate::__private::hotaru_core::marker::MaybeSend
                         + 'static,
                 {
-                    $crate::__private::spawn_task_with_mutex(&RUNTIME_STATE, &JOB_QUEUE, future)
+                    RUNTIME
+                        .spawn_task(future)
                         .expect("failed to spawn detached embassy task");
                 }
 
@@ -504,7 +453,7 @@ macro_rules! define_runtime_worker_pool {
                         + 'static,
                     F::Output: $crate::__private::hotaru_core::marker::MaybeSend + 'static,
                 {
-                    $crate::__private::spawn_join_with_mutex(&RUNTIME_STATE, &JOB_QUEUE, future)
+                    RUNTIME.spawn_join(future)
                 }
 
                 type Instant = $crate::__private::embassy_time::Instant;
