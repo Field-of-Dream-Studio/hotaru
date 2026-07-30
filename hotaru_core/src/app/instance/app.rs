@@ -3,17 +3,14 @@
 use core::marker::PhantomData;
 use core::time::Duration;
 
-use akari::extensions::ParamsClone;
-
+use crate::app::blueprint::{Blueprint, BlueprintError};
 use crate::app::common::{AppInUse, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};
 use crate::app::registry::ProtocolRegistryKind;
 use crate::app::runtime::RuntimeSpec;
 use crate::connection::TransportSpec;
 use crate::executable::def::{AccessPointDef, BindError, FinalHandlerDef};
-use crate::executable::ExecutableBinding;
-use crate::prelude::{Arc, String, Vec};
+use crate::prelude::Arc;
 use crate::protocol::Protocol;
-use crate::url::{PathPattern, UrlError, node::StepName};
 use crate::{debug_log, debug_warn};
 
 use super::{flavour::Accepts, target::AppTarget};
@@ -46,11 +43,6 @@ impl<TS: TransportSpec, Rt: RuntimeSpec, T: AppTarget> App<TS, Rt, T> {
     /// Returns the configured maximum connection lifetime setting.
     pub fn get_max_connection_time(self: &Arc<Self>) -> TimeoutSetting {
         self.config.max_connection_time()
-    }
-
-    /// Returns the configured maximum request processing time in seconds.
-    pub fn get_max_frame_process_time(self: &Arc<Self>) -> usize {
-        self.config.max_frame_process_time()
     }
 
     /// Returns the shared runtime config store.
@@ -88,21 +80,47 @@ impl<TS: TransportSpec, Rt: RuntimeSpec, T: AppTarget> App<TS, Rt, T> {
         self.runtime.get_static::<V>(key).unwrap_or_default()
     }
 
-    /// Bind one route definition accepted by this app role.
+    /// Insert one already-built route definition accepted by this app role.
+    pub fn insert<P, H>(self: &Arc<Self>, def: AccessPointDef<P, H>) -> Result<(), BindError>
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        H: FinalHandlerDef<P>,
+        T: Accepts<H>,
+    {
+        self.registry.register(&def)
+    }
+
+    /// Calls the generated constructor exactly once and registers its result.
     pub fn bind<P, H>(
         self: &Arc<Self>,
-        def: AccessPointDef<P, H>,
+        constructor: fn() -> AccessPointDef<P, H>,
     ) -> Result<(), BindError>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
         H: FinalHandlerDef<P>,
         T: Accepts<H>,
     {
-        self.registry.compile_and_register(def)
+        self.insert(constructor())
     }
 
-    /// Bind a homogeneous batch, stopping at the first error.
-    pub fn bind_all<P, H, I>(self: &Arc<Self>, defs: I) -> Result<(), BindError>
+    /// Applies retained routes to this App's existing protocol entries.
+    /// It never creates a protocol entry.
+    pub fn apply(self: &Arc<Self>, blueprint: &Blueprint<TS, T>) -> Result<(), BlueprintError> {
+        // Full preflight prevents missing-protocol partial mutation.
+        for group in blueprint.groups() {
+            if !group.has_entry(&self.registry) {
+                return Err(BlueprintError::ProtocolNotFound(group.protocol_name()));
+            }
+        }
+        for group in blueprint.groups() {
+            group.register_into(&self.registry)?;
+        }
+        Ok(())
+    }
+
+    /// Insert a homogeneous batch of already-built definitions, stopping at
+    /// the first error.
+    pub fn extend<P, H, I>(self: &Arc<Self>, defs: I) -> Result<(), BindError>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
         H: FinalHandlerDef<P>,
@@ -111,62 +129,20 @@ impl<TS: TransportSpec, Rt: RuntimeSpec, T: AppTarget> App<TS, Rt, T> {
     {
         for (index, def) in defs.into_iter().enumerate() {
             self.registry
-                .compile_and_register(def)
+                .register(&def)
                 .map_err(|error| error.with_batch_index(index))?;
         }
         Ok(())
     }
 
-    /// Registers a literal URL without applying the pattern grammar.
-    pub fn lit_url<P, U, N>(
-        self: &Arc<Self>,
-        url: U,
-        name: N,
-        mut executable: ExecutableBinding<P::Context>,
-        config: ParamsClone,
-    ) -> Result<(), UrlError>
-    where
-        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
-        U: AsRef<str>,
-        N: Into<String>,
-    {
-        if executable.has_no_middlewares() {
-            executable.set_middlewares(self.registry.get_protocol_middlewares::<P>());
-        }
-
-        let path: Vec<PathPattern> = P::lit_parser(url.as_ref())
-            .into_iter()
-            .map(PathPattern::literal_path)
-            .collect();
-
-        self.registry
-            .register::<P, _>(name, path, StepName::default(), executable, config)?;
-        Ok(())
-    }
-
-    /// Registers a URL using the protocol's pattern grammar.
-    pub fn url<P, U, N>(
-        self: &Arc<Self>,
-        url: U,
-        name: N,
-        mut executable: ExecutableBinding<P::Context>,
-        config: ParamsClone,
-    ) -> Result<(), UrlError>
-    where
-        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
-        U: AsRef<str>,
-        N: Into<String>,
-    {
-        if executable.has_no_middlewares() {
-            executable.set_middlewares(self.registry.get_protocol_middlewares::<P>());
-        }
-
-        let tokens = P::tokenize_url(url.as_ref())?;
-        let (path, step_names) = crate::url::tokens_to_patterns(&tokens)?;
-        self.registry
-            .register::<P, _>(name, path, step_names.into(), executable, config)?;
-        Ok(())
-    }
+    // `App::lit_url` and `App::url` (raw `ExecutableBinding` registration)
+    // are intentionally removed in the Stage-5 AP registration cleanup. The
+    // canonical path is `App::insert` / `App::extend` (or the
+    // `App::bind(constructor)` wrapper) with an `AccessPointDef`, which
+    // funnels through `ProtocolRegistryKind::register` ->
+    // `ProtocolEntry::register`. This knowingly breaks the old trans `url`
+    // pipeline until the Stage-10 cutover; do not re-add a raw registry
+    // wrapper to keep them alive.
 
     /// Left-biased merge of two exclusively owned apps with the same target.
     pub fn try_combine(

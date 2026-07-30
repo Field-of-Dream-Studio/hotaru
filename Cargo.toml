@@ -20,14 +20,14 @@ members = [
     # "h2per",
     # "hotaru_grpc",
 
-    # "examples/multi_protocol_example",
+    "examples/multi_protocol_example",
     "examples/example_hotaru",
+    "examples/example_hotaru_2",
     "examples/combine_example",
     "examples/api_registration_example",
-    # "examples/example_hotaru_2",
+    "examples/tutorial_examples",
+    "hotaru_style_guide",
     # "examples/hyper_hotaru_example",
-    # "hotaru_style_guide",
-    # "examples/tutorial_examples"
 ]
 
 # `hotaru_io_embedded` now defaults to the `embedded`/`no_std` flavour, which

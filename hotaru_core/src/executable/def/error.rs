@@ -1,9 +1,11 @@
 use crate::prelude::String;
 use crate::url::UrlError;
 
-/// Contextual error returned by `App::bind` / `bind_all`. Carries the
-/// offending route identity so a large blueprint can name which item
-/// failed.
+/// Contextual error returned by `App::insert` / `App::extend` (and by the
+/// `App::bind(constructor)` wrapper that funnels through `insert`). Carries
+/// the offending route identity so a large blueprint can name which item
+/// failed; `batch_index` is populated only on the `extend` path. 
+/// This is only for binding AccessPoints. Not for binding ports 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BindError {
     route_name: String,
@@ -31,10 +33,18 @@ impl BindError {
         self
     }
 
-    pub fn route_name(&self) -> &str { &self.route_name }
-    pub fn route_url(&self) -> &str { &self.route_url }
-    pub fn source_error(&self) -> &UrlError { &self.source }
-    pub fn batch_index(&self) -> Option<usize> { self.batch_index }
+    pub fn route_name(&self) -> &str {
+        &self.route_name
+    }
+    pub fn route_url(&self) -> &str {
+        &self.route_url
+    }
+    pub fn source_error(&self) -> &UrlError {
+        &self.source
+    }
+    pub fn batch_index(&self) -> Option<usize> {
+        self.batch_index
+    }
 }
 
 impl core::fmt::Display for BindError {
@@ -58,4 +68,4 @@ impl core::error::Error for BindError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         Some(&self.source)
     }
-} 
+}
