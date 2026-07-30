@@ -20,12 +20,13 @@ proc-macro2 = "1"
 hotaru_http = { path = "../hotaru_http", version = "=0.8.4" }
 
 [features]
-default = ["trans"]
-external-ctor = ["ctor"] 
-trans = [] 
-semi-trans = [] 
-attr = [] 
-facade = [] 
+default = ["trans", "auto-reg"]
+external-ctor = ["ctor"]
+trans = []
+semi-trans = []
+attr = []
+facade = []
+auto-reg = []
 
 [lib]
 proc-macro = true

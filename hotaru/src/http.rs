@@ -15,6 +15,9 @@ pub use hotaru_http::{
     TlsTransport,
 };
 
+// Protocol-level error surfaced by HTTP handlers.
+pub use hotaru_http::HttpError;
+
 // Request / response / context
 pub use hotaru_http::context::HttpReqCtx;
 pub use hotaru_http::context::{Executable, HttpContext};

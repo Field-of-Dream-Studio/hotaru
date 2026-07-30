@@ -23,10 +23,14 @@ check_gate() {
     fi
 }
 
-# Stage 6 gates only. Stage 7 extends this script with App/builder application
-# gates after those APIs exist.
 check_gate inbound_rejects_outpoint E0308
 check_gate outbound_rejects_endpoint E0308
 check_gate erased_trait_is_private E0603
 check_gate blueprint_has_no_build E0599
 check_gate configured_has_no_build E0599
+
+# Stage 7 gates: App/builder application refuses wrong-target and configured.
+check_gate server_builder_rejects_outbound E0308
+check_gate server_app_rejects_outbound E0308
+check_gate server_bind_rejects_outpoint E0308
+check_gate built_app_rejects_configured E0308

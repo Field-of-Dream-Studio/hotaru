@@ -90,33 +90,39 @@ We welcome contributions in the following areas:
 
 ## Governance and PR requirements
 
-All changes that reach the canonical repository go through Hotaru's governance
-process — an Update Report and a live QA, with AI-collaboration tiers declared
-per component. Being small or routine does not exempt a change; it changes only
-how much the report records and, usually, who owns the PR. See
-[GOVERNANCE.md](./GOVERNANCE.md) for the roles, PR routes, and tier definitions
-before opening a PR.
+Hotaru uses a two-tier branch system. See [GOVERNANCE.md](./GOVERNANCE.md) for
+the full rules, roles, and AI-collaboration tier definitions.
 
-**Report granularity.** Record one Update Report entry per non-trivial design
-unit — typically a function, struct, enum, trait, or impl that carries its own
-design decision — and justify both its design and why that design should be
-used. Mechanical one-step work may be grouped into a single entry: plain
-getters and setters, renames, re-exports, and similar obvious glue. If a
-function performs several independently meaningful operations, prefer splitting
-it into smaller single-purpose functions rather than writing one large entry;
-the per-unit report is intended to keep functions small and focused.
+**The rule is: any merge whose target is a `theme:xxx` branch or `master`
+requires an Update Report and live QA.** Everything else is your personal
+working branch — name it freely, no process required.
 
-**Easy contributions.** Small or routine PRs should normally use the
-maintainer-staged integration route: a Component or Family Maintainer other
-than the author integrates the change and owns the consolidated Update Report
-and live QA, while the contributor is still credited for authored work. This
-keeps trivial work inside governance without placing the full report-and-QA
-burden on the contributor. The rules against self-approval and the approval
-required for cross-family changes still apply.
+**Personal working branch → `theme:xxx` or `master`.** Submit a PR, complete
+the Update Report, and answer the live QA. One PR covers approximately ten
+changes at function or struct-definition granularity. If splitting still leaves
+CI passing, it must be split. Mechanical changes (renames, moves, formatting)
+must be in separate commits from semantic changes. To find out which theme
+branches are currently open, ask the Project Maintainer or the relevant Family
+Maintainer.
+
+**Theme merge.** When a `theme:xxx` branch is ready to merge into a parent
+theme or into `master`, the theme branch owner submits a consolidated Update
+Report and answers a live QA. The Update Report records one entry per
+non-trivial design unit — typically a function, struct, enum, trait, or impl
+that carries its own design decision — and justifies both its design and why
+that design was chosen. Mechanical work (plain getters and setters, renames,
+re-exports, and similar obvious glue) may be grouped into a single entry.
+
+**Can't complete the QA?** Ask another contributor or Maintainer to carry your
+changes in their own personal working branch. Your authorship is preserved;
+they own the Update Report and QA.
+
+**Self-approval and cross-family approval rules still apply.**
 
 ## Contribution Guidelines
 
-1. **Fork the repository** and create a feature branch
+1. **Fork the repository** and create a personal working branch; target an
+   open `theme:xxx` branch or `master` directly
 2. **Write clear commit messages** describing your changes
 3. **Add tests** for new functionality
 4. **Update documentation** if you change APIs
@@ -134,10 +140,26 @@ required for cross-family changes still apply.
 > should keep normal semver requirements unless there is a specific reason to
 > pin them.
 
-## Code Style
+## Code standards
+
+**Function size.** Keep functions small and single-purpose. If a function
+performs several independently meaningful operations, split it. Unusually long
+functions are a live QA focus area.
+
+**Coupling.** Eliminate coupling between independent changes wherever possible.
+If two changes must ship together because splitting would break the build, be
+prepared to explain in QA exactly why the coupling is unavoidable. Introducing
+a dependency between two changes to avoid splitting them is a code standard
+violation.
+
+**Commit separation.** Mechanical changes (renames, moves, formatting) must not
+be mixed with semantic changes in the same commit. Keep them in separate
+commits so reviewers can read semantic changes without noise.
+
+## Code style
 
 - Follow Rust naming conventions
-- Use `cargo fmt` for formatting
+- Use `cargo fmt` for formatting (on changed files only, not `--all`)
 - Run `cargo clippy` and fix warnings
 - Add doc comments (`///`) for public APIs
 - Write descriptive variable and function names
