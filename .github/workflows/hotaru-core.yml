@@ -146,6 +146,8 @@ jobs:
         uses: esp-rs/xtensa-toolchain@v1.7.0
         with:
           default: true
+          # Match the workspace MSRV and avoid newer Xtensa LLVM regressions.
+          version: "1.88.0"
           ldproxy: false
       - name: Check hotaru_rt_embassy for ESP8266
         run: |
