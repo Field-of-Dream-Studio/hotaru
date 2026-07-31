@@ -3,6 +3,7 @@
 use hotaru_core::extensions::{Params, ParamsClone};
 use hotaru_trans::{params, params_clone};
 
+
 struct RuntimeConfig {
     name: &'static str,
 }
@@ -27,4 +28,7 @@ fn main() {
     let cloned = params.clone();
     assert_eq!(cloned.get::<SharedConfig>().unwrap().retries, 2);
     assert_eq!(cloned.get::<String>().unwrap(), "shared");
+    
+    // issue17
+    let issue17 = params!([std::collections::HashMap::<fn(u32) -> Option<u64>, String>::new()]);
 }
