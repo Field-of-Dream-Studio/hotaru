@@ -26,6 +26,10 @@ members = [
     "examples/combine_example",
     "examples/api_registration_example",
     "examples/tutorial_examples",
+    # `examples/starter_*` each declare their own workspace so the mutually-
+    # exclusive `trans` / `semi-trans` / `attr` macro flavours don't unify
+    # into `trans` under Cargo's additive feature merge. Build them by
+    # `cd examples/starter_<flavour> && cargo run`.
     "hotaru_style_guide",
     # "examples/hyper_hotaru_example",
 ]

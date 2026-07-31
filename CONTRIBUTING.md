@@ -93,11 +93,11 @@ We welcome contributions in the following areas:
 Hotaru uses a two-tier branch system. See [GOVERNANCE.md](./GOVERNANCE.md) for
 the full rules, roles, and AI-collaboration tier definitions.
 
-**The rule is: any merge whose target is a `theme:xxx` branch or `master`
+**The rule is: any merge whose target is a `theme/xxx` branch or `master`
 requires an Update Report and live QA.** Everything else is your personal
 working branch — name it freely, no process required.
 
-**Personal working branch → `theme:xxx` or `master`.** Submit a PR, complete
+**Personal working branch → `theme/xxx` or `master`.** Submit a PR, complete
 the Update Report, and answer the live QA. One PR covers approximately ten
 changes at function or struct-definition granularity. If splitting still leaves
 CI passing, it must be split. Mechanical changes (renames, moves, formatting)
@@ -105,7 +105,7 @@ must be in separate commits from semantic changes. To find out which theme
 branches are currently open, ask the Project Maintainer or the relevant Family
 Maintainer.
 
-**Theme merge.** When a `theme:xxx` branch is ready to merge into a parent
+**Theme merge.** When a `theme/xxx` branch is ready to merge into a parent
 theme or into `master`, the theme branch owner submits a consolidated Update
 Report and answers a live QA. The Update Report records one entry per
 non-trivial design unit — typically a function, struct, enum, trait, or impl
@@ -122,7 +122,7 @@ they own the Update Report and QA.
 ## Contribution Guidelines
 
 1. **Fork the repository** and create a personal working branch; target an
-   open `theme:xxx` branch or `master` directly
+   open `theme/xxx` branch or `master` directly
 2. **Write clear commit messages** describing your changes
 3. **Add tests** for new functionality
 4. **Update documentation** if you change APIs

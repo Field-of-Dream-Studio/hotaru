@@ -1,0 +1,52 @@
+name: hotaru-trans
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: hotaru-trans-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  default:
+    name: default features
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check hotaru_trans default features
+        run: cargo check -p hotaru_trans
+
+  # The macro flavour features (`trans` / `semi-trans` / `attr`) are mutually
+  # exclusive at expansion time, but the crate's lib itself must compile for
+  # every valid single-flavour selection. Same for `auto-reg` on/off,
+  # `external-ctor`, and the `facade` re-export mode.
+  feature-matrix:
+    name: ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - trans
+          - semi-trans
+          - attr
+          - trans,auto-reg
+          - semi-trans,auto-reg
+          - attr,auto-reg
+          - trans,auto-reg,external-ctor
+          - trans,auto-reg,facade
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check hotaru_trans feature set
+        run: cargo check -p hotaru_trans --no-default-features --features "${{ matrix.features }}"

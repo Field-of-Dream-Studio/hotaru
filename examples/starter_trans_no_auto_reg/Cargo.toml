@@ -1,0 +1,10 @@
+[package]
+name = "starter_trans_no_auto_reg"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+hotaru = { path = "../../hotaru", version = "=0.8.4", default-features = false, features = ["trans", "http", "tokio", "full_regex", "template"] }

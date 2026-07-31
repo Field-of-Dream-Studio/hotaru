@@ -1,0 +1,12 @@
+[package]
+name = "starter_trans"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Each starter is its own workspace so cargo does not additively unify the
+# mutually-exclusive trans / semi-trans / attr features across the five.
+[workspace]
+
+[dependencies]
+hotaru = { path = "../../hotaru", version = "=0.8.4", default-features = false, features = ["trans", "auto-reg", "http", "tokio", "full_regex", "template"] }

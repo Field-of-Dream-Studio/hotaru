@@ -35,7 +35,7 @@ pub fn expect_array_consume<T: AsRef<str>>(
                 match inside_tokens.next() {
                     Some(TokenTree::Punct(punct)) if punct.as_char() == '-' && punct.spacing() == Spacing::Joint => {
                         is_prev_minus = true;
-                        current.extend(core::iter::once(punct));
+                        current.extend(core::iter::once(TokenTree::Punct(punct)));
                     }
                     Some(TokenTree::Punct(punct)) if punct.as_char() == '<' => {
                         is_prev_minus = false;
@@ -43,7 +43,7 @@ pub fn expect_array_consume<T: AsRef<str>>(
                             Some(TokenTree::Punct(p)) if p.as_char() == '=' => {},
                             _ => angle_depth += 1,
                         }
-                        current.extend(core::iter::once(punct))
+                        current.extend(core::iter::once(TokenTree::Punct(punct)))
                     }
                     Some(TokenTree::Punct(punct)) if punct.as_char() == '>' => {
                         if is_prev_minus {
@@ -55,7 +55,7 @@ pub fn expect_array_consume<T: AsRef<str>>(
                                 _ => angle_depth -= 1,
                             }
                         }
-                        current.extend(core::iter::once(punct))
+                        current.extend(core::iter::once(TokenTree::Punct(punct)))
                     }
                     Some(TokenTree::Punct(punct)) if punct.as_char() == ',' && angle_depth == 0 => {
                         is_prev_minus = false;

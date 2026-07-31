@@ -53,10 +53,10 @@ endpoint! {
     pub pattern <HTTP> {
         let id = req.pattern("id").unwrap();
         let app_name = req.pattern("app_name").unwrap();
-        json_response(object!({
+        akari_json!({
             id: id,
             app_name: app_name
-        }))
+        }) 
     }
 }
 
