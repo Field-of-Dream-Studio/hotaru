@@ -65,6 +65,9 @@ rsgithub.pub
 /programfiles
 starberry.toml
 
+# Local-only scratch / test scaffolding (e.g. compile-gate fixtures)
+ts/
+
 # Benchmark results
 bench_results/
 

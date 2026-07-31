@@ -65,14 +65,14 @@ that form and is responsible for the accuracy and technical judgment recorded
 in it. These routes do not alter the rules against self-approval or the
 approval required for cross-family changes.
 
-**Any merge whose target is a `theme:xxx` branch or `master` requires an
+**Any merge whose target is a `theme/xxx` branch or `master` requires an
 Update Report and live QA.** The questioner is assigned by the QA order above.
 
 #### Personal working branches
 
 A personal working branch is any branch created by a Contributor or Maintainer
 for their own work. There are no naming requirements. A personal working branch
-may target either a `theme:xxx` branch or `master` directly.
+may target either a `theme/xxx` branch or `master` directly.
 
 A contributor who cannot complete the Update Report or live QA may ask another
 Contributor or Maintainer to carry the work inside their own personal working
@@ -86,7 +86,7 @@ include. The code standards that apply to all contributions are defined in the
 Only the Project Maintainer and Family Maintainers may open theme branches.
 The Project Maintainer opens theme branches that span multiple families; a
 Family Maintainer opens theme branches within their family. Theme branch names
-must carry the prefix `theme:` (for example, `theme:0.9-update`). Theme
+must carry the prefix `theme/` (for example, `theme/0.9-update`). Theme
 branches may nest at any depth; nesting should match the actual development
 structure.
 
@@ -97,12 +97,12 @@ Theme branches accept only two kinds of commits:
 - a single merge commit syncing from `master`, made once when the theme branch
   is ready to merge, not continuously during development.
 
-Direct commits to a `theme:xxx` branch or to `master` are forbidden; all
+Direct commits to a `theme/xxx` branch or to `master` are forbidden; all
 changes must arrive through a pull request. A direct commit discovered during
 record completeness review is a policy violation that blocks the merge until it
 is resolved by the theme branch owner.
 
-A merge of a personal working branch into a `theme:xxx` branch is not
+A merge of a personal working branch into a `theme/xxx` branch is not
 acceptance into Hotaru. The theme branch owner must personally review,
 understand, explain, modify, test, and debug every change they integrate. The
 final consolidated PR must link all staged contributions and identify their
@@ -173,67 +173,11 @@ family, subject to these project-wide requirements:
    discussed at an internal meeting before approval.
 3. Family RFC rules may be stricter than these requirements, but not weaker.
 
-### Core framework
+### Component ownership
 
-Core contracts and the procedural-macro DSL.
-
-**Family Maintainer:** [@Redstone-D](https://github.com/Redstone-D)
-
-| Component | Files and directories | Component Maintainer |
-| --- | --- | --- |
-| Core contracts and semantics | `hotaru_core/**` except the URL paths below | [@Redstone-D](https://github.com/Redstone-D) |
-| DSL and procedural macros | `hotaru_trans/**` | [@Redstone-D](https://github.com/Redstone-D) |
-
-### Facade and tooling
-
-Routing, the public facade and feature surface, CLI tooling, templates, and
-shared user-facing utilities.
-
-**Family Maintainer:** [@JerrySu5379](https://github.com/JerrySu5379)
-
-| Component | Files and directories | Component Maintainer |
-| --- | --- | --- |
-| Routing and URL semantics | `hotaru_core/src/url.rs`, `hotaru_core/src/url/**` | [@JerrySu5379](https://github.com/JerrySu5379) |
-| Facade and public feature surface | `hotaru/src/lib.rs`, `hotaru/src/prelude.rs`, `hotaru/src/http.rs`, `hotaru/src/test.rs`, `hotaru/Cargo.toml`, `hotaru/readme.md` | [@Redstone-D](https://github.com/Redstone-D) |
-| CLI and project templates | `hotaru/src/main.rs`, `templates/**`, `programfiles/**`, `hotaru_style_guide/**` | [@Redstone-D](https://github.com/Redstone-D) |
-| Shared utilities | `hotaru_lib/**` | [@Redstone-D](https://github.com/Redstone-D) |
-
-### Protocol implementations
-
-Wire protocols, protocol-specific security, and standard middleware.
-
-**Family Maintainer:** [@Redstone-D](https://github.com/Redstone-D)
-
-| Component | Files and directories | Component Maintainer |
-| --- | --- | --- |
-| HTTP, TLS, and web middleware | `hotaru_http/**`, `hotaru_tls/**`, `htmstd/**`, `ahttpm/**` | [@Redstone-D](https://github.com/Redstone-D) |
-| MQTT client and broker | [`Field-of-Dream-Studio/hotaru_mqtt`](https://github.com/Field-of-Dream-Studio/hotaru_mqtt) | [@JerrySu5379](https://github.com/JerrySu5379) |
-| Experimental protocol integrations | `h2per/**`, `hotaru_grpc/**` | [@Redstone-D](https://github.com/Redstone-D), [@JerrySu5379](https://github.com/JerrySu5379) |
-
-The MQTT repository should maintain its own matching ownership rules.
-
-### Runtime implementations
-
-Runtime scheduling, spawning, and runtime-specific integration.
-
-**Family Maintainer:** [@JerrySu5379](https://github.com/JerrySu5379)
-
-| Component | Files and directories | Component Maintainer |
-| --- | --- | --- |
-| Tokio runtime | `hotaru_rt_tokio/**` | [@JerrySu5379](https://github.com/JerrySu5379) |
-| Embassy runtime | `hotaru_rt_embassy/**` | [@zkmaojack](https://github.com/zkmaojack) |
-
-### I/O implementations
-
-Adapters between Hotaru's transport contracts and concrete I/O ecosystems.
-
-**Family Maintainer:** [@JerrySu5379](https://github.com/JerrySu5379)
-
-| Component | Files and directories | Component Maintainer |
-| --- | --- | --- |
-| Tokio I/O | `hotaru_io_tokio/**` | [@JerrySu5379](https://github.com/JerrySu5379) |
-| Futures I/O | `hotaru_io_futures/**` | [@JerrySu5379](https://github.com/JerrySu5379) |
-| Embedded I/O | `hotaru_io_embedded/**` | [@zkmaojack](https://github.com/zkmaojack) |
+The per-family list of components, their file paths, and their Component
+Maintainers is maintained in [OWNERSHIP.md](./OWNERSHIP.md). Ownership changes
+are recorded there and do not require an amendment to this document.
 
 ## 3. AI declarations
 
@@ -261,25 +205,8 @@ contributors.
 
 Each Family Maintainer chooses and updates the declarations for components in
 their family. When scopes inside one component use different tiers, the more
-specific declaration applies.
-
-| Family | Component or scope | Tier |
-| --- | --- | --- |
-| Core framework | Core `app`, `connection`, `executable`, and `protocol` | **Author-Owned** |
-| Core framework | Remaining core contracts and semantics | **Human-Led** |
-| Core framework | DSL `endpoint`, `outpoint`, and `middleware` | **Author-Owned** |
-| Core framework | Remaining DSL and procedural macros | **Human-Led** |
-| Facade and tooling | Routing and URL semantics | **Author-Owned** |
-| Facade and tooling | Facade and public feature surface | **Co-Authored** |
-| Facade and tooling | CLI and project templates | **Co-Authored** |
-| Facade and tooling | Shared utilities | **Human-Led** |
-| Protocol implementations | HTTP, CORS, and session middleware | **Human-Led** |
-| Protocol implementations | TLS, remaining middleware, and `ahttpm` | **Co-Authored** |
-| Protocol implementations | MQTT client and general implementation | **Human-Led** |
-| Protocol implementations | MQTT broker and traits | **Co-Authored** |
-| Protocol implementations | Experimental protocol integrations | **Co-Authored** |
-| Runtime implementations | Tokio and Embassy runtimes | **Co-Authored** |
-| I/O implementations | Tokio, Futures, and embedded I/O | **Co-Authored** |
+specific declaration applies. The per-component tier assignments are recorded
+in [OWNERSHIP.md](./OWNERSHIP.md).
 
 ## 4. Eligibility and succession
 

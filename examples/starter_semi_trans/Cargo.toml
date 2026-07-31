@@ -1,0 +1,10 @@
+[package]
+name = "starter_semi_trans"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+hotaru = { path = "../../hotaru", version = "=0.8.4", default-features = false, features = ["semi-trans", "auto-reg", "http", "tokio", "full_regex", "template"] }
