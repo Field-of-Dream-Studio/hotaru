@@ -126,7 +126,7 @@ impl MultiForm {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::form::MultiForm;
+    /// # use hotaru_http::form::MultiForm;
     /// let boundary = "boundary123";
     /// let body = concat!(
     ///     "--boundary123\r\n",

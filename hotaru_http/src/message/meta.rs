@@ -68,7 +68,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header = HeaderValue::new("application/json");
     /// ```
     pub fn new<T: Into<String>>(value: T) -> Self {
@@ -87,7 +87,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header_value = HeaderValue::new("text/html");
     /// header_value.append("charset=UTF-8");
     /// assert_eq!(header_value.as_str(), "text/html, charset=UTF-8");
@@ -114,7 +114,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header_value = HeaderValue::new("text/html");
     /// header_value.append("application/xhtml+xml");
     /// assert_eq!(header_value.as_str(), "text/html, application/xhtml+xml");
@@ -135,7 +135,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header = HeaderValue::new("text/html");
     /// assert_eq!(header.len(), 1);
     ///
@@ -160,7 +160,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let empty_header = HeaderValue::new("");
     /// assert!(empty_header.is_empty());
     ///
@@ -190,7 +190,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header = HeaderValue::new("text/html");
     /// assert_eq!(header.try_get(0), Some(&"text/html".to_string()));
     /// assert_eq!(header.try_get(1), None);
@@ -219,7 +219,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header = HeaderValue::new("text/html");
     /// assert_eq!(header.get(0), "text/html");
     /// assert_eq!(header.get(1), ""); // Out of bounds returns empty string
@@ -242,7 +242,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header = HeaderValue::new("text/html");
     /// assert_eq!(header.get_or(0, "default"), "text/html");
     /// assert_eq!(header.get_or(1, "default"), "default"); // Out of bounds returns default
@@ -265,7 +265,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut cookies = HeaderValue::new("sessionId=abc123; Path=/");
     /// cookies.add_without_combining("theme=dark; Path=/; Max-Age=3600");
     ///
@@ -297,7 +297,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header = HeaderValue::new("text/html");
     /// header.append("application/json");
     /// assert_eq!(header.try_first(), Some(&"text/html".to_string()));
@@ -319,7 +319,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header = HeaderValue::new("text/html");
     /// assert_eq!(header.first(), "text/html");
     ///
@@ -343,7 +343,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header = HeaderValue::new("text/html");
     /// assert_eq!(header.first_or("default"), "text/html");
     ///
@@ -363,7 +363,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header = HeaderValue::new("text/html");
     /// header.append("application/json");
     ///
@@ -392,7 +392,7 @@ impl HeaderValue {
     ///
     /// # Examples
     /// ```rust
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header_value = HeaderValue::new("text/html");
     /// let header_string = header_value.into_header_string("Content-Type");
     /// assert_eq!(header_string, "Content-Type: text/html\r\n");
@@ -426,7 +426,7 @@ impl HeaderValue {
 /// # Examples
 ///
 /// ```rust
-/// use hotaru_http::meta::HeaderValue;
+/// # use hotaru_http::meta::HeaderValue;
 /// let header: HeaderValue = "text/html".to_string().into();
 /// assert_eq!(header.first(), "text/html");
 /// ```
@@ -443,7 +443,7 @@ impl From<String> for HeaderValue {
 /// # Examples
 ///
 /// ```rust
-/// use hotaru_http::meta::HeaderValue;
+/// # use hotaru_http::meta::HeaderValue;
 /// let header: HeaderValue = "text/html".into();
 /// assert_eq!(header.first(), "text/html");
 /// ```
@@ -458,7 +458,7 @@ impl From<&str> for HeaderValue {
 /// # Examples
 ///
 /// ```rust
-/// use hotaru_http::meta::HeaderValue;
+/// # use hotaru_http::meta::HeaderValue;
 /// let mut header = HeaderValue::new("text/html");
 /// header.append("application/json");
 ///
@@ -485,7 +485,7 @@ impl IntoIterator for HeaderValue {
 /// # Examples
 ///
 /// ```rust
-/// use hotaru_http::meta::HeaderValue;
+/// # use hotaru_http::meta::HeaderValue;
 /// let mut header = HeaderValue::new("text/html");
 /// header.append("application/json");
 ///
@@ -508,7 +508,7 @@ impl From<HeaderValue> for Vec<String> {
 /// # Examples
 ///
 /// ```rust
-/// use hotaru_http::meta::HeaderValue;
+/// # use hotaru_http::meta::HeaderValue;
 /// let mut header = HeaderValue::new("text/html");
 /// header.append("application/json");
 ///
@@ -867,8 +867,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -893,8 +893,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -923,7 +923,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HttpMeta;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_content_length(456);
@@ -942,8 +942,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_content_length(123);
@@ -962,8 +962,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_attribute("content-length", "123");
@@ -989,9 +989,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1016,9 +1016,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1046,8 +1046,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::http_value::HttpContentType;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_content_type(HttpContentType::ApplicationJson());
@@ -1070,9 +1070,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1103,9 +1103,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1138,9 +1138,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::http_value::ContentDisposition;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::ContentDisposition;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1170,9 +1170,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::http_value::ContentDisposition;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::ContentDisposition;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1207,8 +1207,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::http_value::{ContentDisposition, ContentDispositionType};
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::http_value::{ContentDisposition, ContentDispositionType};
     ///
     /// let mut meta = HttpMeta::default();
     /// let cd = ContentDisposition::attachment("report.pdf");
@@ -1232,9 +1232,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::http_value::ContentDisposition;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::ContentDisposition;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1268,9 +1268,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::http_value::ContentDisposition;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::ContentDisposition;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1306,9 +1306,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::cookie::{Cookie, CookieMap};
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::cookie::{Cookie, CookieMap};
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1343,8 +1343,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1378,8 +1378,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1409,8 +1409,8 @@ impl HttpMeta {
     ///
     /// ```rust
     /// // For a request with a Cookie header
-    /// use hotaru_http::meta::{HttpMeta, HeaderValue};
-    /// use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::start_line::HttpStartLine;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1497,8 +1497,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::cookie::Cookie;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::cookie::Cookie;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.add_cookie("sessionId", Cookie::new("abc123"));
@@ -1528,8 +1528,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1560,8 +1560,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1595,8 +1595,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1621,8 +1621,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1648,7 +1648,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HttpMeta;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_host(Some("example.com".to_string()));
@@ -1671,8 +1671,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1705,10 +1705,10 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::start_line::HttpStartLine;
-    /// use hotaru_http::http_value::*;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::http_value::*;
     /// use std::collections::HashMap;
     /// let mut headers = HashMap::new();
     /// headers.insert("accept-language".to_string(), HeaderValue::new("en-US, en;q=0.9"));
@@ -1741,10 +1741,10 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::start_line::HttpStartLine;
-    /// use hotaru_http::http_value::*;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::http_value::*;
     /// use std::collections::HashMap;
     /// let mut headers = HashMap::new();
     /// headers.insert("accept-language".to_string(), HeaderValue::new("en-US, en;q=0.9"));
@@ -1781,8 +1781,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::http_value::AcceptLang;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::http_value::AcceptLang;
     /// let mut meta = HttpMeta::default();
     /// meta.set_lang(Some(AcceptLang::from_str("en")));
     /// ```
@@ -1799,7 +1799,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HttpMeta;
     /// let mut meta = HttpMeta::default();
     /// meta.clear_lang();
     /// ```
@@ -1816,7 +1816,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HttpMeta;
     /// let mut meta = HttpMeta::default();
     /// meta.delete_lang();
     /// ```
@@ -1839,8 +1839,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1873,8 +1873,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1899,8 +1899,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1927,7 +1927,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HttpMeta;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_location(Some("/redirect".to_string()));
@@ -1950,8 +1950,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1982,8 +1982,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -2016,7 +2016,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -2047,7 +2047,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -2087,8 +2087,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::encoding::HttpEncoding;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::encoding::HttpEncoding;
     ///
     /// let mut meta = HttpMeta::default();
     /// let encoding = HttpEncoding::from_headers(
@@ -2112,7 +2112,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -2139,7 +2139,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -2178,10 +2178,10 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::meta::HttpMeta;
-    /// use hotaru_http::meta::HeaderValue;
-    /// use hotaru_http::start_line::HttpStartLine;
-    /// use hotaru_http::http_value::{HttpVersion, HttpMethod};
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::http_value::{HttpVersion, HttpMethod};
     /// use std::collections::HashMap;
     ///
     /// // Create a request meta

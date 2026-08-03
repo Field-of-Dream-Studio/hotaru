@@ -221,7 +221,7 @@ impl StatusCode {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::http_value::StatusCode;
+    /// # use hotaru_http::http_value::StatusCode;
     /// let code = StatusCode::OK;
     /// assert_eq!(code.as_u16(), 200);
     /// ```
@@ -238,7 +238,7 @@ impl StatusCode {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::http_value::StatusCode;
+    /// # use hotaru_http::http_value::StatusCode;
     /// let code = StatusCode::OK;
     /// assert_eq!(code.to_string(), "200 OK");
     /// ```
@@ -751,7 +751,7 @@ impl HttpContentType {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::http_value::HttpContentType;
     /// let content_type = HttpContentType::from_str("text/html; charset=UTF-8");
     /// assert_eq!(content_type, HttpContentType::Text { subtype: "html".to_string(), charset: Some("UTF-8".to_string()) });
     /// ```
@@ -812,7 +812,7 @@ impl HttpContentType {
     /// Find value from Vec<(String, String)>
     /// # Examples
     /// ```rust
-    /// use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::http_value::HttpContentType;
     /// let vec = vec![("key1".to_string(), "value1".to_string()), ("key2".to_string(), "value2".to_string())];
     /// let value = HttpContentType::find_value_from_vec(&vec, "key1");
     /// assert_eq!(value, Some("value1".to_string()));
@@ -875,7 +875,7 @@ impl HttpContentType {
     /// Get content type based on file extension
     /// # Examples
     /// ```
-    /// use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::http_value::HttpContentType;
     ///
     /// let content_type = HttpContentType::from_extension("html");
     /// assert_eq!(content_type, HttpContentType::TextHtml());
@@ -999,7 +999,7 @@ impl HttpContentType {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::http_value::HttpContentType;
     ///
     /// let content_type = HttpContentType::from_file_name("index.html");
     /// assert_eq!(content_type, HttpContentType::TextHtml());
@@ -1259,7 +1259,7 @@ impl std::error::Error for ContentDispositionError {}
 /// # Examples
 ///
 /// ```
-/// use hotaru_http::http_value::{ContentDisposition, ContentDispositionType};
+/// # use hotaru_http::http_value::{ContentDisposition, ContentDispositionType};
 ///
 /// // Create an attachment disposition
 /// let disposition = ContentDisposition::attachment("report.pdf");
@@ -1524,7 +1524,7 @@ impl ContentDisposition {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::http_value::ContentDisposition;
+    /// # use hotaru_http::http_value::ContentDisposition;
     ///
     /// // Regular parameter
     /// let header = "attachment; filename=\"example.txt\"";
@@ -1904,7 +1904,7 @@ impl AcceptLang {
     ///
     /// # Example:
     /// ```
-    /// use hotaru_http::http_value::AcceptLang;
+    /// # use hotaru_http::http_value::AcceptLang;
     /// let accept_lang = AcceptLang::from_str("en-US, fr;q=0.7, zh-CN;q=0.5");
     /// assert_eq!(accept_lang.all_languages(), vec!["en-US", "fr", "zh-CN"]);
     /// ```
@@ -1939,7 +1939,7 @@ impl AcceptLang {
     ///
     /// # Example:
     /// ```
-    /// use hotaru_http::http_value::AcceptLang;
+    /// # use hotaru_http::http_value::AcceptLang;
     /// let accept_lang = AcceptLang::from_str("en-US, fr;q=0.7, zh-CN;q=0.5");
     /// let lang = accept_lang.most_preferred();
     /// assert_eq!(lang, "en-US");

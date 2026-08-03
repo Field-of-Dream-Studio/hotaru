@@ -57,7 +57,7 @@ impl RequestStartLine {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::start_line::RequestStartLine;
+    /// # use hotaru_http::start_line::RequestStartLine;
     /// let request_line = "GET /index.html HTTP/1.1";
     /// let start_line = RequestStartLine::parse(request_line).unwrap();
     /// println!("{}", start_line);
@@ -165,7 +165,7 @@ impl ResponseStartLine {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::start_line::ResponseStartLine;
+    /// # use hotaru_http::start_line::ResponseStartLine;
     /// let response_line = "HTTP/1.1 200 OK";
     /// let start_line = ResponseStartLine::parse(response_line).unwrap();
     /// println!("{}", start_line);
@@ -274,7 +274,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::start_line::HttpStartLine;
     /// let line = "GET /index.html HTTP/1.1";
     /// let start_line = HttpStartLine::try_parse(line).unwrap();
     /// assert!(start_line.is_request());
@@ -308,7 +308,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::start_line::HttpStartLine;
     /// let line = "GET /index.html HTTP/1.1";
     /// let start_line = HttpStartLine::try_parse_request(line).unwrap();
     /// assert!(start_line.is_request());
@@ -330,7 +330,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::start_line::HttpStartLine;
     /// let line = "HTTP/1.1 200 OK";
     /// let start_line = HttpStartLine::try_parse_response(line).unwrap();
     /// assert!(start_line.is_response());
@@ -831,7 +831,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// # use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     ///
     /// // Setting status on a response
     /// let mut response = HttpStartLine::new_response(HttpVersion::Http11, StatusCode::OK);
@@ -860,7 +860,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// # use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     ///
     /// // Setting version on a request
     /// let mut request = HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::GET, "/".into());
@@ -889,7 +889,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// # use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     ///
     /// // Setting path on a request
     /// let mut request = HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::GET, "/".into());
@@ -924,7 +924,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// # use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     ///
     /// // Setting method on a request
     /// let mut request = HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::GET, "/".into());
@@ -959,7 +959,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// # use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     /// let start_line = HttpStartLine::request_post("/submit");
     /// ```
     pub fn request_post<T: Into<String>>(url: T) -> Self {
@@ -983,7 +983,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// # use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     /// let start_line = HttpStartLine::request_get("/index.html");
     /// ```
     pub fn request_get<T: Into<String>>(url: T) -> Self {
@@ -1007,7 +1007,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// # use hotaru_http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     /// let start_line = HttpStartLine::response(StatusCode::NOT_FOUND);
     /// // or using an integer:
     /// let start_line = HttpStartLine::response(404);

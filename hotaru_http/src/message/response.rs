@@ -135,7 +135,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::response::response_templates;
+    /// # use hotaru_http::response::response_templates;
     ///
     /// let response = response_templates::text_response("Hello, world!");
     /// ```
@@ -159,7 +159,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::response::response_templates;
+    /// # use hotaru_http::response::response_templates;
     ///
     /// let html = "<html><body><h1>Hello, world!</h1></body></html>";
     /// let response = response_templates::html_response(html);
@@ -184,7 +184,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::response::response_templates;
+    /// # use hotaru_http::response::response_templates;
     ///
     /// let response = response_templates::redirect_response("/login");
     /// ```
@@ -209,7 +209,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::response::response_templates;
+    /// # use hotaru_http::response::response_templates;
     ///
     /// let response = response_templates::plain_template_response("index.html");
     /// ```
@@ -261,8 +261,8 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::response::response_templates;
-    /// use hotaru_http::message::http_value::StatusCode;
+    /// # use hotaru_http::response::response_templates;
+    /// # use hotaru_http::message::http_value::StatusCode;
     ///
     /// let response = response_templates::normal_response(StatusCode::CREATED, "Resource created");
     /// ```
@@ -291,7 +291,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::response::response_templates;
+    /// # use hotaru_http::response::response_templates;
     /// use akari::{Value, object};
     ///
     /// let mut data = object!({});
@@ -321,7 +321,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::response::response_templates;
+    /// # use hotaru_http::response::response_templates;
     /// use akari::Value;
     /// use std::collections::HashMap;
     ///
@@ -358,8 +358,8 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_http::response::response_templates;
-    /// use hotaru_http::message::http_value::StatusCode;
+    /// # use hotaru_http::response::response_templates;
+    /// # use hotaru_http::message::http_value::StatusCode;
     ///
     /// // Return a 404 Not Found response
     /// let response = response_templates::return_status(StatusCode::NOT_FOUND);
