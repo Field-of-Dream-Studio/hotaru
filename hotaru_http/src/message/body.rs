@@ -150,7 +150,7 @@ impl HttpBody {
             safety_setting: &HttpSafety,
         ) -> std::io::Result<Vec<u8>> {
             let mut body_buffer = Vec::new();
-            let mut current_size = 0;
+            let mut current_size: usize = 0;
 
             loop {
                 // Read chunk size line
@@ -180,7 +180,12 @@ impl HttpBody {
                 // Key: Validation happens BEFORE memory allocation (line 138), so attacker
                 // cannot force excessive memory allocation by sending large chunk size declarations.
                 // The check_body_size() uses max_body_size from HttpSafety (default: 10MB).
-                current_size += chunk_size;
+                current_size = current_size.checked_add(chunk_size).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Chunk size integer overflow",
+                    )
+                })?;
                 if !safety_setting.check_body_size(current_size) {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
@@ -221,6 +226,9 @@ impl HttpBody {
         // Read raw body data
         let encoding = header.get_encoding().unwrap_or_default();
         let raw_data = if encoding.transfer().is_chunked() {
+            // RFC 9112 §6.3: if Transfer-Encoding is present, Content-Length
+            // must be ignored to prevent CL.TE desync attacks.
+            header.delete_content_length();
             read_chunked_body(buf_reader, header, parse_config).await?
         } else {
             let content_length = header.get_content_length().unwrap_or(0);

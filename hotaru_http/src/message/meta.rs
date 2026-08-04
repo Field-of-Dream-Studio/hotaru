@@ -906,10 +906,21 @@ impl HttpMeta {
     /// assert_eq!(meta.get_content_length(), Some(123));
     /// ```
     pub fn parse_content_length(&mut self) -> Option<usize> {
-        let length = self
-            .header
-            .get("content-length")
-            .and_then(|s| s.first().parse::<usize>().ok());
+        let header = self.header.get("content-length")?;
+
+        // Reject duplicate Content-Length with differing values (RFC 9112 §6.3)
+        let values = header.values();
+        if values.len() > 1 {
+            let parsed: Vec<Option<usize>> =
+                values.iter().map(|v| v.parse::<usize>().ok()).collect();
+            let first = parsed[0];
+            if !parsed.iter().all(|v| *v == first) {
+                // Conflicting Content-Length — reject the request
+                return None;
+            }
+        }
+
+        let length = header.first().parse::<usize>().ok();
         self.content_length = length;
         length
     }
@@ -2326,5 +2337,60 @@ impl Default for HttpMeta {
             lang: None,
             location: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn header_map(pairs: Vec<(&str, &str)>) -> HashMap<String, HeaderValue> {
+        let mut map: HashMap<String, HeaderValue> = HashMap::new();
+        for (key, value) in pairs {
+            let name = key.to_lowercase();
+            match map.get_mut(&name) {
+                Some(existing) => existing.add_without_combining(value.to_string()),
+                None => {
+                    map.insert(name, HeaderValue::new(value.to_string()));
+                }
+            }
+        }
+        map
+    }
+
+    #[test]
+    fn cl_single_value_parsed() {
+        let headers = header_map(vec![("Content-Length", "123")]);
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        assert_eq!(meta.parse_content_length(), Some(123));
+    }
+
+    #[test]
+    fn cl_duplicate_same_value_accepted() {
+        let headers = header_map(vec![
+            ("Content-Length", "42"),
+            ("Content-Length", "42"),
+        ]);
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        assert_eq!(meta.parse_content_length(), Some(42));
+    }
+
+    #[test]
+    fn cl_duplicate_different_values_rejected() {
+        let headers = header_map(vec![
+            ("Content-Length", "5"),
+            ("Content-Length", "0"),
+        ]);
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        // Differing duplicate CL values -> rejected (None)
+        assert_eq!(meta.parse_content_length(), None);
+    }
+
+    #[test]
+    fn cl_missing_returns_none() {
+        let headers = header_map(vec![("Host", "localhost")]);
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        assert_eq!(meta.parse_content_length(), None);
     }
 }
