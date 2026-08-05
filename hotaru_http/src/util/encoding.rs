@@ -196,16 +196,20 @@ impl ContentCoding {
         }
     }
 
-    pub fn decode_compressed(encoding: &ContentCoding, data: &[u8]) -> std::io::Result<Vec<u8>> {
+    pub fn decode_compressed(
+        encoding: &ContentCoding,
+        data: &[u8],
+        max_size: usize,
+    ) -> std::io::Result<Vec<u8>> {
         match encoding {
             #[cfg(feature = "compression")]
-            ContentCoding::Gzip => compression::decompress_gzip(data),
+            ContentCoding::Gzip => compression::decompress_gzip(data, max_size),
             #[cfg(feature = "compression")]
-            ContentCoding::Deflate => compression::decompress_deflate(data),
+            ContentCoding::Deflate => compression::decompress_deflate(data, max_size),
             #[cfg(feature = "compression")]
-            ContentCoding::Brotli => compression::decompress_brotli(data),
+            ContentCoding::Brotli => compression::decompress_brotli(data, max_size),
             #[cfg(feature = "compression")]
-            ContentCoding::Zstd => compression::decompress_zstd(data),
+            ContentCoding::Zstd => compression::decompress_zstd(data, max_size),
             #[cfg(not(feature = "compression"))]
             ContentCoding::Gzip
             | ContentCoding::Deflate
@@ -495,26 +499,19 @@ impl ContentCodings {
             .join(", ")
     }
 
-    /// Decodes compressed data using the content codings in this collection.
+    /// Decodes compressed data using the content codings in this collection,
+    /// bounded by `max_size`.
     ///
     /// # Arguments
     ///
     /// * `data` - The compressed data to decode
+    /// * `max_size` - Maximum decompressed size in bytes
     ///
     /// # Returns
     ///
-    /// A `Result` containing the decompressed data as a `Vec<u8>`, or an error if decoding fails.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crate::encoding::ContentCodings;
-    /// let codings = ContentCodings::new();
-    /// let data = b"hello".to_vec();
-    /// let result = codings.decode_compressed(data.clone()).unwrap();
-    /// assert_eq!(result, data);
-    /// ```
-    pub fn decode_compressed(&self, data: Vec<u8>) -> std::io::Result<Vec<u8>> {
+    /// A `Result` containing the decompressed data as a `Vec<u8>`, or an error
+    /// if decoding fails or the output exceeds `max_size`.
+    pub fn decode_compressed(&self, data: Vec<u8>, max_size: usize) -> std::io::Result<Vec<u8>> {
         if self.is_identity() {
             return Ok(data);
         }
@@ -522,7 +519,7 @@ impl ContentCodings {
         let mut result = data;
         // Decompress in REVERSE order (last applied first)
         for coding in self.codings.iter().rev() {
-            result = ContentCoding::decode_compressed(coding, &result)?;
+            result = ContentCoding::decode_compressed(coding, &result, max_size)?;
         }
         Ok(result)
     }

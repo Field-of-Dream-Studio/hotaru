@@ -56,9 +56,9 @@ impl HttpBody {
                 if !safety.check_body_size(data.len()) {
                     return Self::Unparsed; // Return Unparsed if size exceeds limits
                 }
-                // Decode the content based on content coding
+                // Decode the content based on content coding (bounded)
                 let data = content_coding
-                    .decode_compressed(data)
+                    .decode_compressed(data, safety.effective_body_size())
                     .unwrap_or_else(|_| vec![]);
                 match content_type {
                     HttpContentType::Application { subtype, .. } if subtype == "json" => {
@@ -153,9 +153,11 @@ impl HttpBody {
             let mut current_size = 0;
 
             loop {
-                // Read chunk size line
+                // Read chunk size line (bounded to prevent unbounded allocation)
                 let mut size_line = String::new();
-                buf_reader.read_line(&mut size_line).await?;
+                buf_reader
+                    .read_line(&mut size_line, safety_setting.effective_line_length())
+                    .await?;
                 let chunk_size_str = size_line.trim_end_matches(|c| c == '\r' || c == '\n');
 
                 // Parse chunk size (validates hex format - critical for preventing crashes)
@@ -227,8 +229,11 @@ impl HttpBody {
             read_content_length_body(buf_reader, parse_config, content_length).await?
         };
 
-        // Apply decompression based on Transfer-Encoding
-        let raw_data = encoding.content().decode_compressed(raw_data)?;
+        // Apply decompression based on Transfer-Encoding (bounded)
+        let raw_data =
+            encoding
+                .content()
+                .decode_compressed(raw_data, parse_config.effective_body_size())?;
 
         Ok(raw_data)
     }

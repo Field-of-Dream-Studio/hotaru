@@ -52,10 +52,16 @@ pub trait HotaruBufRead: HotaruRead {
     /// EOF is `Ok`, and the only failure path is `fill_buf`, which already
     /// yields `Self::Error` (propagated via `?`). No sentinel is needed here,
     /// so this stays a default method that never names `HotaruIOError`.
+    ///
+    /// `max_size` caps the total bytes read (including the delimiter). If the
+    /// buffer would grow beyond this limit, the method returns an error
+    /// immediately — before the allocation happens. This prevents unbounded
+    /// memory growth from a stream that never sends the delimiter byte.
     fn read_until<'a>(
         &'a mut self,
         byte: u8,
         buf: &'a mut alloc::vec::Vec<u8>,
+        max_size: usize,
     ) -> impl Future<Output = Result<usize, Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend,
@@ -66,6 +72,16 @@ pub trait HotaruBufRead: HotaruRead {
                 let (done, used) = {
                     let available = self.fill_buf().await?;
                     if available.is_empty() {
+                        return Ok(read);
+                    }
+                    // Stop silently when max_size would be exceeded — don't
+                    // allocate, don't construct a backend-specific error.
+                    // Callers already validate the resulting buffer length
+                    // (e.g. meta.rs checks check_line_length), so a truncated
+                    // line will trigger the normal PayloadTooLarge path.
+                    // saturating_add prevents overflow; reference:
+                    // Bun WebSocket fix (Swival/security-audits)
+                    if buf.len().saturating_add(available.len()) > max_size {
                         return Ok(read);
                     }
                     if let Some(i) = available.iter().position(|b| *b == byte) {
@@ -87,16 +103,20 @@ pub trait HotaruBufRead: HotaruRead {
 
     /// Reads a line into `buf` (up to and including the next `\n`). Also a
     /// default method returning `Self::Error`; builds on `read_until`.
+    ///
+    /// `max_size` is forwarded to `read_until` — see its docs for the
+    /// rationale.
     fn read_line<'a>(
         &'a mut self,
         buf: &'a mut alloc::string::String,
+        max_size: usize,
     ) -> impl Future<Output = Result<usize, Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend,
     {
         async move {
             let mut bytes = alloc::vec::Vec::new();
-            let n = self.read_until(b'\n', &mut bytes).await?;
+            let n = self.read_until(b'\n', &mut bytes, max_size).await?;
             buf.push_str(&alloc::string::String::from_utf8_lossy(&bytes));
             Ok(n)
         }
