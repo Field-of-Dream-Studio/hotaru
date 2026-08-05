@@ -10,13 +10,12 @@ use hotaru_core::protocol::{
 use hotaru_core::url::UrlNode;
 
 use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 use crate::channel::Http1Channel;
-use crate::message::body::HttpBody;
+use crate::message::body::{BodyError, HttpBody};
 use crate::message::http_value::{HttpMethod, StatusCode};
 use crate::message::meta::HttpMeta;
 use crate::message::request::HttpRequest;
@@ -321,7 +320,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// Note that request body will not be automatically parsed unless this function is called
     /// The automatic parsing is not recommended, as it can lead to performance issues and security vulnerabilities.
     /// If you didn't parse body, the body will be `HttpBody::Unparsed`.
-    pub async fn parse_body(&mut self) {
+    pub async fn parse_body(&mut self) -> Result<(), BodyError> {
         // Start from the protocol baseline (`self.safety`); overlay any
         // per-endpoint override on top. (The prior implementation fetched
         // `endpoint.get_params::<HttpSafety>()` twice — the second call was
@@ -333,70 +332,65 @@ impl<TS: TransportSpec> HttpContext<TS> {
             }
         }
 
-        let body = std::mem::take(&mut self.request.body);
-        self.request.body = body.parse_buffer(&settings);
+        let body = self.request.body.clone().parse_buffer(&settings)?;
+        self.request.body = body;
+        Ok(())
     }
 
-    /// Returns the body of the request as a reference to `HttpBody`.
-    pub async fn form(&mut self) -> Option<&UrlEncodedForm> {
-        self.parse_body().await; // Await the Future<Output = ()>
+    /// Parses and returns the URL-encoded request body.
+    pub async fn form(&mut self) -> Result<&UrlEncodedForm, BodyError> {
+        let content_type = self
+            .request
+            .meta
+            .get_content_type()
+            .map(|value| value.to_string());
+        self.parse_body().await?;
         if let HttpBody::Form(ref data) = self.request.body {
-            Some(data)
+            Ok(data)
+        } else if matches!(self.request.body, HttpBody::Empty | HttpBody::Unparsed) {
+            Err(BodyError::Missing)
         } else {
-            None
+            Err(content_type
+                .map(BodyError::UnsupportedContentType)
+                .unwrap_or(BodyError::MissingContentType))
         }
     }
 
-    /// Returns the body of the request as a reference to `UrlEncodedForm`, or an empty form if not present.
-    pub async fn form_or_default(&mut self) -> &UrlEncodedForm {
-        match self.form().await {
-            Some(form) => form,
-            None => {
-                static EMPTY: Lazy<UrlEncodedForm> = Lazy::new(|| HashMap::new().into());
-                &EMPTY
-            }
-        }
-    }
-
-    /// Returns the body of the request as a reference to `MultiForm`.
-    pub async fn files(&mut self) -> Option<&MultiForm> {
-        self.parse_body().await; // Await the Future<Output = ()>
+    /// Parses and returns the multipart request body.
+    pub async fn files(&mut self) -> Result<&MultiForm, BodyError> {
+        let content_type = self
+            .request
+            .meta
+            .get_content_type()
+            .map(|value| value.to_string());
+        self.parse_body().await?;
         if let HttpBody::Files(ref data) = self.request.body {
-            Some(data)
+            Ok(data)
+        } else if matches!(self.request.body, HttpBody::Empty | HttpBody::Unparsed) {
+            Err(BodyError::Missing)
         } else {
-            None
+            Err(content_type
+                .map(BodyError::UnsupportedContentType)
+                .unwrap_or(BodyError::MissingContentType))
         }
     }
 
-    /// Returns the body of the request as a reference to `MultiForm`, or an empty form if not present.
-    pub async fn files_or_default(&mut self) -> &MultiForm {
-        match self.files().await {
-            Some(files) => files,
-            None => {
-                static EMPTY: Lazy<MultiForm> = Lazy::new(|| HashMap::new().into());
-                &EMPTY
-            }
-        }
-    }
-
-    /// Returns the body of the request as a reference to `HttpBody::Binary`.
-    pub async fn json(&mut self) -> Option<&Value> {
-        self.parse_body().await; // Await the Future<Output = ()>
+    /// Parses and returns the JSON request body.
+    pub async fn json(&mut self) -> Result<&Value, BodyError> {
+        let content_type = self
+            .request
+            .meta
+            .get_content_type()
+            .map(|value| value.to_string());
+        self.parse_body().await?;
         if let HttpBody::Json(ref data) = self.request.body {
-            Some(data)
+            Ok(data)
+        } else if matches!(self.request.body, HttpBody::Empty | HttpBody::Unparsed) {
+            Err(BodyError::Missing)
         } else {
-            None
-        }
-    }
-
-    /// Returns the body of the request as a reference to `HttpBody::Binary`, or an empty JSON if not present.
-    pub async fn json_or_default(&mut self) -> &Value {
-        match self.json().await {
-            Some(json) => json,
-            None => {
-                static EMPTY: Lazy<Value> = Lazy::new(|| Value::new(""));
-                &EMPTY
-            }
+            Err(content_type
+                .map(BodyError::UnsupportedContentType)
+                .unwrap_or(BodyError::MissingContentType))
         }
     }
 

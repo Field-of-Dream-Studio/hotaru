@@ -87,7 +87,7 @@ endpoint! {
     pub api_login <HTTP> {
         if req.method() == POST {
             match req.json().await {
-                Some(json) => {
+                Ok(json) => {
                     let username = json.get("username").to_string();
                     let password = json.get("password").to_string();
 
@@ -108,7 +108,7 @@ endpoint! {
                         }))
                     }
                 }
-                None => {
+                Err(_) => {
                     json_response(object!({
                         status: "error",
                         message: "Invalid JSON data"

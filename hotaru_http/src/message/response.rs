@@ -1,7 +1,7 @@
 ﻿use crate::message::http_value::{ContentDisposition, StatusCode};
 use crate::security::safety::HttpSafety;
 
-use crate::message::body::HttpBody;
+use crate::message::body::{BodyError, HttpBody};
 use crate::util::cookie::Cookie;
 use crate::message::http_value::HttpContentType;
 use crate::message::meta::HttpMeta;
@@ -33,15 +33,19 @@ impl HttpResponse {
     }
 
     /// Parses the HTTP Body from buffer
-    pub async fn parse_body(&mut self, safety_setting: &HttpSafety) {
-        let body = std::mem::take(&mut self.body);
-        self.body = body.parse_buffer(safety_setting);
+    pub async fn parse_body(&mut self, safety_setting: &HttpSafety) -> Result<(), BodyError> {
+        let body = self.body.clone().parse_buffer(safety_setting)?;
+        self.body = body;
+        Ok(())
     }
 
     /// Get the parsed HTTP Body
-    pub async fn get_parsed_body(&mut self, safety: HttpSafety) -> HttpBody {
-        self.parse_body(&safety).await;
-        self.body.clone()
+    pub async fn get_parsed_body(
+        &mut self,
+        safety: HttpSafety,
+    ) -> Result<HttpBody, BodyError> {
+        self.parse_body(&safety).await?;
+        Ok(self.body.clone())
     }
 
     /// Add a cookie into the response metadata.

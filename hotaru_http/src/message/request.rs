@@ -1,7 +1,7 @@
 use crate::util::cookie::Cookie;
 use crate::security::safety::HttpSafety;
 
-use crate::message::body::HttpBody;
+use crate::message::body::{BodyError, HttpBody};
 use crate::message::meta::HttpMeta;
 use crate::message::start_line::HttpStartLine;
 use crate::message::http_value::*;
@@ -43,9 +43,10 @@ impl HttpRequest {
     }
 
     /// Parses the HTTP Body from buffer
-    pub async fn parse_body(&mut self, safety_setting: &HttpSafety) {
-        let body = std::mem::take(&mut self.body);
-        self.body = body.parse_buffer(safety_setting);
+    pub async fn parse_body(&mut self, safety_setting: &HttpSafety) -> Result<(), BodyError> {
+        let body = self.body.clone().parse_buffer(safety_setting)?;
+        self.body = body;
+        Ok(())
     }
 
     /// Add a cookie into the request metadata.

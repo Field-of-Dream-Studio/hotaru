@@ -14,14 +14,14 @@ endpoint! {
     pub form_url_encoded <HTTP> {
         if req.method() == POST {
             match req.form().await {
-                Some(form) => {
+                Ok(form) => {
                     let mut response = String::from("Form data:\n");
                     for (key, value) in form.data.iter() {
                         response.push_str(&format!("{}: {}\n", key, value));
                     }
                     text_response(response)
                 }
-                None => {
+                Err(_) => {
                     text_response("Error parsing form")
                 }
             }
@@ -41,18 +41,24 @@ endpoint! {
     /// Multipart form data handling (file uploads)
     pub form_multipart <HTTP> {
         if req.method() == POST {
-            let files = req.files_or_default().await;
-            let mut response = String::from("Files received:\n");
-            for (name, field) in files.get_all().iter() {
-                if let MultiFormField::File(file_vec) = field {
-                    for file in file_vec {
-                        response.push_str(&format!("Field: {}, Size: {} bytes\n", name, file.data().len()));
+            match req.files().await {
+                Ok(files) => {
+                    let mut response = String::from("Files received:\n");
+                    for (name, field) in files.get_all().iter() {
+                        if let MultiFormField::File(file_vec) = field {
+                            for file in file_vec {
+                                response.push_str(&format!("Field: {}, Size: {} bytes\n", name, file.data().len()));
+                            }
+                        } else if let MultiFormField::Text(text) = field {
+                            response.push_str(&format!("Field: {}, Text: {}\n", name, text));
+                        }
                     }
-                } else if let MultiFormField::Text(text) = field {
-                    response.push_str(&format!("Field: {}, Text: {}\n", name, text));
+                    text_response(response)
+                }
+                Err(_) => {
+                    text_response("Error parsing multipart form")
                 }
             }
-            text_response(response)
         } else {
             akari_render!("forms/multipart.html",
                 title = "Multipart Form Test",
@@ -69,13 +75,13 @@ endpoint! {
     pub form_cookie <HTTP> {
         if req.method() == POST {
             match req.form().await {
-                Some(form) => {
+                Ok(form) => {
                     let name = form.data.get("name").map(|s| s.as_str()).unwrap_or("");
                     let value = form.data.get("value").map(|s| s.as_str()).unwrap_or("");
                     text_response(format!("Cookie set: {} = {}", name, value))
                         .add_cookie(name, Cookie::new(value.to_string()).path("/"))
                 }
-                None => {
+                Err(_) => {
                     text_response("Error parsing form")
                 }
             }
@@ -104,7 +110,7 @@ endpoint! {
     pub form_json <HTTP> {
         if req.method() == POST {
             match req.json().await {
-                Some(json) => {
+                Ok(json) => {
                     let received_json = json.clone();
                     let message = "JSON data received successfully";
                     json_response(object!({
@@ -112,7 +118,7 @@ endpoint! {
                         message: message
                     }))
                 }
-                None => {
+                Err(_) => {
                     let error = "Failed to parse JSON";
                     json_response(object!({
                         error: error

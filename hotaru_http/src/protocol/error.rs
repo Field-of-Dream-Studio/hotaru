@@ -144,7 +144,7 @@ impl From<std::io::Error> for HttpError {
 impl From<BodyError> for HttpError {
     fn from(error: BodyError) -> Self {
         match error {
-            BodyError::TooLarge { .. } => HttpError::PayloadTooLarge,
+            BodyError::TooLarge => HttpError::PayloadTooLarge,
             BodyError::MissingContentType
             | BodyError::UnsupportedContentType(_)
             | BodyError::UnsupportedContentEncoding(_) => HttpError::UnsupportedMediaType,
