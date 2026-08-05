@@ -3,6 +3,7 @@ use std::fmt;
 use hotaru_core::connection::error::ConnectionError;
 use hotaru_core::protocol::ProtocolError;
 
+use crate::message::body::BodyError;
 use crate::message::http_value::StatusCode;
 
 /// Comprehensive HTTP error type covering all standard error conditions.
@@ -137,6 +138,19 @@ impl ProtocolError for HttpError {
 impl From<std::io::Error> for HttpError {
     fn from(err: std::io::Error) -> Self {
         HttpError::Io(err)
+    }
+}
+
+impl From<BodyError> for HttpError {
+    fn from(error: BodyError) -> Self {
+        match error {
+            BodyError::TooLarge { .. } => HttpError::PayloadTooLarge,
+            BodyError::MissingContentType
+            | BodyError::UnsupportedContentType(_)
+            | BodyError::UnsupportedContentEncoding(_) => HttpError::UnsupportedMediaType,
+            BodyError::Io(error) => HttpError::Io(error),
+            error => HttpError::ParseError(error.to_string()),
+        }
     }
 }
 
