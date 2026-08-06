@@ -89,15 +89,16 @@ endpoint! {
     pub form_page <HTTP> {
         if req.method() == POST {
             match req.form().await {
-                Some(form) => {
+                Ok(form) => {
                     let mut response = String::from("Form data received:\n");
                     for (key, value) in form.data.iter() {
                         response.push_str(&format!("{}: {}\n", key, value));
                     }
                     text_response(response)
                 }
-                None => {
-                    text_response("Error parsing form")
+                Err(error) => {
+                    text_response(format!("Error parsing form: {error}"))
+                        .status(StatusCode::BAD_REQUEST)
                 }
             }
         } else {
@@ -113,14 +114,15 @@ endpoint! {
     pub cookie_page <HTTP> {
         if req.method() == POST {
             match req.form().await {
-                Some(form) => {
+                Ok(form) => {
                     let name = form.data.get("name").map(|s| s.as_str()).unwrap_or("");
                     let value = form.data.get("value").map(|s| s.as_str()).unwrap_or("");
                     text_response(format!("Cookie set: {} = {}", name, value))
                         .add_cookie(name, Cookie::new(value.to_string()).path("/"))
                 }
-                None => {
-                    text_response("Error parsing form")
+                Err(error) => {
+                    text_response(format!("Error parsing form: {error}"))
+                        .status(StatusCode::BAD_REQUEST)
                 }
             }
         } else {
