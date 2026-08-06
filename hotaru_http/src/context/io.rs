@@ -30,8 +30,7 @@ pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(
 
     // Add the values such as content length into header
     let bin = body.into_static(&mut meta).await?;
-    write!(&mut headers, "{}", meta.represent())
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    write!(&mut headers, "{}", meta.represent()).map_err(std::io::Error::other)?;
 
     writer.write_all(headers.as_bytes()).await?;
     writer.write_all(&bin).await?;

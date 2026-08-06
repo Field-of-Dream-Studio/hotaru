@@ -21,8 +21,9 @@ endpoint! {
                     }
                     text_response(response)
                 }
-                Err(_) => {
-                    text_response("Error parsing form")
+                Err(error) => {
+                    text_response(format!("Error parsing form: {error}"))
+                        .status(StatusCode::BAD_REQUEST)
                 }
             }
         } else {
@@ -55,8 +56,9 @@ endpoint! {
                     }
                     text_response(response)
                 }
-                Err(_) => {
-                    text_response("Error parsing multipart form")
+                Err(error) => {
+                    text_response(format!("Error parsing multipart form: {error}"))
+                        .status(StatusCode::BAD_REQUEST)
                 }
             }
         } else {
@@ -81,8 +83,9 @@ endpoint! {
                     text_response(format!("Cookie set: {} = {}", name, value))
                         .add_cookie(name, Cookie::new(value.to_string()).path("/"))
                 }
-                Err(_) => {
-                    text_response("Error parsing form")
+                Err(error) => {
+                    text_response(format!("Error parsing form: {error}"))
+                        .status(StatusCode::BAD_REQUEST)
                 }
             }
         } else {
@@ -118,11 +121,10 @@ endpoint! {
                         message: message
                     }))
                 }
-                Err(_) => {
-                    let error = "Failed to parse JSON";
+                Err(error) => {
                     json_response(object!({
-                        error: error
-                    }))
+                        error: error.to_string()
+                    })).status(StatusCode::BAD_REQUEST)
                 }
             }
         } else {

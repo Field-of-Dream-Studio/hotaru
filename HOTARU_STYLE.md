@@ -665,28 +665,29 @@ if req.method() == POST {
 ### Form Data
 ```rust
 match req.form().await {
-    Some(form) => {
+    Ok(form) => {
         let username = form.data.get("username")
             .map(|s| s.as_str())
             .unwrap_or("anonymous");
         
         text_response(format!("Hello, {}!", username))
     }
-    None => {
-        text_response("Invalid form data")
+    Err(error) => {
+        text_response(format!("Invalid form data: {error}"))
+            .status(StatusCode::BAD_REQUEST)
     }
 }
 ```
 
 ### JSON Data
 ```rust
-// Generic JSON
-match req.json::<serde_json::Value>().await {
-    Some(json_data) => {
-        // Process JSON
+match req.json().await {
+    Ok(json_data) => {
+        // Process the Akari Value
     }
-    None => {
-        text_response("Invalid JSON")
+    Err(error) => {
+        text_response(format!("Invalid JSON: {error}"))
+            .status(StatusCode::BAD_REQUEST)
     }
 }
 ```
@@ -1064,8 +1065,9 @@ let user: User = serde_json::from_str(&req.body_string()).unwrap();
 ```rust
 // No struct needed!
 let json_data = match req.json().await {
-    Some(data) => data,
-    None => return json_response(object!({ error: "No JSON data" }))
+    Ok(data) => data,
+    Err(error) => return json_response(object!({ error: error.to_string() }))
+        .status(StatusCode::BAD_REQUEST)
 };
 let name = json_data.get("name").string();
 let age = json_data.get("age").numerical() as u32;

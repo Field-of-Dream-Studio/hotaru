@@ -61,10 +61,6 @@ endpoint! {
         let user_agent = req.request.meta.get_header("User-Agent")
             .unwrap_or_default();
         
-        // Raw body access (if needed)
-        req.parse_body().await; // Parse body first
-        let body = &req.request.body;
-        
         json_response(object!({
             method: method.to_string(),
             path: path,
@@ -199,28 +195,17 @@ endpoint! {
             }));
         }
         
-        // Parse JSON from request body
-        req.parse_body().await;
-        
-        let json_body = match &req.request.body {
-            HttpBody::Json(value) => value,
-            _ => return json_response(object!({
-                error: "Invalid JSON"
-            }))
+        let json_body = match req.json().await {
+            Ok(value) => value,
+            Err(error) => return json_response(object!({
+                error: error.to_string()
+            })).status(StatusCode::BAD_REQUEST)
         };
         
         // Access JSON fields
-        let name = json_body.get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        
-        let age = json_body.get("age")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(0);
-        
-        let email = json_body.get("email")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let name = json_body.get("name").string();
+        let age = json_body.get("age").numerical() as i64;
+        let email = json_body.get("email").string();
         
         // Validate
         if name.is_empty() || email.is_empty() {
@@ -317,14 +302,11 @@ endpoint! {
             return text_response("Use POST to submit form");
         }
         
-        req.parse_body().await;
-        
-        match &req.request.body {
-            HttpBody::Form(form_data) => {
+        match req.form().await {
+            Ok(form_data) => {
                 // Access form fields
                 let username = form_data.get("username")
-                    .unwrap_or("");
-                let password = form_data.get("password")
+                    .map(String::as_str)
                     .unwrap_or("");
                 
                 json_response(object!({
@@ -332,10 +314,10 @@ endpoint! {
                     username: username
                 }))
             },
-            _ => {
+            Err(error) => {
                 json_response(object!({
-                    error: "Expected form data"
-                }))
+                    error: error.to_string()
+                })).status(StatusCode::BAD_REQUEST)
             }
         }
     }
@@ -353,32 +335,30 @@ endpoint! {
             return text_response("Use POST to upload");
         }
         
-        req.parse_body().await;
-        
-        match &req.request.body {
-            HttpBody::Files(multi_form) => {
-                // Access uploaded files
-                for (field_name, file_data) in multi_form.files.iter() {
-                    println!("File field: {}", field_name);
-                    println!("File size: {} bytes", file_data.len());
-                    
-                    // Save file
-                    // std::fs::write(format!("uploads/{}", field_name), file_data)?;
-                }
-                
-                // Access form fields
-                for (key, value) in multi_form.fields.iter() {
-                    println!("Field {}: {}", key, value);
+        match req.files().await {
+            Ok(multi_form) => {
+                for (field_name, field) in multi_form.get_all() {
+                    match field {
+                        MultiFormField::Text(value) => {
+                            println!("Field {field_name}: {value}");
+                        }
+                        MultiFormField::File(files) => {
+                            for file in files {
+                                println!("File field: {field_name}");
+                                println!("File size: {} bytes", file.data().len());
+                            }
+                        }
+                    }
                 }
                 
                 json_response(object!({
                     message: "Files uploaded successfully"
                 }))
             },
-            _ => {
+            Err(error) => {
                 json_response(object!({
-                    error: "Expected multipart form data"
-                }))
+                    error: error.to_string()
+                })).status(StatusCode::BAD_REQUEST)
             }
         }
     }
@@ -776,7 +756,7 @@ mod tests {
 
 ## Performance Tips
 
-1. **Parse body only when needed** - Call `req.parse_body().await` only for endpoints that need the body
+1. **Parse body only when needed** - Call `req.json().await`, `req.form().await`, or `req.files().await` only for endpoints that need the body
 2. **Use streaming for large files** - Don't load entire files into memory
 3. **Cache static responses** - Use lazy_static for responses that don't change
 4. **Validate early** - Check method, content-type, and size limits before processing

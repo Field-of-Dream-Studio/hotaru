@@ -1,6 +1,6 @@
 //! HTTP-body processing errors.
 
-use std::fmt;
+use core::fmt;
 
 /// An error produced while encoding, decoding, parsing, or extracting an HTTP body.
 ///
@@ -31,7 +31,7 @@ pub enum BodyError {
     InvalidMultipart(String),
     /// The body ended before the declared representation was complete.
     IncompleteBody,
-    /// An I/O failure occurred while reading the body.
+    /// An I/O failure occurred while processing the body.
     Io(std::io::Error),
 }
 
@@ -62,7 +62,7 @@ impl fmt::Display for BodyError {
                 "request body contains invalid multipart data: {details}"
             ),
             Self::IncompleteBody => formatter.write_str("request body is incomplete"),
-            Self::Io(error) => write!(formatter, "request body I/O error: {error}"),
+            Self::Io(error) => write!(formatter, "HTTP body I/O error: {error}"),
         }
     }
 }

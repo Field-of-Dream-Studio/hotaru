@@ -11,7 +11,8 @@ impl HttpBody {
     pub(crate) fn parse_buffer(self, safety: &HttpSafety) -> Result<Self, BodyError> {
         fn parse_into_json(body: Vec<u8>) -> Result<HttpBody, BodyError> {
             let body = String::from_utf8(body).map_err(|_| BodyError::InvalidUtf8)?;
-            let value = Value::from_json(&body).map_err(BodyError::InvalidJson)?;
+            let value = Value::from_json(&body)
+                .map_err(|_| BodyError::InvalidJson("invalid JSON syntax".to_string()))?;
             Ok(HttpBody::Json(value))
         }
 
@@ -110,6 +111,16 @@ mod tests {
         let result = buffered_json(vec![0xff]).parse_buffer(&HttpSafety::new());
 
         assert!(matches!(result, Err(BodyError::InvalidUtf8)));
+    }
+
+    #[test]
+    fn json_error_does_not_expose_body_contents() {
+        let error = buffered_json(b"secret-token".to_vec())
+            .parse_buffer(&HttpSafety::new())
+            .unwrap_err();
+
+        assert!(matches!(&error, BodyError::InvalidJson(_)));
+        assert!(!error.to_string().contains("secret-token"));
     }
 
     #[test]

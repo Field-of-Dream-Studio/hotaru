@@ -1,13 +1,13 @@
-use crate::util::cookie::Cookie;
 use crate::security::safety::HttpSafety;
+use crate::util::cookie::Cookie;
 
+use crate::context::io;
 use crate::message::body::{BodyError, HttpBody};
+use crate::message::http_value::*;
 use crate::message::meta::HttpMeta;
 use crate::message::start_line::HttpStartLine;
-use crate::message::http_value::*;
-use crate::context::io;
-use std::collections::HashMap;
 use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
+use std::collections::HashMap;
 
 /// Represents an HTTP request with metadata and body.
 ///
@@ -73,7 +73,10 @@ impl HttpRequest {
         self
     }
 
-    pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(self, writer: &mut W) -> std::io::Result<()> {
+    pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(
+        self,
+        writer: &mut W,
+    ) -> std::io::Result<()> {
         io::send(self.meta, self.body, writer).await
     }
 }
@@ -96,10 +99,10 @@ pub mod request_templates {
     use akari::Value;
 
     use crate::message::body::HttpBody;
-    use crate::util::form::UrlEncodedForm;
     use crate::message::http_value::{HttpContentType, HttpMethod, HttpVersion};
     use crate::message::meta::HttpMeta;
     use crate::message::start_line::HttpStartLine;
+    use crate::util::form::UrlEncodedForm;
 
     use super::HttpRequest;
 

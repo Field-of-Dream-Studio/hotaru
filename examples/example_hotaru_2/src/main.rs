@@ -96,8 +96,9 @@ endpoint! {
                     }
                     text_response(response)
                 }
-                Err(_) => {
-                    text_response("Error parsing form")
+                Err(error) => {
+                    text_response(format!("Error parsing form: {error}"))
+                        .status(StatusCode::BAD_REQUEST)
                 }
             }
         } else {
@@ -119,8 +120,9 @@ endpoint! {
                     text_response(format!("Cookie set: {} = {}", name, value))
                         .add_cookie(name, Cookie::new(value.to_string()).path("/"))
                 }
-                Err(_) => {
-                    text_response("Error parsing form")
+                Err(error) => {
+                    text_response(format!("Error parsing form: {error}"))
+                        .status(StatusCode::BAD_REQUEST)
                 }
             }
         } else {

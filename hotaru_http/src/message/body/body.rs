@@ -40,7 +40,7 @@ impl HttpBody {
             content_coding: header
                 .get_encoding()
                 .map(|e| e.content().clone())
-                .unwrap_or(ContentCodings::new()),
+                .unwrap_or_default(),
         })
     }
 

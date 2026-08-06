@@ -1,14 +1,14 @@
-﻿use crate::message::http_value::{ContentDisposition, StatusCode};
+use crate::message::http_value::{ContentDisposition, StatusCode};
 use crate::security::safety::HttpSafety;
 
+use crate::context::io;
 use crate::message::body::{BodyError, HttpBody};
-use crate::util::cookie::Cookie;
 use crate::message::http_value::HttpContentType;
 use crate::message::meta::HttpMeta;
-use crate::context::io;
 use crate::message::start_line::{HttpStartLine, ResponseStartLine};
-use std::collections::HashMap;
+use crate::util::cookie::Cookie;
 use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct HttpResponse {
@@ -40,10 +40,7 @@ impl HttpResponse {
     }
 
     /// Get the parsed HTTP Body
-    pub async fn get_parsed_body(
-        &mut self,
-        safety: HttpSafety,
-    ) -> Result<HttpBody, BodyError> {
+    pub async fn get_parsed_body(&mut self, safety: HttpSafety) -> Result<HttpBody, BodyError> {
         self.parse_body(&safety).await?;
         Ok(self.body.clone())
     }
@@ -81,7 +78,10 @@ impl HttpResponse {
 
     /// Send the response
     /// When this method is changed, please also check Request::send()
-    pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(self, writer: &mut W) -> std::io::Result<()> {
+    pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(
+        self,
+        writer: &mut W,
+    ) -> std::io::Result<()> {
         io::send(self.meta, self.body, writer).await
     }
 

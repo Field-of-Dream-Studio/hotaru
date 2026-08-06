@@ -108,11 +108,11 @@ endpoint! {
                         }))
                     }
                 }
-                Err(_) => {
+                Err(error) => {
                     json_response(object!({
                         status: "error",
-                        message: "Invalid JSON data"
-                    }))
+                        message: error.to_string()
+                    })).status(StatusCode::BAD_REQUEST)
                 }
             }
         } else {
