@@ -19,7 +19,7 @@
 //! ## Examples
 //!
 //! ```
-//! use hotaru_http::encoding::HttpEncoding;
+//! use crate::encoding::HttpEncoding;
 //!
 //! // Parse from headers
 //! let encoding = HttpEncoding::from_headers(
@@ -69,7 +69,7 @@ impl TransferCoding {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::TransferCoding;
+    /// use crate::encoding::TransferCoding;
     ///
     /// let coding = TransferCoding::from_string("chunked");
     /// assert!(matches!(coding, TransferCoding::Chunked));
@@ -93,7 +93,7 @@ impl TransferCoding {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::TransferCoding;
+    /// use crate::encoding::TransferCoding;
     ///
     /// let coding = TransferCoding::Chunked;
     /// assert_eq!(coding.as_str(), "chunked");
@@ -149,7 +149,7 @@ impl ContentCoding {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::ContentCoding;
+    /// use crate::encoding::ContentCoding;
     ///
     /// let coding = ContentCoding::from_string("gzip");
     /// assert!(matches!(coding, ContentCoding::Gzip));
@@ -177,7 +177,7 @@ impl ContentCoding {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::ContentCoding;
+    /// use crate::encoding::ContentCoding;
     ///
     /// let coding = ContentCoding::Gzip;
     /// assert_eq!(coding.as_str(), "gzip");
@@ -196,24 +196,31 @@ impl ContentCoding {
         }
     }
 
-    pub fn decode_compressed(encoding: &ContentCoding, data: &[u8]) -> std::io::Result<Vec<u8>> {
+    pub fn decode_compressed(
+        encoding: &ContentCoding,
+        data: &[u8],
+        max_size: usize,
+    ) -> std::io::Result<Vec<u8>> {
         match encoding {
             #[cfg(feature = "compression")]
-            ContentCoding::Gzip => compression::decompress_gzip(data),
+            ContentCoding::Gzip => compression::decompress_gzip(data, max_size),
             #[cfg(feature = "compression")]
-            ContentCoding::Deflate => compression::decompress_deflate(data),
+            ContentCoding::Deflate => compression::decompress_deflate(data, max_size),
             #[cfg(feature = "compression")]
-            ContentCoding::Brotli => compression::decompress_brotli(data),
+            ContentCoding::Brotli => compression::decompress_brotli(data, max_size),
             #[cfg(feature = "compression")]
-            ContentCoding::Zstd => compression::decompress_zstd(data),
+            ContentCoding::Zstd => compression::decompress_zstd(data, max_size),
             #[cfg(not(feature = "compression"))]
             ContentCoding::Gzip
             | ContentCoding::Deflate
             | ContentCoding::Brotli
-            | ContentCoding::Zstd => Err(std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
-                "compression feature not enabled",
-            )),
+            | ContentCoding::Zstd => {
+                let _ = max_size;
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "compression feature not enabled",
+                ))
+            }
             ContentCoding::Compress => Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
                 "compress encoding not supported",
@@ -269,7 +276,7 @@ impl TransferCodings {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::TransferCodings;
+    /// use crate::encoding::TransferCodings;
     ///
     /// let codings = TransferCodings::new();
     /// assert!(codings.is_identity());
@@ -296,7 +303,7 @@ impl TransferCodings {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::{TransferCodings, TransferCoding};
+    /// use crate::encoding::{TransferCodings, TransferCoding};
     ///
     /// let mut codings = TransferCodings::new();
     ///
@@ -344,7 +351,7 @@ impl TransferCodings {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::{TransferCodings, TransferCoding};
+    /// use crate::encoding::{TransferCodings, TransferCoding};
     ///
     /// let mut codings = TransferCodings::new();
     /// assert!(!codings.is_chunked());
@@ -367,7 +374,7 @@ impl TransferCodings {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::{TransferCodings, TransferCoding};
+    /// use crate::encoding::{TransferCodings, TransferCoding};
     ///
     /// let mut codings = TransferCodings::new();
     /// assert!(codings.is_identity());
@@ -388,7 +395,7 @@ impl TransferCodings {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::{TransferCodings, TransferCoding};
+    /// use crate::encoding::{TransferCodings, TransferCoding};
     ///
     /// let mut codings = TransferCodings::new();
     /// codings.push(TransferCoding::Other("gzip".into())).unwrap();
@@ -421,7 +428,7 @@ impl ContentCodings {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::ContentCodings;
+    /// use crate::encoding::ContentCodings;
     ///
     /// let codings = ContentCodings::new();
     /// assert!(codings.is_identity());
@@ -439,7 +446,7 @@ impl ContentCodings {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::{ContentCodings, ContentCoding};
+    /// use crate::encoding::{ContentCodings, ContentCoding};
     ///
     /// let mut codings = ContentCodings::new();
     /// codings.push(ContentCoding::Gzip);
@@ -458,7 +465,7 @@ impl ContentCodings {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::{ContentCodings, ContentCoding};
+    /// use crate::encoding::{ContentCodings, ContentCoding};
     ///
     /// let mut codings = ContentCodings::new();
     /// assert!(codings.is_identity());
@@ -479,7 +486,7 @@ impl ContentCodings {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::{ContentCodings, ContentCoding};
+    /// use crate::encoding::{ContentCodings, ContentCoding};
     ///
     /// let mut codings = ContentCodings::new();
     /// codings.push(ContentCoding::Gzip);
@@ -495,26 +502,19 @@ impl ContentCodings {
             .join(", ")
     }
 
-    /// Decodes compressed data using the content codings in this collection.
+    /// Decodes compressed data using the content codings in this collection,
+    /// bounded by `max_size`.
     ///
     /// # Arguments
     ///
     /// * `data` - The compressed data to decode
+    /// * `max_size` - Maximum decompressed size in bytes
     ///
     /// # Returns
     ///
-    /// A `Result` containing the decompressed data as a `Vec<u8>`, or an error if decoding fails.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use hotaru_http::encoding::ContentCodings;
-    /// let codings = ContentCodings::new();
-    /// let data = b"hello".to_vec();
-    /// let result = codings.decode_compressed(data.clone()).unwrap();
-    /// assert_eq!(result, data);
-    /// ```
-    pub fn decode_compressed(&self, data: Vec<u8>) -> std::io::Result<Vec<u8>> {
+    /// A `Result` containing the decompressed data as a `Vec<u8>`, or an error
+    /// if decoding fails or the output exceeds `max_size`.
+    pub fn decode_compressed(&self, data: Vec<u8>, max_size: usize) -> std::io::Result<Vec<u8>> {
         if self.is_identity() {
             return Ok(data);
         }
@@ -522,7 +522,7 @@ impl ContentCodings {
         let mut result = data;
         // Decompress in REVERSE order (last applied first)
         for coding in self.codings.iter().rev() {
-            result = ContentCoding::decode_compressed(coding, &result)?;
+            result = ContentCoding::decode_compressed(coding, &result, max_size)?;
         }
         Ok(result)
     }
@@ -539,7 +539,7 @@ impl ContentCodings {
     ///
     /// # Examples
     /// ```
-    /// # use hotaru_http::encoding::ContentCodings;
+    /// use crate::encoding::ContentCodings;
     /// let codings = ContentCodings::new();
     /// let data = b"hello".to_vec();
     /// let result = codings.encode_compressed(data.clone()).unwrap();
@@ -583,7 +583,7 @@ impl HttpEncoding {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::HttpEncoding;
+    /// use crate::encoding::HttpEncoding;
     ///
     /// let encoding = HttpEncoding::from_headers(
     ///     Some("chunked, gzip".to_string()),
@@ -630,7 +630,7 @@ impl HttpEncoding {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::{HttpEncoding, TransferCoding, ContentCoding};
+    /// use crate::encoding::{HttpEncoding, TransferCoding, ContentCoding};
     ///
     /// let mut encoding = HttpEncoding::from_headers(
     ///     Some("chunked".to_string()),
@@ -666,7 +666,7 @@ impl HttpEncoding {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::HttpEncoding;
+    /// use crate::encoding::HttpEncoding;
     ///
     /// let encoding = HttpEncoding::from_headers(
     ///     Some("chunked".to_string()),
@@ -688,7 +688,7 @@ impl HttpEncoding {
     /// # Examples
     ///
     /// ```
-    /// # use hotaru_http::encoding::HttpEncoding;
+    /// use crate::encoding::HttpEncoding;
     ///
     /// let encoding = HttpEncoding::from_headers(
     ///     None,

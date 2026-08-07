@@ -45,7 +45,7 @@ impl HttpBody {
                 }
 
                 let data = content_coding
-                    .decode_compressed(data)
+                    .decode_compressed(data, safety.effective_body_size())
                     .map_err(|_| BodyError::InvalidEncoding)?;
                 if !safety.check_body_size(data.len()) {
                     return Err(BodyError::TooLarge);
