@@ -68,7 +68,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header = HeaderValue::new("application/json");
     /// ```
     pub fn new<T: Into<String>>(value: T) -> Self {
@@ -87,7 +87,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header_value = HeaderValue::new("text/html");
     /// header_value.append("charset=UTF-8");
     /// assert_eq!(header_value.as_str(), "text/html, charset=UTF-8");
@@ -114,7 +114,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header_value = HeaderValue::new("text/html");
     /// header_value.append("application/xhtml+xml");
     /// assert_eq!(header_value.as_str(), "text/html, application/xhtml+xml");
@@ -135,7 +135,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header = HeaderValue::new("text/html");
     /// assert_eq!(header.len(), 1);
     ///
@@ -160,7 +160,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let empty_header = HeaderValue::new("");
     /// assert!(empty_header.is_empty());
     ///
@@ -190,7 +190,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header = HeaderValue::new("text/html");
     /// assert_eq!(header.try_get(0), Some(&"text/html".to_string()));
     /// assert_eq!(header.try_get(1), None);
@@ -219,7 +219,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header = HeaderValue::new("text/html");
     /// assert_eq!(header.get(0), "text/html");
     /// assert_eq!(header.get(1), ""); // Out of bounds returns empty string
@@ -242,7 +242,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header = HeaderValue::new("text/html");
     /// assert_eq!(header.get_or(0, "default"), "text/html");
     /// assert_eq!(header.get_or(1, "default"), "default"); // Out of bounds returns default
@@ -265,7 +265,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut cookies = HeaderValue::new("sessionId=abc123; Path=/");
     /// cookies.add_without_combining("theme=dark; Path=/; Max-Age=3600");
     ///
@@ -297,7 +297,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header = HeaderValue::new("text/html");
     /// header.append("application/json");
     /// assert_eq!(header.try_first(), Some(&"text/html".to_string()));
@@ -319,7 +319,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header = HeaderValue::new("text/html");
     /// assert_eq!(header.first(), "text/html");
     ///
@@ -343,7 +343,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header = HeaderValue::new("text/html");
     /// assert_eq!(header.first_or("default"), "text/html");
     ///
@@ -363,7 +363,7 @@ impl HeaderValue {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let mut header = HeaderValue::new("text/html");
     /// header.append("application/json");
     ///
@@ -392,7 +392,7 @@ impl HeaderValue {
     ///
     /// # Examples
     /// ```rust
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HeaderValue;
     /// let header_value = HeaderValue::new("text/html");
     /// let header_string = header_value.into_header_string("Content-Type");
     /// assert_eq!(header_string, "Content-Type: text/html\r\n");
@@ -426,7 +426,7 @@ impl HeaderValue {
 /// # Examples
 ///
 /// ```rust
-/// use crate::meta::HeaderValue;
+/// # use hotaru_http::meta::HeaderValue;
 /// let header: HeaderValue = "text/html".to_string().into();
 /// assert_eq!(header.first(), "text/html");
 /// ```
@@ -443,7 +443,7 @@ impl From<String> for HeaderValue {
 /// # Examples
 ///
 /// ```rust
-/// use crate::meta::HeaderValue;
+/// # use hotaru_http::meta::HeaderValue;
 /// let header: HeaderValue = "text/html".into();
 /// assert_eq!(header.first(), "text/html");
 /// ```
@@ -458,7 +458,7 @@ impl From<&str> for HeaderValue {
 /// # Examples
 ///
 /// ```rust
-/// use crate::meta::HeaderValue;
+/// # use hotaru_http::meta::HeaderValue;
 /// let mut header = HeaderValue::new("text/html");
 /// header.append("application/json");
 ///
@@ -485,7 +485,7 @@ impl IntoIterator for HeaderValue {
 /// # Examples
 ///
 /// ```rust
-/// use crate::meta::HeaderValue;
+/// # use hotaru_http::meta::HeaderValue;
 /// let mut header = HeaderValue::new("text/html");
 /// header.append("application/json");
 ///
@@ -508,7 +508,7 @@ impl From<HeaderValue> for Vec<String> {
 /// # Examples
 ///
 /// ```rust
-/// use crate::meta::HeaderValue;
+/// # use hotaru_http::meta::HeaderValue;
 /// let mut header = HeaderValue::new("text/html");
 /// header.append("application/json");
 ///
@@ -867,8 +867,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -893,8 +893,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -934,7 +934,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
+    /// # use hotaru_http::meta::HttpMeta;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_content_length(456);
@@ -953,8 +953,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_content_length(123);
@@ -973,11 +973,11 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     ///
     /// let mut meta = HttpMeta::default();
-    /// meta.set_header("content-length", "123");
+    /// meta.set_attribute("content-length", "123");
     /// meta.delete_content_length();
     ///
     /// // Both the cached field and the header are now removed
@@ -1000,16 +1000,16 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::http_value::HttpContentType;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
     /// headers.insert("content-type".to_string(), HeaderValue::new("text/html"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
-    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::TextHtml));
+    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::from_str("text/html")));
     /// ```
     pub fn get_content_type(&mut self) -> Option<HttpContentType> {
         if let Some(ref content_type) = self.content_type {
@@ -1027,9 +1027,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::http_value::HttpContentType;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1037,7 +1037,7 @@ impl HttpMeta {
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// let content_type = meta.parse_content_type();
-    /// assert_eq!(content_type, Some(HttpContentType::TextHtml));
+    /// assert_eq!(content_type, Some(HttpContentType::from_str("text/html")));
     /// ```
     pub fn parse_content_type(&mut self) -> Option<HttpContentType> {
         // Try lowercase first, then uppercase for backward compatibility
@@ -1057,13 +1057,13 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::http_value::HttpContentType;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::http_value::HttpContentType;
     ///
     /// let mut meta = HttpMeta::default();
-    /// meta.set_content_type(HttpContentType::ApplicationJson);
+    /// meta.set_content_type(HttpContentType::ApplicationJson());
     ///
-    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::ApplicationJson));
+    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::ApplicationJson()));
     /// ```
     pub fn set_content_type(&mut self, content_type: HttpContentType) {
         self.content_type = Some(content_type);
@@ -1081,9 +1081,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::http_value::HttpContentType;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1092,13 +1092,13 @@ impl HttpMeta {
     ///
     /// // Parse the value into the cache
     /// let content_type = meta.get_content_type();
-    /// assert_eq!(content_type, Some(HttpContentType::TextHtml));
+    /// assert_eq!(content_type, Some(HttpContentType::from_str("text/html")));
     ///
     /// // Clear the cache only
     /// meta.clear_content_type();
     ///
     /// // The header is still intact and will be re-parsed
-    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::TextHtml));
+    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::from_str("text/html")));
     /// ```
     pub fn clear_content_type(&mut self) {
         self.content_type = None;
@@ -1114,9 +1114,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::http_value::HttpContentType;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1129,8 +1129,8 @@ impl HttpMeta {
     /// // The header is gone
     /// assert!(meta.get_header("content-type").is_none());
     ///
-    /// // And get_content_type will now return a default value
-    /// assert_eq!(meta.get_content_type().unwrap(), HttpContentType::from_str(""));
+    /// // And get_content_type will now return None
+    /// assert!(meta.get_content_type().is_none());
     /// ```
     pub fn delete_content_type(&mut self) {
         self.content_type = None;
@@ -1149,9 +1149,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::http_value::ContentDisposition;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::ContentDisposition;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1181,9 +1181,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::http_value::ContentDisposition;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::ContentDisposition;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1218,8 +1218,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::http_value::{ContentDisposition, ContentDispositionType};
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::http_value::{ContentDisposition, ContentDispositionType};
     ///
     /// let mut meta = HttpMeta::default();
     /// let cd = ContentDisposition::attachment("report.pdf");
@@ -1243,9 +1243,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::http_value::ContentDisposition;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::ContentDisposition;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1279,9 +1279,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::http_value::ContentDisposition;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::http_value::ContentDisposition;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1317,9 +1317,9 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::cookie::{Cookie, CookieMap};
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::cookie::{Cookie, CookieMap};
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1354,8 +1354,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1389,8 +1389,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1420,8 +1420,8 @@ impl HttpMeta {
     ///
     /// ```rust
     /// // For a request with a Cookie header
-    /// use crate::meta::{HttpMeta, HeaderValue};
-    /// use crate::http_value::HttpStartLine;
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::start_line::HttpStartLine;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1432,10 +1432,6 @@ impl HttpMeta {
     /// assert_eq!(cookies.get("sessionId").unwrap().value, "abc123");
     ///
     /// // For a response with Set-Cookie headers
-    /// use crate::meta::{HttpMeta, HeaderValue};
-    /// use crate::http_value::HttpStartLine;
-    /// use std::collections::HashMap;
-    ///
     /// let mut headers = HashMap::new();
     /// headers.insert("set-cookie".to_string(), HeaderValue::new("sessionId=abc123; Path=/; Secure"));
     /// let mut meta = HttpMeta::new(HttpStartLine::parse_response("HTTP/1.1 200 OK"), headers);
@@ -1512,8 +1508,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::cookie::Cookie;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::cookie::Cookie;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.add_cookie("sessionId", Cookie::new("abc123"));
@@ -1543,8 +1539,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1553,13 +1549,13 @@ impl HttpMeta {
     ///
     /// // Parse the value into the cache
     /// let cookies = meta.get_cookies();
-    /// assert_eq!(cookies.get("sessionId").unwrap().value(), "abc123");
+    /// assert_eq!(cookies.get("sessionId").unwrap().get_value(), "abc123");
     ///
     /// // Clear the cache only
     /// meta.clear_cookies();
     ///
     /// // The header is still intact and will be re-parsed
-    /// assert_eq!(meta.get_cookies().get("sessionId").unwrap().value(), "abc123");
+    /// assert_eq!(meta.get_cookies().get("sessionId").unwrap().get_value(), "abc123");
     /// ```
     pub fn clear_cookies(&mut self) {
         self.cookies = None;
@@ -1575,8 +1571,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1590,7 +1586,7 @@ impl HttpMeta {
     /// assert!(meta.get_header("cookie").is_none());
     ///
     /// // And get_cookies will now return an empty map
-    /// assert!(meta.get_cookies().is_empty());
+    /// assert!(meta.get_cookies().get("sessionId").is_none());
     /// ```
     pub fn delete_cookies(&mut self) {
         self.cookies = None;
@@ -1610,8 +1606,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1636,8 +1632,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1663,7 +1659,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
+    /// # use hotaru_http::meta::HttpMeta;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_host(Some("example.com".to_string()));
@@ -1686,8 +1682,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1720,10 +1716,10 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::start_line::HttpStartLine;
-    /// use crate::http_value::*;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::http_value::*;
     /// use std::collections::HashMap;
     /// let mut headers = HashMap::new();
     /// headers.insert("accept-language".to_string(), HeaderValue::new("en-US, en;q=0.9"));
@@ -1756,10 +1752,10 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::start_line::HttpStartLine;
-    /// use crate::http_value::*;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::http_value::*;
     /// use std::collections::HashMap;
     /// let mut headers = HashMap::new();
     /// headers.insert("accept-language".to_string(), HeaderValue::new("en-US, en;q=0.9"));
@@ -1796,8 +1792,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::http_value::AcceptLang;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::http_value::AcceptLang;
     /// let mut meta = HttpMeta::default();
     /// meta.set_lang(Some(AcceptLang::from_str("en")));
     /// ```
@@ -1814,7 +1810,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
+    /// # use hotaru_http::meta::HttpMeta;
     /// let mut meta = HttpMeta::default();
     /// meta.clear_lang();
     /// ```
@@ -1831,7 +1827,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
+    /// # use hotaru_http::meta::HttpMeta;
     /// let mut meta = HttpMeta::default();
     /// meta.delete_lang();
     /// ```
@@ -1854,8 +1850,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1888,8 +1884,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1914,8 +1910,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1942,7 +1938,7 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
+    /// # use hotaru_http::meta::HttpMeta;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_location(Some("/redirect".to_string()));
@@ -1965,8 +1961,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1997,8 +1993,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -2031,12 +2027,12 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("chunked")]);
-    /// headers.insert("content-encoding".to_string(), vec![HeaderValue::new("gzip")]);
+    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("chunked"));
+    /// headers.insert("content-encoding".to_string(), HeaderValue::new("gzip"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// let encoding = meta.get_encoding();
@@ -2062,12 +2058,12 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("chunked")]);
-    /// headers.insert("content-encoding".to_string(), vec![HeaderValue::new("br")]);
+    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("chunked"));
+    /// headers.insert("content-encoding".to_string(), HeaderValue::new("br"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// let encoding = meta.parse_encoding();
@@ -2102,8 +2098,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::encoding::HttpEncoding;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::encoding::HttpEncoding;
     ///
     /// let mut meta = HttpMeta::default();
     /// let encoding = HttpEncoding::from_headers(
@@ -2127,11 +2123,11 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("chunked")]);
+    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("chunked"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// // Parse the value into cache
@@ -2154,12 +2150,12 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("gzip")]);
-    /// headers.insert("content-encoding".to_string(), vec![HeaderValue::new("br")]);
+    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("gzip"));
+    /// headers.insert("content-encoding".to_string(), HeaderValue::new("br"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// // Delete both cache and headers
@@ -2193,9 +2189,10 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// use crate::meta::HttpMeta;
-    /// use crate::meta::HeaderValue;
-    /// use crate::http_value::{HttpStartLine, HttpVersion, HttpMethod};
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::http_value::{HttpVersion, HttpMethod};
     /// use std::collections::HashMap;
     ///
     /// // Create a request meta
@@ -2207,7 +2204,7 @@ impl HttpMeta {
     ///     ),
     ///     HashMap::new()
     /// );
-    /// meta.set_header("host", "example.com");
+    /// meta.set_attribute("host", "example.com");
     ///
     /// let http_string = meta.represent();
     /// assert!(http_string.starts_with("GET /index.html HTTP/1.1\r\n"));

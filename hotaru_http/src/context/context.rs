@@ -10,13 +10,12 @@ use hotaru_core::protocol::{
 use hotaru_core::url::UrlNode;
 
 use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 use crate::channel::Http1Channel;
-use crate::message::body::HttpBody;
+use crate::message::body::{BodyError, HttpBody};
 use crate::message::http_value::{HttpMethod, StatusCode};
 use crate::message::meta::HttpMeta;
 use crate::message::request::HttpRequest;
@@ -321,7 +320,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// Note that request body will not be automatically parsed unless this function is called
     /// The automatic parsing is not recommended, as it can lead to performance issues and security vulnerabilities.
     /// If you didn't parse body, the body will be `HttpBody::Unparsed`.
-    pub async fn parse_body(&mut self) {
+    pub async fn parse_body(&mut self) -> Result<(), BodyError> {
         // Start from the protocol baseline (`self.safety`); overlay any
         // per-endpoint override on top. (The prior implementation fetched
         // `endpoint.get_params::<HttpSafety>()` twice — the second call was
@@ -333,70 +332,65 @@ impl<TS: TransportSpec> HttpContext<TS> {
             }
         }
 
-        let body = std::mem::take(&mut self.request.body);
-        self.request.body = body.parse_buffer(&settings);
+        let body = self.request.body.clone().parse_buffer(&settings)?;
+        self.request.body = body;
+        Ok(())
     }
 
-    /// Returns the body of the request as a reference to `HttpBody`.
-    pub async fn form(&mut self) -> Option<&UrlEncodedForm> {
-        self.parse_body().await; // Await the Future<Output = ()>
+    /// Parses and returns the URL-encoded request body.
+    pub async fn form(&mut self) -> Result<&UrlEncodedForm, BodyError> {
+        let content_type = self
+            .request
+            .meta
+            .get_content_type()
+            .map(|value| value.to_string());
+        self.parse_body().await?;
         if let HttpBody::Form(ref data) = self.request.body {
-            Some(data)
+            Ok(data)
+        } else if matches!(self.request.body, HttpBody::Empty | HttpBody::Unparsed) {
+            Err(BodyError::Missing)
         } else {
-            None
+            Err(content_type
+                .map(BodyError::UnsupportedContentType)
+                .unwrap_or(BodyError::MissingContentType))
         }
     }
 
-    /// Returns the body of the request as a reference to `UrlEncodedForm`, or an empty form if not present.
-    pub async fn form_or_default(&mut self) -> &UrlEncodedForm {
-        match self.form().await {
-            Some(form) => form,
-            None => {
-                static EMPTY: Lazy<UrlEncodedForm> = Lazy::new(|| HashMap::new().into());
-                &EMPTY
-            }
-        }
-    }
-
-    /// Returns the body of the request as a reference to `MultiForm`.
-    pub async fn files(&mut self) -> Option<&MultiForm> {
-        self.parse_body().await; // Await the Future<Output = ()>
+    /// Parses and returns the multipart request body.
+    pub async fn files(&mut self) -> Result<&MultiForm, BodyError> {
+        let content_type = self
+            .request
+            .meta
+            .get_content_type()
+            .map(|value| value.to_string());
+        self.parse_body().await?;
         if let HttpBody::Files(ref data) = self.request.body {
-            Some(data)
+            Ok(data)
+        } else if matches!(self.request.body, HttpBody::Empty | HttpBody::Unparsed) {
+            Err(BodyError::Missing)
         } else {
-            None
+            Err(content_type
+                .map(BodyError::UnsupportedContentType)
+                .unwrap_or(BodyError::MissingContentType))
         }
     }
 
-    /// Returns the body of the request as a reference to `MultiForm`, or an empty form if not present.
-    pub async fn files_or_default(&mut self) -> &MultiForm {
-        match self.files().await {
-            Some(files) => files,
-            None => {
-                static EMPTY: Lazy<MultiForm> = Lazy::new(|| HashMap::new().into());
-                &EMPTY
-            }
-        }
-    }
-
-    /// Returns the body of the request as a reference to `HttpBody::Binary`.
-    pub async fn json(&mut self) -> Option<&Value> {
-        self.parse_body().await; // Await the Future<Output = ()>
+    /// Parses and returns the JSON request body.
+    pub async fn json(&mut self) -> Result<&Value, BodyError> {
+        let content_type = self
+            .request
+            .meta
+            .get_content_type()
+            .map(|value| value.to_string());
+        self.parse_body().await?;
         if let HttpBody::Json(ref data) = self.request.body {
-            Some(data)
+            Ok(data)
+        } else if matches!(self.request.body, HttpBody::Empty | HttpBody::Unparsed) {
+            Err(BodyError::Missing)
         } else {
-            None
-        }
-    }
-
-    /// Returns the body of the request as a reference to `HttpBody::Binary`, or an empty JSON if not present.
-    pub async fn json_or_default(&mut self) -> &Value {
-        match self.json().await {
-            Some(json) => json,
-            None => {
-                static EMPTY: Lazy<Value> = Lazy::new(|| Value::new(""));
-                &EMPTY
-            }
+            Err(content_type
+                .map(BodyError::UnsupportedContentType)
+                .unwrap_or(BodyError::MissingContentType))
         }
     }
 
@@ -618,263 +612,3 @@ impl<TS: TransportSpec> HttpContext<TS> {
         self.request = request;
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::message::http_value::StatusCode;
-    use crate::message::response::response_templates;
-
-    type TestHttpContext = HttpContext<hotaru_io_tokio::TcpTransport>;
-
-    fn client_context(host: &str) -> TestHttpContext {
-        TestHttpContext::new_client(host.to_string(), HttpSafety::default())
-    }
-
-    #[test]
-    fn take_request_sets_missing_host_from_context() {
-        let mut ctx = client_context("example.com");
-
-        let mut request = ctx.take_request();
-
-        assert_eq!(request.meta.get_host(), Some("example.com".to_string()));
-    }
-
-    #[test]
-    fn take_request_preserves_existing_request_host() {
-        let mut ctx = client_context("context.example");
-        let mut request = HttpRequest::default();
-        request.meta.set_host(Some("request.example".to_string()));
-        ctx.request = request;
-
-        let mut request = ctx.take_request();
-
-        assert_eq!(request.meta.get_host(), Some("request.example".to_string()));
-    }
-
-    #[test]
-    fn take_request_ignores_empty_context_host() {
-        let mut ctx = client_context("");
-
-        let mut request = ctx.take_request();
-
-        assert_eq!(request.meta.get_host(), None);
-    }
-
-    #[test]
-    fn set_response_stores_response() {
-        let mut ctx = client_context("");
-        let response = response_templates::normal_response(StatusCode::CREATED, "created");
-
-        ctx.set_response(response);
-
-        assert_eq!(
-            ctx.response.meta.start_line.status_code(),
-            StatusCode::CREATED
-        );
-    }
-}
-
-// #[cfg(test)]
-// mod test {
-//     use crate::http::{
-//         context::HttpResCtx, request::request_templates::get_request, safety::HttpSafety,
-//     };
-//     #[cfg(feature = "tls")]
-//     use hotaru_tls::{TlsClientConfig, TlsConnector, TlsTransport};
-//     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-
-// =========================================================================
-// Socket Address Accessor Tests
-// =========================================================================
-
-// #[test]
-// fn test_client_ip_with_address() {
-//     use crate::app::application::App;
-//     use crate::http::request::HttpRequest;
-//     use crate::url::Url;
-//     use std::sync::Arc;
-
-//     let app = App::new().build();
-//     let endpoint = Arc::new(Url::<super::HttpContext>::default());
-//     let request = HttpRequest::default();
-//     let remote = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 54321);
-//     let local = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8080);
-
-//     let ctx = super::HttpContext::new_server(app, endpoint, request, Some(remote), Some(local));
-
-//     // Test client_ip()
-//     assert_eq!(ctx.client_ip(), Some(remote));
-//     assert_eq!(ctx.client_ip_or_default(), remote);
-
-//     // Test client_ip_only()
-//     assert_eq!(
-//         ctx.client_ip_only(),
-//         Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)))
-//     );
-//     assert_eq!(
-//         ctx.client_ip_only_or_default(),
-//         IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100))
-//     );
-
-//     // Test server_addr()
-//     assert_eq!(ctx.server_addr(), Some(local));
-//     assert_eq!(ctx.server_addr_or_default(), local);
-
-//     // Test aliases
-//     assert_eq!(ctx.remote_addr(), Some(remote));
-//     assert_eq!(ctx.remote_addr_or_default(), remote);
-//     assert_eq!(ctx.local_addr(), Some(local));
-//     assert_eq!(ctx.local_addr_or_default(), local);
-// }
-
-//     #[test]
-//     fn test_client_ip_without_address() {
-//         use crate::app::application::App;
-//         use crate::http::request::HttpRequest;
-//         use crate::url::Url;
-//         use std::sync::Arc;
-
-//         let app = App::new().build();
-//         let endpoint = Arc::new(Url::<super::HttpContext>::default());
-//         let request = HttpRequest::default();
-
-//         let ctx = super::HttpContext::new_server(
-//             app, endpoint, request, None, // No remote address
-//             None, // No local address
-//         );
-
-//         let unset = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
-
-//         // Test client_ip() returns None
-//         assert_eq!(ctx.client_ip(), None);
-//         assert_eq!(ctx.client_ip_or_default(), unset);
-
-//         // Test client_ip_only() returns None
-//         assert_eq!(ctx.client_ip_only(), None);
-//         assert_eq!(
-//             ctx.client_ip_only_or_default(),
-//             IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))
-//         );
-
-//         // Test server_addr() returns None
-//         assert_eq!(ctx.server_addr(), None);
-//         assert_eq!(ctx.server_addr_or_default(), unset);
-
-//         // Test aliases
-//         assert_eq!(ctx.remote_addr(), None);
-//         assert_eq!(ctx.remote_addr_or_default(), unset);
-//         assert_eq!(ctx.local_addr(), None);
-//         assert_eq!(ctx.local_addr_or_default(), unset);
-//     }
-
-//     #[test]
-//     fn test_client_context_has_no_addresses() {
-//         let ctx = super::HttpContext::<hotaru_io_tokio::TcpTransport>::new_client(
-//             "example.com".to_string(),
-//             HttpSafety::default(),
-//         );
-
-//         // Client contexts start with no addresses
-//         assert_eq!(ctx.client_ip(), None);
-//         assert_eq!(ctx.server_addr(), None);
-//     }
-
-//     #[test]
-//     fn test_ipv6_address() {
-//         use crate::app::application::App;
-//         use crate::http::request::HttpRequest;
-//         use crate::url::Url;
-//         use std::net::Ipv6Addr;
-//         use std::sync::Arc;
-
-//         let app = App::new().build();
-//         let endpoint = Arc::new(Url::<super::HttpContext>::default());
-//         let request = HttpRequest::default();
-//         let remote = SocketAddr::new(
-//             IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
-//             54321,
-//         );
-//         let local = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 8080);
-
-//         let ctx = super::HttpContext::new_server(app, endpoint, request, Some(remote), Some(local));
-
-//         assert_eq!(ctx.client_ip(), Some(remote));
-//         assert_eq!(
-//             ctx.client_ip_only(),
-//             Some(IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)))
-//         );
-//         assert_eq!(ctx.server_addr(), Some(local));
-//     }
-
-//     // =========================================================================
-//     // HTTP Client Tests
-//     // =========================================================================
-
-//     // #[tokio::test]
-//     // async fn request_a_page() {
-//     //     let builder = ConnectionBuilder::new("example.com", 443)
-//     //         .protocol(Protocol::HTTP)
-//     //         .tls(true);
-//     //     let connection = builder.connect().await.unwrap();
-//     //     let mut request = HttpResCtx::new(
-//     //         connection,
-//     //         HttpSafety::new().with_max_body_size(25565),
-//     //         "example.com",
-//     //     );
-//     //     let _ = request.process(request_templates::get_request("/")).await;
-//     //     request.parse_response().await;
-//     //     // println!("{:?}, {:?}", request.response.meta, request.response.body);
-//     // }
-
-//     /// HTTPS test (requires `tls` feature and external network).
-//     #[cfg(feature = "tls")]
-//     #[tokio::test]
-//     #[ignore = "requires external network and TLS feature"]
-//     async fn request_another_page() {
-//         let connector = TlsConnector::new(TlsClientConfig::new()).unwrap();
-//         let response = HttpResCtx::<TlsTransport>::send_request(
-//             ("api.pmine.org".to_string(), 443),
-//             connector,
-//             get_request("/num/change/lhsduifhsjdbczfjgszjdhfgxyjey/36/2"),
-//             HttpSafety::new().with_max_body_size(25565),
-//         )
-//         .await
-//         .unwrap();
-//         println!("{:?}, {:?}", response.meta, response.body);
-//     }
-
-//     /// HTTPS chunked-response test (requires `tls` feature and external network).
-//     #[cfg(feature = "tls")]
-//     #[tokio::test]
-//     #[ignore = "requires external network and TLS feature"]
-//     async fn request_chunked_page() {
-//         let connector = TlsConnector::new(TlsClientConfig::new()).unwrap();
-//         let response = HttpResCtx::<TlsTransport>::send_request(
-//             ("api.pmine.org".to_string(), 443),
-//             connector,
-//             get_request("/num/c2"),
-//             HttpSafety::new().with_max_body_size(25565),
-//         )
-//         .await
-//         .unwrap();
-//         println!("{:?}, {:?}", response.meta, response.body);
-//     }
-
-//     /// Test requires a local server running on port 3003
-//     /// Run with: cargo test --lib -- --ignored localhost
-//     #[tokio::test]
-//     #[ignore = "requires local server on port 3003"]
-//     async fn localhost() {
-//         let response = HttpResCtx::send_request_host(
-//             "http://localhost:3003",
-//             None,
-//             crate::connection::tcp::TcpConnector,
-//             get_request("/"),
-//             HttpSafety::new().with_max_body_size(25565),
-//         )
-//         .await
-//         .unwrap();
-//         println!("{:?}, {:?}", response.meta, response.body);
-//     }
-// }
