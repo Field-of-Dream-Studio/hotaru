@@ -40,15 +40,20 @@ use zstd::stream::{read::Decoder as ZstdDecoder, write::Encoder as ZstdEncoder};
 
 static CHUNK_SIZE: usize = 4096;
 
-/// Decompresses GZIP-encoded data
+/// Decompresses GZIP-encoded data bounded by `max_size`.
+///
+/// Uses `Read::take` so the limit is enforced *during* decompression —
+/// a decompression bomb never has the chance to allocate beyond `max_size`.
 ///
 /// # Arguments
 ///
 /// * `data` - GZIP-compressed byte slice
+/// * `max_size` - Maximum decompressed size in bytes
 ///
 /// # Returns
 ///
-/// Decompressed data as `Vec<u8>` or `std::io::Error` on failure
+/// Decompressed data as `Vec<u8>`, or an error if the output exceeds
+/// `max_size` or the data is corrupt.
 ///
 /// # Example
 /// ```
@@ -60,10 +65,18 @@ static CHUNK_SIZE: usize = 4096;
 /// let decompressed = decompress_gzip(&data).unwrap();
 /// assert_eq!(decompressed, b"Hello world!");
 /// ```
-pub fn decompress_gzip(data: &[u8]) -> std::io::Result<Vec<u8>> {
+pub fn decompress_gzip(data: &[u8], max_size: usize) -> std::io::Result<Vec<u8>> {
     let mut decoder = bufread::GzDecoder::new(data);
     let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)?;
+    decoder
+        .take((max_size + 1) as u64)
+        .read_to_end(&mut decompressed)?;
+    if decompressed.len() > max_size {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "decompressed data exceeds max_size",
+        ));
+    }
     Ok(decompressed)
 }
 
@@ -107,10 +120,18 @@ pub fn compress_gzip(data: &[u8]) -> std::io::Result<Vec<u8>> {
 /// let decompressed = decompress_deflate(&data).unwrap();
 /// assert_eq!(decompressed, b"Hello world!");
 /// ```
-pub fn decompress_deflate(data: &[u8]) -> std::io::Result<Vec<u8>> {
+pub fn decompress_deflate(data: &[u8], max_size: usize) -> std::io::Result<Vec<u8>> {
     let mut decoder = bufread::DeflateDecoder::new(data);
     let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)?;
+    decoder
+        .take((max_size + 1) as u64)
+        .read_to_end(&mut decompressed)?;
+    if decompressed.len() > max_size {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "decompressed data exceeds max_size",
+        ));
+    }
     Ok(decompressed)
 }
 
@@ -147,11 +168,18 @@ pub fn compress_deflate(data: &[u8]) -> std::io::Result<Vec<u8>> {
 /// let decompressed = decompress_brotli(&data).unwrap();
 /// assert_eq!(decompressed, b"Hello world!");
 /// ```
-pub fn decompress_brotli(data: &[u8]) -> std::io::Result<Vec<u8>> {
+pub fn decompress_brotli(data: &[u8], max_size: usize) -> std::io::Result<Vec<u8>> {
     let mut decompressed = Vec::new();
     BrotliDecompressor::new(data, CHUNK_SIZE)
+        .take((max_size + 1) as u64)
         .read_to_end(&mut decompressed)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    if decompressed.len() > max_size {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "decompressed data exceeds max_size",
+        ));
+    }
     Ok(decompressed)
 }
 
@@ -189,10 +217,18 @@ pub fn compress_brotli(data: &[u8]) -> std::io::Result<Vec<u8>> {
 /// let decompressed = decompress_zstd(&data).unwrap();
 /// assert_eq!(decompressed, b"Hello world!");
 /// ```
-pub fn decompress_zstd(data: &[u8]) -> std::io::Result<Vec<u8>> {
+pub fn decompress_zstd(data: &[u8], max_size: usize) -> std::io::Result<Vec<u8>> {
     let mut decoder = ZstdDecoder::new(data)?;
     let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)?;
+    decoder
+        .take((max_size + 1) as u64)
+        .read_to_end(&mut decompressed)?;
+    if decompressed.len() > max_size {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "decompressed data exceeds max_size",
+        ));
+    }
     Ok(decompressed)
 }
 
