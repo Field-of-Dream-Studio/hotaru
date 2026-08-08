@@ -283,6 +283,11 @@ impl<TS: TransportSpec> HttpContext<TS> {
         if let Some(ep) = endpoint.get_params::<HttpSafety>() {
             config.update(&ep);
         }
+        if self.request.meta.is_content_length_invalid() {
+            return Err(HttpError::InvalidHeader(
+                "Conflicting Content-Length values".to_string(),
+            ));
+        }
         if !config.check_body_size(self.request.meta.get_content_length().unwrap_or(0)) {
             return Err(HttpError::PayloadTooLarge);
         }

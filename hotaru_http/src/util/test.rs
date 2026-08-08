@@ -623,4 +623,72 @@ mod security_tests {
         // Should succeed (hex is case-insensitive)
         assert!(result.is_ok());
     }
+
+    // ============================================================================
+    // Content-Length Parsing Tests — duplicate / conflicting values
+    //
+    // PR #43 pattern: duplicate Content-Length conflict detection happens at
+    // header ingestion time (has_conflicting_content_length), not inside
+    // parse_content_length. parse_content_length stays simple — just .first().
+    // ============================================================================
+
+    fn cl_header_map(pairs: Vec<(&str, &str)>) -> std::collections::HashMap<String, crate::message::meta::HeaderValue> {
+        use std::collections::HashMap;
+        let mut map: HashMap<String, crate::message::meta::HeaderValue> = HashMap::new();
+        for (key, value) in pairs {
+            let name = key.to_lowercase();
+            match map.get_mut(&name) {
+                Some(existing) => existing.add_without_combining(value.to_string()),
+                None => {
+                    map.insert(name, crate::message::meta::HeaderValue::new(value.to_string()));
+                }
+            }
+        }
+        map
+    }
+
+    #[test]
+    fn cl_single_value_parsed() {
+        let headers = cl_header_map(vec![("Content-Length", "123")]);
+        let mut meta = HttpMeta::new(Default::default(), headers.clone());
+        // parse_content_length just takes .first() — PR #43 style
+        assert_eq!(meta.parse_content_length(), Some(123));
+        // No conflict detected at ingestion time
+        assert!(!HttpMeta::has_conflicting_content_length(&headers));
+    }
+
+    #[test]
+    fn cl_duplicate_same_value_accepted() {
+        let headers = cl_header_map(vec![
+            ("Content-Length", "42"),
+            ("Content-Length", "42"),
+        ]);
+        let mut meta = HttpMeta::new(Default::default(), headers.clone());
+        // .first() returns the first "42", parsing succeeds
+        assert_eq!(meta.parse_content_length(), Some(42));
+        // Identical values → no conflict
+        assert!(!HttpMeta::has_conflicting_content_length(&headers));
+    }
+
+    #[test]
+    fn cl_duplicate_different_values_rejected() {
+        let headers = cl_header_map(vec![
+            ("Content-Length", "5"),
+            ("Content-Length", "42"),
+        ]);
+        let mut meta = HttpMeta::new(Default::default(), headers.clone());
+        // .first() returns "5" (parses fine — simple PR #43 approach)
+        assert_eq!(meta.parse_content_length(), Some(5));
+        // But has_conflicting_content_length detects the mismatch at ingestion time
+        assert!(HttpMeta::has_conflicting_content_length(&headers));
+    }
+
+    #[test]
+    fn cl_missing_returns_none() {
+        let headers = cl_header_map(vec![("Host", "localhost")]);
+        let mut meta = HttpMeta::new(Default::default(), headers.clone());
+        assert_eq!(meta.parse_content_length(), None);
+        // Missing CL is not a conflict
+        assert!(!HttpMeta::has_conflicting_content_length(&headers));
+    }
 }

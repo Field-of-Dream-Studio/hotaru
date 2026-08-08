@@ -187,6 +187,12 @@ impl HttpBody {
             header.delete_content_length();
             read_chunked_body(buf_reader, header, parse_config).await?
         } else {
+            if header.is_content_length_invalid() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Conflicting Content-Length values",
+                ));
+            }
             let content_length = header.get_content_length().unwrap_or(0);
             read_content_length_body(buf_reader, parse_config, content_length).await?
         };

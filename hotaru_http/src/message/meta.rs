@@ -22,6 +22,9 @@ pub struct HttpMeta {
     // Content-length header, overrides the content length from the hashmap if present
     content_length: Option<usize>,
 
+    // Set to true when Content-Length has conflicting duplicate values
+    content_length_invalid: bool,
+
     // Cookies header in request, Set-Cookie header in response
     cookies: Option<CookieMap>,
 
@@ -532,6 +535,7 @@ impl HttpMeta {
             header: headers,
             content_type: None,
             content_length: None,
+            content_length_invalid: false,
             content_disposition: None,
             cookies: None,
             encoding: None,
@@ -564,12 +568,19 @@ impl HttpMeta {
         // Parse headers with special handling for specific header names
         let header = Self::parse_headers(headers, is_request);
 
+        // RFC 9112 §6.3.1: detect conflicting Content-Length at ingestion time.
+        // Following PR #43's pattern: validate early so parse_content_length
+        // stays simple (just takes .first()).
+        let content_length_invalid = Self::has_conflicting_content_length(&header);
+
         if print_raw {
             println!("Parsed headers: {:?}", header);
             println!("Parsed start line: {:?}", start_line);
         }
 
-        Ok(HttpMeta::new(start_line, header))
+        let mut meta = HttpMeta::new(start_line, header);
+        meta.content_length_invalid = content_length_invalid;
+        Ok(meta)
     }
 
     async fn header_lines_raw_from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
@@ -726,6 +737,23 @@ impl HttpMeta {
         headers
     }
 
+    /// Returns `true` when the header map contains multiple Content-Length
+    /// field values that disagree (RFC 9112 §6.3.1).
+    ///
+    /// Duplicate Content-Length headers with the *same* value are harmless;
+    /// only conflicting values make the message boundary ambiguous and must
+    /// cause the request to be rejected.
+    pub(crate) fn has_conflicting_content_length(headers: &HashMap<String, HeaderValue>) -> bool {
+        if let Some(cl) = headers.get("content-length") {
+            if cl.len() > 1 {
+                let values = cl.values();
+                let first = &values[0];
+                return !values.iter().all(|v| v == first);
+            }
+        }
+        false
+    }
+
     // Expose the specific methods that call the shared implementation
     pub async fn from_request_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         buf_reader: &mut R,
@@ -752,6 +780,11 @@ impl HttpMeta {
 
         // Parse headers
         let header = Self::parse_headers(headers, true);
+
+        // RFC 9112 §6.3.1: detect conflicting Content-Length at ingestion time.
+        if Self::has_conflicting_content_length(&header) {
+            self.content_length_invalid = true;
+        }
 
         if print_raw {
             println!("Parsed request headers: {:?}", header);
@@ -906,23 +939,20 @@ impl HttpMeta {
     /// assert_eq!(meta.get_content_length(), Some(123));
     /// ```
     pub fn parse_content_length(&mut self) -> Option<usize> {
-        let header = self.header.get("content-length")?;
-
-        // Reject duplicate Content-Length with differing values (RFC 9112 §6.3)
-        let values = header.values();
-        if values.len() > 1 {
-            let parsed: Vec<Option<usize>> =
-                values.iter().map(|v| v.parse::<usize>().ok()).collect();
-            let first = parsed[0];
-            if !parsed.iter().all(|v| *v == first) {
-                // Conflicting Content-Length — reject the request
-                return None;
-            }
-        }
-
-        let length = header.first().parse::<usize>().ok();
+        let length = self
+            .header
+            .get("content-length")
+            .and_then(|s| s.first().parse::<usize>().ok());
         self.content_length = length;
         length
+    }
+
+    /// Returns true if Content-Length header was present but had conflicting values.
+    ///
+    /// When this returns true, the request should be rejected with a 400 Bad Request
+    /// because the conflicting Content-Length makes the message boundary ambiguous.
+    pub fn is_content_length_invalid(&self) -> bool {
+        self.content_length_invalid
     }
 
     /// Sets the content_length field.
@@ -2327,6 +2357,7 @@ impl Default for HttpMeta {
             header: HashMap::new(),
             content_type: None,
             content_length: None,
+            content_length_invalid: false,
             content_disposition: None,
             cookies: None,
             encoding: None,
