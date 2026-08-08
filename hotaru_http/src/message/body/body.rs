@@ -87,14 +87,14 @@ impl HttpBody {
         /// 4. **Simplicity**: Clear, maintainable code with focused security checks
         ///
         /// ## What We Check (Critical)
-        /// - 鉁?Cumulative size limits (prevents DoS)
-        /// - 鉁?Invalid hex chunk sizes (prevents crashes)
-        /// - 鉁?CRLF terminators (prevents protocol confusion)
+        /// - [x] Cumulative size limits (prevents DoS)
+        /// - [x] Invalid hex chunk sizes (prevents crashes)
+        /// - [x] CRLF terminators (prevents protocol confusion)
         ///
         /// ## What We Don't Check (Non-Critical)
-        /// - 鉂?Chunk extension validity (doesn't affect security if size is validated)
-        /// - 鉂?Duplicate zero chunks (harmless, just ends parsing)
-        /// - 鉂?Chunk data content validation (application layer concern)
+        /// - [ ] Chunk extension validity (doesn't affect security if size is validated)
+        /// - [ ] Duplicate zero chunks (harmless, just ends parsing)
+        /// - [ ] Chunk data content validation (application layer concern)
         ///
         /// **Rationale**: If data doesn't overflow the upper size limit, it's safe to process.
         /// Malformed but size-compliant data will be caught at the application layer or cause
@@ -111,7 +111,9 @@ impl HttpBody {
             loop {
                 // Read chunk size line
                 let mut size_line = String::new();
-                buf_reader.read_line(&mut size_line).await?;
+                let _ = buf_reader
+                    .read_line(&mut size_line, safety_setting.effective_line_length())
+                    .await?;
                 let chunk_size_str = size_line.trim_end_matches(|c| c == '\r' || c == '\n');
 
                 // Parse chunk size (validates hex format - critical for preventing crashes)

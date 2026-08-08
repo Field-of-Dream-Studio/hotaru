@@ -627,9 +627,9 @@ impl HttpMeta {
 
             loop {
                 let mut line = String::new();
-                let bytes_read = buf_reader.read_line(&mut line).await.map_err(|_| {
-                    ConnectionError::InternalServerError(format!("Failed to read line"))
-                })?;
+                let bytes_read = buf_reader
+                    .read_line(&mut line, config.effective_line_length())
+                    .await?;
                 if print_raw {
                     println!("Read line: {}, buffer: {}", line, bytes_read);
                 }
@@ -637,12 +637,6 @@ impl HttpMeta {
                 if bytes_read == 0 || line.trim_end().is_empty() {
                     // println!("[End of headers] No more lines to read, 0 bytes read {}, empty line: {}", bytes_read, line.trim_end().is_empty());
                     break; // End of headers
-                }
-
-                // Reject with an extremely long header line
-                if !config.check_line_length(line.len()) {
-                    // println!("[Header line too long] Rejecting line: {}", line);
-                    return Err(ConnectionError::PayloadTooLarge);
                 }
 
                 total_header_size += line.len();
@@ -966,7 +960,7 @@ impl HttpMeta {
     /// # use hotaru_http::meta::HeaderValue;
     ///
     /// let mut meta = HttpMeta::default();
-    /// meta.set_attribute("content-length", "123");
+    /// meta.set_header("content-length", "123");
     /// meta.delete_content_length();
     ///
     /// // Both the cached field and the header are now removed
@@ -998,7 +992,7 @@ impl HttpMeta {
     /// headers.insert("content-type".to_string(), HeaderValue::new("text/html"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
-    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::from_str("text/html")));
+    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::TextHtml));
     /// ```
     pub fn get_content_type(&mut self) -> Option<HttpContentType> {
         if let Some(ref content_type) = self.content_type {
@@ -1026,7 +1020,7 @@ impl HttpMeta {
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// let content_type = meta.parse_content_type();
-    /// assert_eq!(content_type, Some(HttpContentType::from_str("text/html")));
+    /// assert_eq!(content_type, Some(HttpContentType::TextHtml));
     /// ```
     pub fn parse_content_type(&mut self) -> Option<HttpContentType> {
         // Try lowercase first, then uppercase for backward compatibility
@@ -1050,9 +1044,9 @@ impl HttpMeta {
     /// # use hotaru_http::http_value::HttpContentType;
     ///
     /// let mut meta = HttpMeta::default();
-    /// meta.set_content_type(HttpContentType::ApplicationJson());
+    /// meta.set_content_type(HttpContentType::ApplicationJson);
     ///
-    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::ApplicationJson()));
+    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::ApplicationJson));
     /// ```
     pub fn set_content_type(&mut self, content_type: HttpContentType) {
         self.content_type = Some(content_type);
@@ -1081,13 +1075,13 @@ impl HttpMeta {
     ///
     /// // Parse the value into the cache
     /// let content_type = meta.get_content_type();
-    /// assert_eq!(content_type, Some(HttpContentType::from_str("text/html")));
+    /// assert_eq!(content_type, Some(HttpContentType::TextHtml));
     ///
     /// // Clear the cache only
     /// meta.clear_content_type();
     ///
     /// // The header is still intact and will be re-parsed
-    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::from_str("text/html")));
+    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::TextHtml));
     /// ```
     pub fn clear_content_type(&mut self) {
         self.content_type = None;
@@ -1118,8 +1112,8 @@ impl HttpMeta {
     /// // The header is gone
     /// assert!(meta.get_header("content-type").is_none());
     ///
-    /// // And get_content_type will now return None
-    /// assert!(meta.get_content_type().is_none());
+    /// // And get_content_type will now return a default value
+    /// assert_eq!(meta.get_content_type().unwrap(), HttpContentType::from_str(""));
     /// ```
     pub fn delete_content_type(&mut self) {
         self.content_type = None;
@@ -1410,7 +1404,7 @@ impl HttpMeta {
     /// ```rust
     /// // For a request with a Cookie header
     /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
-    /// # use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::http_value::HttpStartLine;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -1421,6 +1415,10 @@ impl HttpMeta {
     /// assert_eq!(cookies.get("sessionId").unwrap().value, "abc123");
     ///
     /// // For a response with Set-Cookie headers
+    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::http_value::HttpStartLine;
+    /// use std::collections::HashMap;
+    ///
     /// let mut headers = HashMap::new();
     /// headers.insert("set-cookie".to_string(), HeaderValue::new("sessionId=abc123; Path=/; Secure"));
     /// let mut meta = HttpMeta::new(HttpStartLine::parse_response("HTTP/1.1 200 OK"), headers);
@@ -1538,13 +1536,13 @@ impl HttpMeta {
     ///
     /// // Parse the value into the cache
     /// let cookies = meta.get_cookies();
-    /// assert_eq!(cookies.get("sessionId").unwrap().get_value(), "abc123");
+    /// assert_eq!(cookies.get("sessionId").unwrap().value(), "abc123");
     ///
     /// // Clear the cache only
     /// meta.clear_cookies();
     ///
     /// // The header is still intact and will be re-parsed
-    /// assert_eq!(meta.get_cookies().get("sessionId").unwrap().get_value(), "abc123");
+    /// assert_eq!(meta.get_cookies().get("sessionId").unwrap().value(), "abc123");
     /// ```
     pub fn clear_cookies(&mut self) {
         self.cookies = None;
@@ -1575,7 +1573,7 @@ impl HttpMeta {
     /// assert!(meta.get_header("cookie").is_none());
     ///
     /// // And get_cookies will now return an empty map
-    /// assert!(meta.get_cookies().get("sessionId").is_none());
+    /// assert!(meta.get_cookies().is_empty());
     /// ```
     pub fn delete_cookies(&mut self) {
         self.cookies = None;
@@ -2020,8 +2018,8 @@ impl HttpMeta {
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("chunked"));
-    /// headers.insert("content-encoding".to_string(), HeaderValue::new("gzip"));
+    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("chunked")]);
+    /// headers.insert("content-encoding".to_string(), vec![HeaderValue::new("gzip")]);
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// let encoding = meta.get_encoding();
@@ -2051,8 +2049,8 @@ impl HttpMeta {
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("chunked"));
-    /// headers.insert("content-encoding".to_string(), HeaderValue::new("br"));
+    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("chunked")]);
+    /// headers.insert("content-encoding".to_string(), vec![HeaderValue::new("br")]);
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// let encoding = meta.parse_encoding();
@@ -2116,7 +2114,7 @@ impl HttpMeta {
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("chunked"));
+    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("chunked")]);
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// // Parse the value into cache
@@ -2143,8 +2141,8 @@ impl HttpMeta {
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("gzip"));
-    /// headers.insert("content-encoding".to_string(), HeaderValue::new("br"));
+    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("gzip")]);
+    /// headers.insert("content-encoding".to_string(), vec![HeaderValue::new("br")]);
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// // Delete both cache and headers
@@ -2180,8 +2178,7 @@ impl HttpMeta {
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
     /// # use hotaru_http::meta::HeaderValue;
-    /// # use hotaru_http::start_line::HttpStartLine;
-    /// # use hotaru_http::http_value::{HttpVersion, HttpMethod};
+    /// # use hotaru_http::http_value::{HttpStartLine, HttpVersion, HttpMethod};
     /// use std::collections::HashMap;
     ///
     /// // Create a request meta
@@ -2193,7 +2190,7 @@ impl HttpMeta {
     ///     ),
     ///     HashMap::new()
     /// );
-    /// meta.set_attribute("host", "example.com");
+    /// meta.set_header("host", "example.com");
     ///
     /// let http_string = meta.represent();
     /// assert!(http_string.starts_with("GET /index.html HTTP/1.1\r\n"));
