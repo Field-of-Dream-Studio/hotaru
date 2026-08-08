@@ -10,7 +10,7 @@
 
 use core::fmt;
 
-use hotaru_core::connection::ReadLimitError;
+use hotaru_core::connection::HotaruIoError;
 #[cfg(feature = "spawn_local")]
 use hotaru_core::connection::{
     HotaruBufRead, HotaruBufReader, HotaruBufWriter, HotaruRead, HotaruWrite, MaybeSend,
@@ -67,8 +67,8 @@ impl fmt::Display for EmbeddedIoError {
     }
 }
 
-impl ReadLimitError for EmbeddedIoError {
-    fn rate_limit_error() -> Self {
+impl HotaruIoError for EmbeddedIoError {
+    fn size_exceeded() -> Self {
         Self::SizeExceeded
     }
 }

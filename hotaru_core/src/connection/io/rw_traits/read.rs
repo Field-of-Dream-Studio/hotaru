@@ -1,6 +1,6 @@
 use core::future::Future;
 
-use super::error::ReadLimitError;
+use super::error::HotaruIoError;
 use super::super::MaybeSend;
 
 /// Async byte reader.
@@ -52,7 +52,7 @@ pub trait HotaruBufRead: HotaruRead {
     /// inclusive. Stops at EOF without error.
     ///
     /// Returns `Ok(bytes_read)` on success (delimiter found or EOF).
-    /// Returns `Err(Self::Error)` via [`ReadLimitError::rate_limit_error`] when
+    /// Returns `Err(Self::Error)` via [`HotaruIoError::size_exceeded`] when
     /// `max_size` was reached before the delimiter was found. The accumulated
     /// data remains in `buf`.
     ///
@@ -68,7 +68,7 @@ pub trait HotaruBufRead: HotaruRead {
     ) -> impl Future<Output = Result<usize, Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend,
-        Self::Error: ReadLimitError,
+        Self::Error: HotaruIoError,
     {
         async move {
             let mut read = 0;
@@ -79,7 +79,7 @@ pub trait HotaruBufRead: HotaruRead {
                         return Ok(read);
                     }
                     if buf.len().saturating_add(available.len()) > max_size {
-                        return Err(ReadLimitError::rate_limit_error());
+                        return Err(HotaruIoError::size_exceeded());
                     }
                     if let Some(i) = available.iter().position(|b| *b == byte) {
                         buf.extend_from_slice(&available[..=i]);
@@ -111,7 +111,7 @@ pub trait HotaruBufRead: HotaruRead {
     ) -> impl Future<Output = Result<usize, Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend,
-        Self::Error: ReadLimitError,
+        Self::Error: HotaruIoError,
     {
         async move {
             let mut bytes = alloc::vec::Vec::new();

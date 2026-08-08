@@ -1,6 +1,6 @@
 //
-pub trait ReadLimitError: core::error::Error + Send + Sync + 'static {
-    fn rate_limit_error() -> Self;
+pub trait HotaruIoError: core::error::Error + Send + Sync + 'static {
+    fn size_exceeded() -> Self;
 }
 
 // ============================================================================
@@ -11,8 +11,8 @@ pub trait ReadLimitError: core::error::Error + Send + Sync + 'static {
 mod std_impl {
     use super::*;
 
-    impl ReadLimitError for std::io::Error {
-        fn rate_limit_error() -> Self {
+    impl HotaruIoError for std::io::Error {
+        fn size_exceeded() -> Self {
             std::io::Error::new(std::io::ErrorKind::InvalidData, "read rate limit exceeded")
         }
     }
@@ -39,8 +39,8 @@ pub enum HotaruIOError {
     SizeExceeded,
 }
 
-impl ReadLimitError for HotaruIOError {
-    fn rate_limit_error() -> Self {
+impl HotaruIoError for HotaruIOError {
+    fn size_exceeded() -> Self {
         Self::SizeExceeded
     }
 }
