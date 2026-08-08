@@ -10,9 +10,6 @@
 
 use core::fmt;
 
-extern crate alloc;
-use alloc::vec::Vec;
-
 use hotaru_core::connection::ReadLimitError;
 #[cfg(feature = "spawn_local")]
 use hotaru_core::connection::{
@@ -35,8 +32,8 @@ pub enum EmbeddedIoError {
     UnexpectedEof,
     /// Writer accepted 0 bytes before `write_all` drained its buffer.
     WriteZero,
-    /// `read_until` / `read_line` reached rate limit, carrying accumulated data.
-    SizeExceeded(Vec<u8>),
+    /// `read_until` / `read_line` reached rate limit.
+    SizeExceeded,
 }
 
 impl EmbeddedIoError {
@@ -54,7 +51,7 @@ impl EmbeddedIoError {
             Self::Backend(kind) => *kind,
             Self::UnexpectedEof => embedded_io_async::ErrorKind::Other,
             Self::WriteZero => embedded_io_async::ErrorKind::WriteZero,
-            Self::SizeExceeded(..) => embedded_io_async::ErrorKind::InvalidData,
+            Self::SizeExceeded => embedded_io_async::ErrorKind::InvalidData,
         }
     }
 }
@@ -65,23 +62,14 @@ impl fmt::Display for EmbeddedIoError {
             Self::Backend(kind) => write!(f, "embedded IO error: {kind:?}"),
             Self::UnexpectedEof => f.write_str("unexpected EOF before buffer was filled"),
             Self::WriteZero => f.write_str("writer accepted 0 bytes"),
-            Self::SizeExceeded(data) => {
-                write!(f, "read rate limit exceeded: {} bytes read", data.len())
-            }
+            Self::SizeExceeded => f.write_str("read rate limit exceeded"),
         }
     }
 }
 
 impl ReadLimitError for EmbeddedIoError {
-    fn rate_limit_error(data: Vec<u8>) -> Self {
-        Self::SizeExceeded(data)
-    }
-
-    fn get_read(&self) -> &[u8] {
-        match self {
-            Self::SizeExceeded(data) => data.as_slice(),
-            _ => &[],
-        }
+    fn rate_limit_error() -> Self {
+        Self::SizeExceeded
     }
 }
 

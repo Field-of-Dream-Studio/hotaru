@@ -53,9 +53,8 @@ pub trait HotaruBufRead: HotaruRead {
     ///
     /// Returns `Ok(bytes_read)` on success (delimiter found or EOF).
     /// Returns `Err(Self::Error)` via [`ReadLimitError::rate_limit_error`] when
-    /// `max_size` was reached before the delimiter was found. The error takes
-    /// ownership of the accumulated data; callers can retrieve it with
-    /// [`ReadLimitError::get_read`].
+    /// `max_size` was reached before the delimiter was found. The accumulated
+    /// data remains in `buf`.
     ///
     /// `max_size` caps the total bytes read (including the delimiter). If the
     /// buffer would grow beyond this limit, the read stops **before** the
@@ -80,7 +79,7 @@ pub trait HotaruBufRead: HotaruRead {
                         return Ok(read);
                     }
                     if buf.len().saturating_add(available.len()) > max_size {
-                        return Err(ReadLimitError::rate_limit_error(core::mem::take(buf)));
+                        return Err(ReadLimitError::rate_limit_error());
                     }
                     if let Some(i) = available.iter().position(|b| *b == byte) {
                         buf.extend_from_slice(&available[..=i]);
@@ -102,8 +101,7 @@ pub trait HotaruBufRead: HotaruRead {
     /// Reads a line into `buf` (up to and including the next `\n`).
     ///
     /// Returns `Ok(bytes_read)` on success. On truncation, `buf` receives the
-    /// partially-read line (via [`ReadLimitError::get_read`]) before returning
-    /// `Err` — data is never lost.
+    /// partially-read line before returning `Err` — data is never lost.
     ///
     /// `max_size` is forwarded to `read_until`.
     fn read_line<'a>(
@@ -123,11 +121,8 @@ pub trait HotaruBufRead: HotaruRead {
                     Ok(n)
                 }
                 Err(e) => {
-                    // `read_until` took the data with `mem::take`; retrieve it
-                    // via `get_read` so the caller's buffer is still populated.
-                    buf.push_str(&alloc::string::String::from_utf8_lossy(
-                        ReadLimitError::get_read(&e),
-                    ));
+                    // `bytes` already has the partial data — write it to buf directly.
+                    buf.push_str(&alloc::string::String::from_utf8_lossy(&bytes));
                     Err(e)
                 }
             }

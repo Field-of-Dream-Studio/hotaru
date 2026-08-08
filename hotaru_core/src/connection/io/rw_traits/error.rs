@@ -1,41 +1,26 @@
-use alloc::vec::Vec;
 //
 pub trait ReadLimitError: core::error::Error + Send + Sync + 'static {
-    fn rate_limit_error(data: Vec<u8>) -> Self;
-
-    fn get_read(&self) -> &[u8] {
-        &[]
-    }
+    fn rate_limit_error() -> Self;
 }
+
+// ============================================================================
+// std::io::Error — tokio / futures / tls backends
+// ============================================================================
 
 #[cfg(feature = "std")]
 mod std_impl {
     use super::*;
 
-    #[derive(Debug)]
-    struct RateLimitData(Vec<u8>);
-
-    impl core::fmt::Display for RateLimitData {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            write!(f, "read rate limit exceeded: {} bytes read", self.0.len())
-        }
-    }
-
-    impl core::error::Error for RateLimitData {}
-
     impl ReadLimitError for std::io::Error {
-        fn rate_limit_error(data: Vec<u8>) -> Self {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, RateLimitData(data))
-        }
-
-        fn get_read(&self) -> &[u8] {
-            self.get_ref()
-                .and_then(|e| e.downcast_ref::<RateLimitData>())
-                .map(|r| r.0.as_slice())
-                .unwrap_or(&[])
+        fn rate_limit_error() -> Self {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "read rate limit exceeded")
         }
     }
 }
+
+// ============================================================================
+// HotaruIOError — framework-owned error type
+// ============================================================================
 
 /// Framework-owned IO error. Concrete, non-generic, and identical
 /// across feature sets. It starts with only the framework-level sentinel
@@ -50,19 +35,13 @@ pub enum HotaruIOError {
     UnexpectedEof,
     /// Writer accepted 0 bytes before `write_all` drained its buffer.
     WriteZero,
-    SizeExceeded(Vec<u8>),
+    /// `read_until` / `read_line` hit the rate limit.
+    SizeExceeded,
 }
 
 impl ReadLimitError for HotaruIOError {
-    fn rate_limit_error(data: Vec<u8>) -> Self {
-        Self::SizeExceeded(data)
-    }
-
-    fn get_read(&self) -> &[u8] {
-        match self {
-            Self::SizeExceeded(data) => data.as_slice(),
-            _ => &[],
-        }
+    fn rate_limit_error() -> Self {
+        Self::SizeExceeded
     }
 }
 
@@ -71,9 +50,7 @@ impl core::fmt::Display for HotaruIOError {
         match self {
             Self::UnexpectedEof => f.write_str("unexpected EOF before buffer was filled"),
             Self::WriteZero => f.write_str("writer accepted 0 bytes"),
-            Self::SizeExceeded(data) => {
-                write!(f, "read rate limit exceeded: {} bytes read", data.len())
-            }
+            Self::SizeExceeded => f.write_str("read rate limit exceeded"),
         }
     }
 }
