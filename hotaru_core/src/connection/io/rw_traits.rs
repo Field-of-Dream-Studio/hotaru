@@ -12,6 +12,6 @@ pub mod read;
 /// Async write-side Hotaru IO traits.
 pub mod write;
 
-pub use error::HotaruIOError;
+pub use error::{HotaruIOError, ReadLimitError};
 pub use read::{HotaruBufRead, HotaruRead};
 pub use write::{HotaruBufWrite, HotaruWrite};

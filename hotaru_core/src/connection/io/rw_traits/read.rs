@@ -1,5 +1,6 @@
 use core::future::Future;
 
+use super::error::ReadLimitError;
 use super::super::MaybeSend;
 
 /// Async byte reader.
@@ -50,15 +51,11 @@ pub trait HotaruBufRead: HotaruRead {
     /// Reads bytes into `buf` until the delimiter `byte` is encountered,
     /// inclusive. Stops at EOF without error.
     ///
-    /// Returns `(bytes_read, truncated)` where `truncated` is `true` when
-    /// `max_size` was reached before the delimiter was found. Callers must
-    /// check this flag — truncated data is often a sign of a malicious or
-    /// malformed request and should be rejected (e.g. 413 Payload Too Large).
-    ///
-    /// `Self::Error` is never constructed here; the only failure path is
-    /// `fill_buf`, which already yields `Self::Error` (propagated via `?`).
-    /// The `bool` signal avoids the need for every `HotaruBufRead` impl to
-    /// provide its own error-construction method for a size-limit violation.
+    /// Returns `Ok(bytes_read)` on success (delimiter found or EOF).
+    /// Returns `Err(Self::Error)` via [`ReadLimitError::rate_limit_error`] when
+    /// `max_size` was reached before the delimiter was found. The error takes
+    /// ownership of the accumulated data; callers can retrieve it with
+    /// [`ReadLimitError::get_read`].
     ///
     /// `max_size` caps the total bytes read (including the delimiter). If the
     /// buffer would grow beyond this limit, the read stops **before** the
@@ -69,9 +66,10 @@ pub trait HotaruBufRead: HotaruRead {
         byte: u8,
         buf: &'a mut alloc::vec::Vec<u8>,
         max_size: usize,
-    ) -> impl Future<Output = Result<(usize, bool), Self::Error>> + MaybeSend + 'a
+    ) -> impl Future<Output = Result<usize, Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend,
+        Self::Error: ReadLimitError,
     {
         async move {
             let mut read = 0;
@@ -79,10 +77,10 @@ pub trait HotaruBufRead: HotaruRead {
                 let (done, used) = {
                     let available = self.fill_buf().await?;
                     if available.is_empty() {
-                        return Ok((read, false));
+                        return Ok(read);
                     }
                     if buf.len().saturating_add(available.len()) > max_size {
-                        return Ok((read, true));
+                        return Err(ReadLimitError::rate_limit_error(core::mem::take(buf)));
                     }
                     if let Some(i) = available.iter().position(|b| *b == byte) {
                         buf.extend_from_slice(&available[..=i]);
@@ -95,7 +93,7 @@ pub trait HotaruBufRead: HotaruRead {
                 self.consume(used);
                 read += used;
                 if done {
-                    return Ok((read, false));
+                    return Ok(read);
                 }
             }
         }
@@ -103,23 +101,36 @@ pub trait HotaruBufRead: HotaruRead {
 
     /// Reads a line into `buf` (up to and including the next `\n`).
     ///
-    /// Returns `(bytes_read, truncated)` — see [`read_until`] for the
-    /// meaning of `truncated`.
+    /// Returns `Ok(bytes_read)` on success. On truncation, `buf` receives the
+    /// partially-read line (via [`ReadLimitError::get_read`]) before returning
+    /// `Err` — data is never lost.
     ///
     /// `max_size` is forwarded to `read_until`.
     fn read_line<'a>(
         &'a mut self,
         buf: &'a mut alloc::string::String,
         max_size: usize,
-    ) -> impl Future<Output = Result<(usize, bool), Self::Error>> + MaybeSend + 'a
+    ) -> impl Future<Output = Result<usize, Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend,
+        Self::Error: ReadLimitError,
     {
         async move {
             let mut bytes = alloc::vec::Vec::new();
-            let (n, truncated) = self.read_until(b'\n', &mut bytes, max_size).await?;
-            buf.push_str(&alloc::string::String::from_utf8_lossy(&bytes));
-            Ok((n, truncated))
+            match self.read_until(b'\n', &mut bytes, max_size).await {
+                Ok(n) => {
+                    buf.push_str(&alloc::string::String::from_utf8_lossy(&bytes));
+                    Ok(n)
+                }
+                Err(e) => {
+                    // `read_until` took the data with `mem::take`; retrieve it
+                    // via `get_read` so the caller's buffer is still populated.
+                    buf.push_str(&alloc::string::String::from_utf8_lossy(
+                        ReadLimitError::get_read(&e),
+                    ));
+                    Err(e)
+                }
+            }
         }
     }
 }

@@ -111,15 +111,9 @@ impl HttpBody {
             loop {
                 // Read chunk size line
                 let mut size_line = String::new();
-                let (_, truncated) = buf_reader
+                let _ = buf_reader
                     .read_line(&mut size_line, safety_setting.effective_line_length())
                     .await?;
-                if truncated {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "chunk size line exceeds max_size",
-                    ));
-                }
                 let chunk_size_str = size_line.trim_end_matches(|c| c == '\r' || c == '\n');
 
                 // Parse chunk size (validates hex format - critical for preventing crashes)

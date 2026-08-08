@@ -627,15 +627,9 @@ impl HttpMeta {
 
             loop {
                 let mut line = String::new();
-                let (bytes_read, truncated) = buf_reader
+                let bytes_read = buf_reader
                     .read_line(&mut line, config.effective_line_length())
-                    .await
-                    .map_err(|_| {
-                        ConnectionError::InternalServerError(format!("Failed to read line"))
-                    })?;
-                if truncated {
-                    return Err(ConnectionError::PayloadTooLarge);
-                }
+                    .await?;
                 if print_raw {
                     println!("Read line: {}, buffer: {}", line, bytes_read);
                 }
