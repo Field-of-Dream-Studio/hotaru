@@ -1,6 +1,7 @@
 use core::future::Future;
 
 use super::super::MaybeSend;
+use super::transfer::{TransferOutcome, TransferTermination};
 
 /// Async byte writer.
 pub trait HotaruWrite {
@@ -35,6 +36,40 @@ pub trait HotaruWrite {
     ) -> impl Future<Output = Result<(), Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend;
+
+    /// Writes all of `buf` only when it fits within `cap`.
+    ///
+    /// Inputs larger than `cap` are rejected before any bytes are written and
+    /// return `CapReached` with `transferred == 0`. This preflight behavior
+    /// prevents a capped write from emitting a partial protocol frame.
+    /// `Self::Error` is reserved for failures reported by the underlying IO
+    /// backend while writing an accepted buffer.
+    #[av::ver(
+        unstable,
+        since = "0.8.5",
+        note = "Preflight-capped complete write",
+        date = "2026-08-09"
+    )]
+    fn write_all_capped<'a>(
+        &'a mut self,
+        buf: &'a [u8],
+        cap: usize,
+    ) -> impl Future<Output = Result<TransferOutcome, Self::Error>> + MaybeSend + 'a
+    where
+        Self: MaybeSend,
+    {
+        async move {
+            if buf.len() > cap {
+                return Ok(TransferOutcome::new(0, TransferTermination::CapReached));
+            }
+
+            self.write_all(buf).await?;
+            Ok(TransferOutcome::new(
+                buf.len(),
+                TransferTermination::Complete,
+            ))
+        }
+    }
 }
 
 pub trait HotaruBufWrite: HotaruWrite {}

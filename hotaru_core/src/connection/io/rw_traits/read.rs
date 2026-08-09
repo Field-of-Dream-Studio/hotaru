@@ -1,7 +1,7 @@
 use core::future::Future;
 
-use super::error::HotaruIoError;
 use super::super::MaybeSend;
+use super::transfer::{TransferOutcome, TransferTermination};
 
 /// Async byte reader.
 pub trait HotaruRead {
@@ -48,84 +48,153 @@ pub trait HotaruBufRead: HotaruRead {
     /// the next `fill_buf` skips them.
     fn consume(&mut self, amt: usize);
 
-    /// Reads bytes into `buf` until the delimiter `byte` is encountered,
-    /// inclusive. Stops at EOF without error.
+    /// Reads bytes into `buf` until `delimiter` is encountered, inclusive.
     ///
-    /// Returns `Ok(bytes_read)` on success (delimiter found or EOF).
-    /// Returns `Err(Self::Error)` via [`HotaruIoError::size_exceeded`] when
-    /// `max_size` was reached before the delimiter was found. The accumulated
-    /// data remains in `buf`.
+    /// `TransferTermination::Complete` means the delimiter was consumed,
+    /// `SourceEnded` means EOF arrived first, and `CapReached` means `cap` was
+    /// filled before the delimiter was found. `Self::Error` is reserved for
+    /// failures reported by the underlying IO backend.
     ///
-    /// `max_size` caps the total bytes read (including the delimiter). If the
-    /// buffer would grow beyond this limit, the read stops **before** the
-    /// allocation — `saturating_add` prevents overflow (reference: Bun
-    /// WebSocket fix, Swival/security-audits).
+    /// `cap` bounds the final length of `buf`, including any bytes already in
+    /// it. On `CapReached`, the method consumes and appends exactly the prefix
+    /// that fits; bytes beyond the cap remain unread. Callers must decide
+    /// whether an incomplete logical record can be resumed or the connection
+    /// must be discarded.
+    #[av::ver(
+        unstable,
+        since = "0.8.5",
+        note = "Bounded delimiter read with typed termination",
+        date = "2026-08-09"
+    )]
     fn read_until<'a>(
         &'a mut self,
-        byte: u8,
+        delimiter: u8,
         buf: &'a mut alloc::vec::Vec<u8>,
-        max_size: usize,
-    ) -> impl Future<Output = Result<usize, Self::Error>> + MaybeSend + 'a
+        cap: usize,
+    ) -> impl Future<Output = Result<TransferOutcome, Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend,
-        Self::Error: HotaruIoError,
     {
         async move {
-            let mut read = 0;
+            let mut transferred = 0;
+
+            if buf.len() >= cap {
+                return Ok(TransferOutcome::new(
+                    transferred,
+                    TransferTermination::CapReached,
+                ));
+            }
+
             loop {
-                let (done, used) = {
+                let (termination, used) = {
                     let available = self.fill_buf().await?;
                     if available.is_empty() {
-                        return Ok(read);
+                        return Ok(TransferOutcome::new(
+                            transferred,
+                            TransferTermination::SourceEnded,
+                        ));
                     }
-                    if buf.len().saturating_add(available.len()) > max_size {
-                        return Err(HotaruIoError::size_exceeded());
-                    }
-                    if let Some(i) = available.iter().position(|b| *b == byte) {
+
+                    let remaining = cap - buf.len();
+                    let available_within_cap = &available[..available.len().min(remaining)];
+
+                    if let Some(i) = available_within_cap
+                        .iter()
+                        .position(|candidate| *candidate == delimiter)
+                    {
                         buf.extend_from_slice(&available[..=i]);
-                        (true, i + 1)
+                        (Some(TransferTermination::Complete), i + 1)
                     } else {
-                        buf.extend_from_slice(available);
-                        (false, available.len())
+                        buf.extend_from_slice(available_within_cap);
+                        let termination = (available_within_cap.len() == remaining)
+                            .then_some(TransferTermination::CapReached);
+                        (termination, available_within_cap.len())
                     }
                 };
+
                 self.consume(used);
-                read += used;
-                if done {
-                    return Ok(read);
+                transferred += used;
+
+                if let Some(termination) = termination {
+                    return Ok(TransferOutcome::new(transferred, termination));
                 }
             }
         }
     }
 
+    /// Reads through `delimiter` without imposing an application-level cap.
+    ///
+    /// This is an explicit opt-out from bounded accumulation. Prefer
+    /// [`HotaruBufRead::read_until`] for protocol data or any other untrusted
+    /// input. The returned [`TransferOutcome`] still distinguishes a delimiter
+    /// match (`Complete`) from EOF before the delimiter (`SourceEnded`).
+    /// `CapReached` is only theoretically possible at the address-space limit.
+    #[av::ver(
+        unstable,
+        since = "0.8.5",
+        note = "Explicitly unbounded delimiter read",
+        date = "2026-08-09"
+    )]
+    fn read_until_unbounded<'a>(
+        &'a mut self,
+        delimiter: u8,
+        buf: &'a mut alloc::vec::Vec<u8>,
+    ) -> impl Future<Output = Result<TransferOutcome, Self::Error>> + MaybeSend + 'a
+    where
+        Self: MaybeSend,
+    {
+        self.read_until(delimiter, buf, usize::MAX)
+    }
+
     /// Reads a line into `buf` (up to and including the next `\n`).
     ///
-    /// Returns `Ok(bytes_read)` on success. On truncation, `buf` receives the
-    /// partially-read line before returning `Err` — data is never lost.
+    /// The returned termination has the same meaning as
+    /// [`HotaruBufRead::read_until`]. On `CapReached`, `buf` receives
+    /// the prefix that fit within `cap`.
     ///
-    /// `max_size` is forwarded to `read_until`.
+    /// `cap` applies to the newly-read line, not to text already present in
+    /// `buf`.
+    #[av::ver(
+        unstable,
+        since = "0.8.5",
+        note = "Bounded line read with typed termination",
+        date = "2026-08-09"
+    )]
     fn read_line<'a>(
         &'a mut self,
         buf: &'a mut alloc::string::String,
-        max_size: usize,
-    ) -> impl Future<Output = Result<usize, Self::Error>> + MaybeSend + 'a
+        cap: usize,
+    ) -> impl Future<Output = Result<TransferOutcome, Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend,
-        Self::Error: HotaruIoError,
     {
         async move {
             let mut bytes = alloc::vec::Vec::new();
-            match self.read_until(b'\n', &mut bytes, max_size).await {
-                Ok(n) => {
-                    buf.push_str(&alloc::string::String::from_utf8_lossy(&bytes));
-                    Ok(n)
-                }
-                Err(e) => {
-                    // `bytes` already has the partial data — write it to buf directly.
-                    buf.push_str(&alloc::string::String::from_utf8_lossy(&bytes));
-                    Err(e)
-                }
-            }
+            let outcome = self.read_until(b'\n', &mut bytes, cap).await?;
+            buf.push_str(&alloc::string::String::from_utf8_lossy(&bytes));
+            Ok(outcome)
         }
+    }
+
+    /// Reads a line without imposing an application-level cap.
+    ///
+    /// This is an explicit opt-out from bounded accumulation. Prefer
+    /// [`HotaruBufRead::read_line`] for protocol data or any other untrusted
+    /// input. The returned [`TransferOutcome`] still distinguishes a complete
+    /// line (`Complete`) from EOF before the newline (`SourceEnded`).
+    #[av::ver(
+        unstable,
+        since = "0.8.5",
+        note = "Explicitly unbounded line read",
+        date = "2026-08-09"
+    )]
+    fn read_line_unbounded<'a>(
+        &'a mut self,
+        buf: &'a mut alloc::string::String,
+    ) -> impl Future<Output = Result<TransferOutcome, Self::Error>> + MaybeSend + 'a
+    where
+        Self: MaybeSend,
+    {
+        self.read_line(buf, usize::MAX)
     }
 }

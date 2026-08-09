@@ -23,7 +23,7 @@ pub use self::io::buf_reader::HotaruBufReader;
 pub use self::io::buf_writer::HotaruBufWriter;
 pub use self::io::{
     BufferedReadHalf, BufferedWriteHalf, HotaruBufRead, HotaruBufWrite, HotaruIOError, HotaruRead,
-    HotaruWrite, MaybeSend, MaybeSendBoxFuture, HotaruIoError,
+    HotaruWrite, MaybeSend, MaybeSendBoxFuture, TransferOutcome, TransferTermination,
 };
 pub use self::primitive::{Accepter, Connector};
 pub use self::runtime::{Inbound, Outbound};

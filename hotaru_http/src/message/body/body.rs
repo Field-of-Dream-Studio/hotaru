@@ -5,7 +5,7 @@ use crate::message::http_value::*;
 use crate::message::meta::HttpMeta;
 use crate::util::form::*;
 use akari::Value;
-use hotaru_core::connection::HotaruBufRead;
+use hotaru_core::connection::{HotaruBufRead, TransferTermination};
 
 use super::BodyError;
 
@@ -111,9 +111,15 @@ impl HttpBody {
             loop {
                 // Read chunk size line
                 let mut size_line = String::new();
-                let _ = buf_reader
+                let outcome = buf_reader
                     .read_line(&mut size_line, safety_setting.effective_line_length())
                     .await?;
+                if outcome.termination == TransferTermination::CapReached {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Chunk size line exceeds maximum length",
+                    ));
+                }
                 let chunk_size_str = size_line.trim_end_matches(|c| c == '\r' || c == '\n');
 
                 // Parse chunk size (validates hex format - critical for preventing crashes)
