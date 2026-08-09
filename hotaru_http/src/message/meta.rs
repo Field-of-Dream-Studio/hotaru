@@ -10,6 +10,19 @@ use std::collections::{HashMap, HashSet};
 use std::str;
 use hotaru_core::connection::HotaruBufRead;
 
+/// How the Content-Length field(s) of a message were interpreted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentLength {
+    /// No Content-Length header present.
+    Absent,
+    /// A single unambiguous value.
+    Exact(usize),
+    /// Present but unusable — non-DIGIT, empty, overflowing, or values that
+    /// disagree (RFC 9112 §6.3.1). The message boundary is ambiguous and the
+    /// message must be rejected; it must never degrade to a length.
+    Invalid,
+}
+
 /// RequestHeader is a struct that represents the headers of an HTTP request.
 #[derive(Debug, Clone)]
 pub struct HttpMeta {
@@ -19,11 +32,8 @@ pub struct HttpMeta {
     // Content-type header, overrides the content type from the hashmap if present
     content_type: Option<HttpContentType>,
 
-    // Content-length header, overrides the content length from the hashmap if present
-    content_length: Option<usize>,
-
-    // Set to true when Content-Length has conflicting duplicate values
-    content_length_invalid: bool,
+    // Content-length — None = not parsed yet; Some(_) = cached parse result.
+    content_length: Option<ContentLength>,
 
     // Cookies header in request, Set-Cookie header in response
     cookies: Option<CookieMap>,
@@ -535,7 +545,6 @@ impl HttpMeta {
             header: headers,
             content_type: None,
             content_length: None,
-            content_length_invalid: false,
             content_disposition: None,
             cookies: None,
             encoding: None,
@@ -568,19 +577,12 @@ impl HttpMeta {
         // Parse headers with special handling for specific header names
         let header = Self::parse_headers(headers, is_request);
 
-        // RFC 9112 §6.3.1: detect conflicting Content-Length at ingestion time.
-        // Following PR #43's pattern: validate early so parse_content_length
-        // stays simple (just takes .first()).
-        let content_length_invalid = Self::has_conflicting_content_length(&header);
-
         if print_raw {
             println!("Parsed headers: {:?}", header);
             println!("Parsed start line: {:?}", start_line);
         }
 
-        let mut meta = HttpMeta::new(start_line, header);
-        meta.content_length_invalid = content_length_invalid;
-        Ok(meta)
+        Ok(HttpMeta::new(start_line, header))
     }
 
     async fn header_lines_raw_from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
@@ -737,23 +739,6 @@ impl HttpMeta {
         headers
     }
 
-    /// Returns `true` when the header map contains multiple Content-Length
-    /// field values that disagree (RFC 9112 §6.3.1).
-    ///
-    /// Duplicate Content-Length headers with the *same* value are harmless;
-    /// only conflicting values make the message boundary ambiguous and must
-    /// cause the request to be rejected.
-    pub(crate) fn has_conflicting_content_length(headers: &HashMap<String, HeaderValue>) -> bool {
-        if let Some(cl) = headers.get("content-length") {
-            if cl.len() > 1 {
-                let values = cl.values();
-                let first = &values[0];
-                return !values.iter().all(|v| v == first);
-            }
-        }
-        false
-    }
-
     // Expose the specific methods that call the shared implementation
     pub async fn from_request_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         buf_reader: &mut R,
@@ -780,11 +765,6 @@ impl HttpMeta {
 
         // Parse headers
         let header = Self::parse_headers(headers, true);
-
-        // RFC 9112 §6.3.1: detect conflicting Content-Length at ingestion time.
-        if Self::has_conflicting_content_length(&header) {
-            self.content_length_invalid = true;
-        }
 
         if print_raw {
             println!("Parsed request headers: {:?}", header);
@@ -890,44 +870,48 @@ impl HttpMeta {
 
     /// Gets the content length from the HTTP meta data.
     ///
-    /// Returns the cached content length if available, otherwise parses
+    /// Returns the cached parse result if available, otherwise parses
     /// the content-length header from the headers map.
     ///
     /// # Returns
     ///
-    /// * `Option<usize>` - The content length, or None if not available or invalid.
+    /// * [`ContentLength`] — `Exact(n)` for a valid value, `Absent` when the
+    ///   header is missing, or `Invalid` when the value is unusable.
     ///
     /// # Examples
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
     /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::ContentLength;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
     /// headers.insert("content-length".to_string(), HeaderValue::new("123"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
-    /// assert_eq!(meta.get_content_length(), Some(123));
+    /// assert_eq!(meta.get_content_length(), ContentLength::Exact(123));
     /// ```
-    pub fn get_content_length(&mut self) -> Option<usize> {
-        if let Some(length) = self.content_length {
-            return Some(length);
+    pub fn get_content_length(&mut self) -> ContentLength {
+        match self.content_length {
+            Some(cached) => cached,
+            None => self.parse_content_length(),
         }
-        self.parse_content_length()
     }
 
-    /// Parses the Content-Length header from the headers map and stores it in the content_length field.
+    /// Parses the Content-Length header from the headers map and stores the
+    /// result in the content_length field.
     ///
     /// # Returns
     ///
-    /// * `Option<usize>` - The parsed Content-Length value, or None if not present or invalid.
+    /// * [`ContentLength`] — the interpreted Content-Length value.
     ///
     /// # Examples
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
     /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::ContentLength;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -935,27 +919,56 @@ impl HttpMeta {
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// let length = meta.parse_content_length();
-    /// assert_eq!(length, Some(123));
-    /// assert_eq!(meta.get_content_length(), Some(123));
+    /// assert_eq!(length, ContentLength::Exact(123));
+    /// assert_eq!(meta.get_content_length(), ContentLength::Exact(123));
     /// ```
-    pub fn parse_content_length(&mut self) -> Option<usize> {
-        let length = self
-            .header
-            .get("content-length")
-            .and_then(|s| s.first().parse::<usize>().ok());
-        self.content_length = length;
-        length
+    pub fn parse_content_length(&mut self) -> ContentLength {
+        let parsed = match self.header.get("content-length") {
+            None => ContentLength::Absent,
+            Some(hv) => Self::interpret_content_length(hv),
+        };
+        self.content_length = Some(parsed);
+        parsed
     }
 
-    /// Returns true if Content-Length header was present but had conflicting values.
+    /// RFC 9112 §6.3.1: the header may appear more than once *and* a single
+    /// field-value may itself be a comma-separated list. Every token across
+    /// every occurrence must be a DIGIT string, and they must all agree.
+    fn interpret_content_length(hv: &HeaderValue) -> ContentLength {
+        let mut agreed: Option<usize> = None;
+        for raw in hv.values() {
+            for token in raw.split(',') {
+                let token = token.trim();
+                if token.is_empty() || !token.bytes().all(|b| b.is_ascii_digit()) {
+                    return ContentLength::Invalid;
+                }
+                let Ok(n) = token.parse::<usize>() else {
+                    return ContentLength::Invalid; // overflow
+                };
+                match agreed {
+                    Some(prev) if prev != n => return ContentLength::Invalid,
+                    _ => agreed = Some(n),
+                }
+            }
+        }
+        agreed.map_or(ContentLength::Invalid, ContentLength::Exact)
+    }
+
+    /// Convenience for callers that only need a usable number.
     ///
-    /// When this returns true, the request should be rejected with a 400 Bad Request
-    /// because the conflicting Content-Length makes the message boundary ambiguous.
-    pub fn is_content_length_invalid(&self) -> bool {
-        self.content_length_invalid
+    /// Collapses `Absent` and `Invalid` into `None`. Never use this on the
+    /// inbound path, where those two must be distinguished.
+    pub fn content_length_value(&mut self) -> Option<usize> {
+        match self.get_content_length() {
+            ContentLength::Exact(n) => Some(n),
+            _ => None,
+        }
     }
 
     /// Sets the content_length field.
+    ///
+    /// Stores `Exact(length)` in the cache — used by the outbound path when
+    /// the body is serialised.
     ///
     /// # Arguments
     ///
@@ -965,14 +978,15 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::meta::ContentLength;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_content_length(456);
     ///
-    /// assert_eq!(meta.get_content_length(), Some(456));
+    /// assert_eq!(meta.get_content_length(), ContentLength::Exact(456));
     /// ```
     pub fn set_content_length(&mut self, length: usize) {
-        self.content_length = Some(length);
+        self.content_length = Some(ContentLength::Exact(length));
     }
 
     /// Clears the cached content_length field without modifying the header map.
@@ -985,6 +999,7 @@ impl HttpMeta {
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
     /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::meta::ContentLength;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_content_length(123);
@@ -2256,8 +2271,8 @@ impl HttpMeta {
             handled_headers.insert("content-type".to_string());
         }
 
-        // Add content-length if present
-        if let Some(content_length) = self.content_length {
+        // Add content-length if present and valid
+        if let Some(ContentLength::Exact(content_length)) = self.content_length {
             result.push_str(&format!("content-length: {}\r\n", content_length));
             handled_headers.insert("content-length".to_string());
         }
@@ -2357,7 +2372,6 @@ impl Default for HttpMeta {
             header: HashMap::new(),
             content_type: None,
             content_length: None,
-            content_length_invalid: false,
             content_disposition: None,
             cookies: None,
             encoding: None,

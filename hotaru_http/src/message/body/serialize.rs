@@ -1,7 +1,7 @@
 use akari::Value;
 
 use crate::message::http_value::HttpContentType;
-use crate::message::meta::HttpMeta;
+use crate::message::meta::{ContentLength, HttpMeta};
 use crate::util::form::{MultiForm, UrlEncodedForm};
 
 use super::{BodyError, HttpBody};
@@ -65,7 +65,7 @@ impl HttpBody {
             _ => (Vec::new(), None),
         };
 
-        if meta.get_content_length().is_none() {
+        if !matches!(meta.get_content_length(), ContentLength::Exact(_)) {
             meta.set_content_length(bin.len());
         }
         if meta.get_content_type().is_none()
@@ -110,7 +110,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(body, b"hello");
-        assert_eq!(meta.get_content_length(), Some(5));
+        assert_eq!(meta.get_content_length(), ContentLength::Exact(5));
         assert!(matches!(
             meta.get_content_type(),
             Some(HttpContentType::Text { subtype, .. }) if subtype == "html"

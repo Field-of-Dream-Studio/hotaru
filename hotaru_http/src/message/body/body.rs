@@ -2,7 +2,7 @@ use crate::security::safety::HttpSafety;
 use crate::util::encoding::ContentCodings;
 
 use crate::message::http_value::*;
-use crate::message::meta::HttpMeta;
+use crate::message::meta::{ContentLength, HttpMeta};
 use crate::util::form::*;
 use akari::Value;
 use hotaru_core::connection::HotaruBufRead;
@@ -59,7 +59,11 @@ impl HttpBody {
         header: &mut HttpMeta,
         parse_config: &HttpSafety,
     ) -> std::io::Result<Vec<u8>> {
-        /// Reads body with Content-Length
+        /// Reads body with Content-Length.
+        ///
+        /// Rejects if the declared content_length exceeds the safety limit
+        /// rather than silently truncating — leftover bytes in the stream
+        /// would be read as the next request (request smuggling).
         async fn read_content_length_body<
             R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
         >(
@@ -67,9 +71,13 @@ impl HttpBody {
             safety_setting: &HttpSafety,
             content_length: usize,
         ) -> std::io::Result<Vec<u8>> {
-            let effective_content_length =
-                std::cmp::min(content_length, safety_setting.effective_body_size());
-            let mut body_buffer = vec![0; effective_content_length];
+            if !safety_setting.check_body_size(content_length) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Body exceeds maximum size",
+                ));
+            }
+            let mut body_buffer = vec![0; content_length];
             buf_reader.read_exact(&mut body_buffer).await?;
             Ok(body_buffer)
         }
@@ -182,19 +190,24 @@ impl HttpBody {
         // Read raw body data
         let encoding = header.get_encoding().unwrap_or_default();
         let raw_data = if encoding.transfer().is_chunked() {
-            // RFC 9112 §6.3: if Transfer-Encoding is present, Content-Length
-            // must be ignored to prevent CL.TE desync attacks.
+            // RFC 9112 §6.3: Transfer-Encoding overrides Content-Length.
+            // Drop it so nothing downstream can act on a conflicting value
+            // (CL.TE desync).
             header.delete_content_length();
             read_chunked_body(buf_reader, header, parse_config).await?
         } else {
-            if header.is_content_length_invalid() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Conflicting Content-Length values",
-                ));
+            match header.get_content_length() {
+                ContentLength::Exact(n) => {
+                    read_content_length_body(buf_reader, parse_config, n).await?
+                }
+                ContentLength::Absent => Vec::new(),
+                ContentLength::Invalid => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Ambiguous Content-Length (RFC 9112 §6.3.1)",
+                    ));
+                }
             }
-            let content_length = header.get_content_length().unwrap_or(0);
-            read_content_length_body(buf_reader, parse_config, content_length).await?
         };
 
         Ok(raw_data)

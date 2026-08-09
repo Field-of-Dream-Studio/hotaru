@@ -9,7 +9,7 @@
 mod security_tests {
     use crate::message::body::HttpBody;
     use crate::message::http_value::HttpMethod;
-    use crate::message::meta::HttpMeta;
+    use crate::message::meta::{ContentLength, HttpMeta};
     use crate::message::start_line::RequestStartLine;
     use crate::security::safety::HttpSafety;
     use hotaru_io_tokio::TokioIo;
@@ -284,8 +284,9 @@ mod security_tests {
             .await;
         assert!(result.is_ok());
 
-        // Should have content length set
-        assert!(meta.get_content_length().is_some());
+        // The header parser collapses same-name headers to the last value,
+        // so only "20" is stored → interpret_content_length returns Exact(20).
+        assert_eq!(meta.get_content_length(), ContentLength::Exact(20));
     }
 
     /// SECURITY FINDING: Line folding test
@@ -625,11 +626,11 @@ mod security_tests {
     }
 
     // ============================================================================
-    // Content-Length Parsing Tests — duplicate / conflicting values
+    // Content-Length Parsing Tests — ContentLength enum
     //
-    // PR #43 pattern: duplicate Content-Length conflict detection happens at
-    // header ingestion time (has_conflicting_content_length), not inside
-    // parse_content_length. parse_content_length stays simple — just .first().
+    // All parsing goes through `interpret_content_length` which validates every
+    // token across every header occurrence (RFC 9112 §6.3.1). parse_content_length
+    // caches the result so get_content_length returns consistently.
     // ============================================================================
 
     fn cl_header_map(pairs: Vec<(&str, &str)>) -> std::collections::HashMap<String, crate::message::meta::HeaderValue> {
@@ -648,47 +649,94 @@ mod security_tests {
     }
 
     #[test]
-    fn cl_single_value_parsed() {
+    fn cl_single_value_exact() {
         let headers = cl_header_map(vec![("Content-Length", "123")]);
-        let mut meta = HttpMeta::new(Default::default(), headers.clone());
-        // parse_content_length just takes .first() — PR #43 style
-        assert_eq!(meta.parse_content_length(), Some(123));
-        // No conflict detected at ingestion time
-        assert!(!HttpMeta::has_conflicting_content_length(&headers));
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        assert_eq!(meta.parse_content_length(), ContentLength::Exact(123));
+        assert_eq!(meta.get_content_length(), ContentLength::Exact(123));
     }
 
     #[test]
-    fn cl_duplicate_same_value_accepted() {
+    fn cl_duplicate_same_value_exact() {
         let headers = cl_header_map(vec![
             ("Content-Length", "42"),
             ("Content-Length", "42"),
         ]);
-        let mut meta = HttpMeta::new(Default::default(), headers.clone());
-        // .first() returns the first "42", parsing succeeds
-        assert_eq!(meta.parse_content_length(), Some(42));
-        // Identical values → no conflict
-        assert!(!HttpMeta::has_conflicting_content_length(&headers));
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        // Identical values agree → Exact
+        assert_eq!(meta.parse_content_length(), ContentLength::Exact(42));
     }
 
     #[test]
-    fn cl_duplicate_different_values_rejected() {
+    fn cl_duplicate_different_values_invalid() {
         let headers = cl_header_map(vec![
             ("Content-Length", "5"),
             ("Content-Length", "42"),
         ]);
-        let mut meta = HttpMeta::new(Default::default(), headers.clone());
-        // .first() returns "5" (parses fine — simple PR #43 approach)
-        assert_eq!(meta.parse_content_length(), Some(5));
-        // But has_conflicting_content_length detects the mismatch at ingestion time
-        assert!(HttpMeta::has_conflicting_content_length(&headers));
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        // Mismatched values → Invalid
+        assert_eq!(meta.parse_content_length(), ContentLength::Invalid);
     }
 
     #[test]
-    fn cl_missing_returns_none() {
+    fn cl_missing_absent() {
         let headers = cl_header_map(vec![("Host", "localhost")]);
-        let mut meta = HttpMeta::new(Default::default(), headers.clone());
-        assert_eq!(meta.parse_content_length(), None);
-        // Missing CL is not a conflict
-        assert!(!HttpMeta::has_conflicting_content_length(&headers));
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        assert_eq!(meta.parse_content_length(), ContentLength::Absent);
+    }
+
+    #[test]
+    fn cl_comma_separated_values_agree() {
+        // Single header with comma-separated list (RFC 9112 §6.3.1)
+        let mut headers = std::collections::HashMap::new();
+        headers.insert(
+            "content-length".to_string(),
+            crate::message::meta::HeaderValue::new("100, 100, 100"),
+        );
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        assert_eq!(meta.parse_content_length(), ContentLength::Exact(100));
+    }
+
+    #[test]
+    fn cl_comma_separated_values_disagree() {
+        let mut headers = std::collections::HashMap::new();
+        headers.insert(
+            "content-length".to_string(),
+            crate::message::meta::HeaderValue::new("100, 200"),
+        );
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        assert_eq!(meta.parse_content_length(), ContentLength::Invalid);
+    }
+
+    #[test]
+    fn cl_non_digit_invalid() {
+        let mut headers = std::collections::HashMap::new();
+        headers.insert(
+            "content-length".to_string(),
+            crate::message::meta::HeaderValue::new("123abc"),
+        );
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        assert_eq!(meta.parse_content_length(), ContentLength::Invalid);
+    }
+
+    #[test]
+    fn cl_empty_value_invalid() {
+        let mut headers = std::collections::HashMap::new();
+        headers.insert(
+            "content-length".to_string(),
+            crate::message::meta::HeaderValue::new(""),
+        );
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        assert_eq!(meta.parse_content_length(), ContentLength::Invalid);
+    }
+
+    #[test]
+    fn cl_content_length_value_convenience() {
+        let headers = cl_header_map(vec![("Content-Length", "99")]);
+        let mut meta = HttpMeta::new(Default::default(), headers);
+        assert_eq!(meta.content_length_value(), Some(99));
+        // Absent → None
+        let mut meta2 = HttpMeta::default();
+        assert_eq!(meta2.content_length_value(), None);
     }
 }

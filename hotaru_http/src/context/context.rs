@@ -17,7 +17,7 @@ use std::sync::Arc;
 use crate::channel::Http1Channel;
 use crate::message::body::{BodyError, HttpBody};
 use crate::message::http_value::{HttpMethod, StatusCode};
-use crate::message::meta::HttpMeta;
+use crate::message::meta::{ContentLength, HttpMeta};
 use crate::message::request::HttpRequest;
 use crate::message::response::{HttpResponse, response_templates};
 use crate::protocol::HttpError;
@@ -283,13 +283,16 @@ impl<TS: TransportSpec> HttpContext<TS> {
         if let Some(ep) = endpoint.get_params::<HttpSafety>() {
             config.update(&ep);
         }
-        if self.request.meta.is_content_length_invalid() {
-            return Err(HttpError::InvalidHeader(
-                "Conflicting Content-Length values".to_string(),
-            ));
-        }
-        if !config.check_body_size(self.request.meta.get_content_length().unwrap_or(0)) {
-            return Err(HttpError::PayloadTooLarge);
+        match self.request.meta.get_content_length() {
+            ContentLength::Invalid => {
+                return Err(HttpError::InvalidHeader(
+                    "Ambiguous Content-Length (RFC 9112 §6.3.1)".to_string(),
+                ));
+            }
+            ContentLength::Exact(n) if !config.check_body_size(n) => {
+                return Err(HttpError::PayloadTooLarge);
+            }
+            _ => {}
         }
         if !config.check_method(&self.request.meta.method()) {
             return Err(HttpError::MethodNotAllowed);
