@@ -48,9 +48,10 @@ pub enum TransferCoding {
     /// Chunked transfer encoding, where the message body is divided into a series
     /// of chunks, each with its own size indicator.
     Chunked,
+    Gzip,
 
     /// Any other transfer encoding not explicitly defined in this enum.
-    Other(Box<str>),
+    Other(Box<str>),//gzip will be parsed as "Other" ("gzip")
 }
 
 impl TransferCoding {
@@ -80,6 +81,7 @@ impl TransferCoding {
     pub fn from_string(s: &str) -> Self {
         match s.trim().to_lowercase().as_str() {
             "chunked" => TransferCoding::Chunked,
+            "gzip" => TransferCoding::Gzip,
             other => TransferCoding::Other(other.into()),
         }
     }
@@ -104,6 +106,7 @@ impl TransferCoding {
     pub fn as_str(&self) -> &str {
         match self {
             Self::Chunked => "chunked",
+            Self::Gzip => "gzip",
             Self::Other(s) => s,
         }
     }
@@ -402,6 +405,11 @@ impl TransferCodings {
             .map(|c| c.as_str())
             .collect::<Vec<_>>()
             .join(", ")
+    }
+
+    ///Returns an iterator over the transfer codings.
+    pub fn iter(&self) -> std::slice::Iter<TransferCoding> {
+        self.codings.iter()
     }
 }
 

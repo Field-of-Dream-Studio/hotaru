@@ -1,4 +1,5 @@
-﻿use crate::util::encoding::ContentCodings;
+﻿use crate::encoding::{ContentCoding, TransferCoding};
+use crate::util::encoding::ContentCodings;
 use crate::security::safety::HttpSafety;
 
 use crate::util::form::*;
@@ -159,6 +160,13 @@ impl HttpBody {
                 let chunk_size_str = size_line.trim_end_matches(|c| c == '\r' || c == '\n');
 
                 // Parse chunk size (validates hex format - critical for preventing crashes)
+                // Chunk size can be followed by semicolon and extensions, we only need the hex number before the ";"
+                let chunk_size_hex = chunk_size_str
+                    .split(';')
+                    .next()
+                    .unwrap_or(chunk_size_str)
+                    .trim();
+                // Parse chunk size (validates hex format - critical for preventing crashes)
                 let chunk_size = usize::from_str_radix(chunk_size_str, 16).map_err(|_| {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid chunk size")
                 })?;
@@ -220,11 +228,27 @@ impl HttpBody {
 
         // Read raw body data
         let encoding = header.get_encoding().unwrap_or_default();
-        let raw_data = if encoding.transfer().is_chunked() {
+        let transfer_codings = encoding.transfer();
+        let raw_data = if transfer_codings.is_chunked() {
             read_chunked_body(buf_reader, header, parse_config).await?
-        } else {
+        } else if transfer_codings.is_identity(){
             let content_length = header.get_content_length().unwrap_or(0);
             read_content_length_body(buf_reader, parse_config, content_length).await?
+        } else {
+            let is_gzip = transfer_codings.iter().any(|c| matches!(c, TransferCoding::Gzip));
+            if is_gzip {
+                // Read the original gzip data by Content-Length
+                let content_length = header.get_content_length().unwrap_or(0);
+                let compressed = read_content_length_body(buf_reader, parse_config, content_length).await?;
+
+                // use ContentCodings to decode the gzip data
+                ContentCoding::decode_compressed(&ContentCoding::Gzip, &compressed)?
+            } else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    format!("Unsupported Transfer-Encoding: {:?}", transfer_codings),
+                ));
+            }
         };
 
         // Apply decompression based on Transfer-Encoding
