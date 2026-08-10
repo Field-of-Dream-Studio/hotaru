@@ -39,11 +39,13 @@ pub trait HotaruWrite {
 
     /// Writes up to `exact` bytes from the source buffer.
     ///
-    /// `ConditionReached` means exactly `exact` bytes were written.
-    /// `SourceEnded` means the source buffer contained fewer than `exact`
-    /// bytes, so all available bytes were written instead. Backend failures,
-    /// including a writer accepting zero bytes before the selected prefix is
-    /// exhausted, remain in `Self::Error` through [`HotaruWrite::write_all`].
+    /// `SourceEnded` means the source buffer was exhausted at or before
+    /// `exact`. `ConditionReached` means `exact` bytes were written while the
+    /// source still contained more bytes. `exact` is a logical condition, not
+    /// a transfer cap, so this method does not return `CapReached`. Backend
+    /// failures, including a writer accepting zero bytes before the selected
+    /// prefix is exhausted, remain in `Self::Error` through
+    /// [`HotaruWrite::write_all`].
     #[av::ver(
         unstable,
         since = "0.8.5",
@@ -62,10 +64,10 @@ pub trait HotaruWrite {
             let transferred = buf.len().min(exact);
             self.write_all(&buf[..transferred]).await?;
 
-            let termination = if transferred == exact {
-                TransferTermination::ConditionReached
-            } else {
+            let termination = if buf.len() <= exact {
                 TransferTermination::SourceEnded
+            } else {
+                TransferTermination::ConditionReached
             };
 
             Ok(TransferOutcome::new(transferred, termination))

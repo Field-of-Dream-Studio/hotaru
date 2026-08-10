@@ -303,6 +303,19 @@ async fn write_exact_reports_source_ended_when_the_buffer_is_shorter() {
 }
 
 #[tokio::test]
+async fn write_exact_reports_source_ended_when_the_buffer_matches_exactly() {
+    let mut writer = VecWriter::default();
+
+    let outcome = writer.write_exact(b"hello", 5).await.unwrap();
+
+    assert_eq!(
+        outcome,
+        TransferOutcome::new(5, TransferTermination::SourceEnded)
+    );
+    assert_eq!(writer.bytes, b"hello");
+}
+
+#[tokio::test]
 async fn write_exact_zero_reaches_the_condition_without_writing() {
     let mut writer = VecWriter::default();
 

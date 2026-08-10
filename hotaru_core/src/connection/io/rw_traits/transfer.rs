@@ -13,7 +13,7 @@ pub enum TransferTermination {
     /// No input remained in the operation's source.
     ///
     /// This can be successful completion when exhausting the source is the
-    /// operation's goal, as with `read_to_end` or `write_all`. For a
+    /// operation's goal, as with `read_to_end` or `write_exact`. For a
     /// delimiter-oriented read it means EOF arrived before the delimiter.
     SourceEnded,
     /// The configured transfer cap was reached before another stop condition.

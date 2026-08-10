@@ -17,7 +17,7 @@
 //! | [`HotaruRead::into_buf`] | [`HotaruWrite::into_buf_write`] | Consume an adapter and produce its buffered form. |
 //! | [`HotaruRead::read`] | [`HotaruWrite::write`] | Perform one partial transfer and return the byte count. |
 //! | [`HotaruRead::read_exact`] | [`HotaruWrite::write_all`] | Strict completion: fill the entire destination or drain the entire source; inability to complete is `Self::Error`. |
-//! | [`HotaruRead::read_to_end`] | [`HotaruWrite::write_exact`] | Outcome-driven count boundary: distinguish source exhaustion from reaching the caller's configured boundary. |
+//! | [`HotaruRead::read_to_end`] | [`HotaruWrite::write_exact`] | Outcome-driven count boundary: distinguish source exhaustion from reaching the caller's configured boundary while source input remains. |
 //! | [`HotaruBufRead::read_until`] | [`HotaruWrite::write_until`] | Transfer through an inclusive delimiter, subject to a cap. |
 //! | [`HotaruBufRead::read_until_unbounded`] | [`HotaruWrite::write_until_unbounded`] | Explicitly opt out of the delimiter-transfer cap. |
 //! | [`HotaruBufRead::read_line`] | [`HotaruWrite::write_line`] | Transfer through an existing newline, subject to a cap. |
