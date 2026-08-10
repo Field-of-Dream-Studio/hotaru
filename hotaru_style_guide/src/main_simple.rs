@@ -157,15 +157,16 @@ endpoint! {
     pub form_handler <HTTP> {
         if req.method() == POST {
             match req.form().await {
-                Some(form) => {
+                Ok(form) => {
                     let username = form.data.get("username")
                         .map(|s| s.as_str())
                         .unwrap_or("anonymous");
 
                     text_response(format!("Hello, {}!", username))
                 }
-                None => {
-                    text_response("Invalid form data")
+                Err(error) => {
+                    text_response(format!("Invalid form data: {error}"))
+                        .status(StatusCode::BAD_REQUEST)
                 }
             }
         } else {

@@ -10,6 +10,7 @@
 
 use core::fmt;
 
+use hotaru_core::connection::HotaruIoError;
 #[cfg(feature = "spawn_local")]
 use hotaru_core::connection::{
     HotaruBufRead, HotaruBufReader, HotaruBufWriter, HotaruRead, HotaruWrite, MaybeSend,
@@ -23,7 +24,7 @@ pub enum EmbeddedBackend {}
 /// Driver-specific embedded IO errors are normalized to
 /// [`embedded_io_async::ErrorKind`]. Hotaru-owned sentinel conditions stay
 /// explicit because `embedded-io` has no exact EOF-before-buffer-filled kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EmbeddedIoError {
     /// Error returned by the wrapped embedded IO value.
     Backend(embedded_io_async::ErrorKind),
@@ -31,6 +32,8 @@ pub enum EmbeddedIoError {
     UnexpectedEof,
     /// Writer accepted 0 bytes before `write_all` drained its buffer.
     WriteZero,
+    /// `read_until` / `read_line` reached rate limit.
+    SizeExceeded,
 }
 
 impl EmbeddedIoError {
@@ -48,6 +51,7 @@ impl EmbeddedIoError {
             Self::Backend(kind) => *kind,
             Self::UnexpectedEof => embedded_io_async::ErrorKind::Other,
             Self::WriteZero => embedded_io_async::ErrorKind::WriteZero,
+            Self::SizeExceeded => embedded_io_async::ErrorKind::InvalidData,
         }
     }
 }
@@ -58,7 +62,14 @@ impl fmt::Display for EmbeddedIoError {
             Self::Backend(kind) => write!(f, "embedded IO error: {kind:?}"),
             Self::UnexpectedEof => f.write_str("unexpected EOF before buffer was filled"),
             Self::WriteZero => f.write_str("writer accepted 0 bytes"),
+            Self::SizeExceeded => f.write_str("read rate limit exceeded"),
         }
+    }
+}
+
+impl HotaruIoError for EmbeddedIoError {
+    fn size_exceeded() -> Self {
+        Self::SizeExceeded
     }
 }
 

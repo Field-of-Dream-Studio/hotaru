@@ -63,7 +63,7 @@ impl HttpSafety {
     ///
     /// # Examples
     /// ```
-    /// # use crate::safety::HttpSafety;
+    /// # use hotaru_http::safety::HttpSafety;
     /// let safety = HttpSafety::new();
     /// assert!(safety.max_body_size().is_none());
     /// ```
@@ -289,7 +289,7 @@ impl HttpSafety {
     ///
     /// # Examples
     /// ```
-    /// # use crate::safety::HttpSafety;
+    /// # use hotaru_http::safety::HttpSafety;
     /// let mut base = HttpSafety::new();
     /// base.set_max_body_size(Some(1024));
     ///
@@ -329,22 +329,22 @@ impl HttpSafety {
     ///
     /// # Examples
     /// ```
-    /// # use crate::safety::HttpSafety;
-    /// # use crate::http_value::HttpMethod;
+    /// # use hotaru_http::safety::HttpSafety;
+    /// # use hotaru_http::http_value::HttpMethod;
     /// let mut global = HttpSafety::new();
     /// global.set_max_body_size(Some(2048));
-    /// global.set_allowed_methods(Some(vec![HttpMethod::Get, HttpMethod::Post]));
+    /// global.set_allowed_methods(Some(vec![HttpMethod::GET, HttpMethod::POST]));
     ///
     /// let mut route = HttpSafety::new();
     /// route.set_max_body_size(Some(1024));
-    /// route.set_allowed_methods(Some(vec![HttpMethod::Post]));
+    /// route.set_allowed_methods(Some(vec![HttpMethod::POST]));
     ///
     /// global.merge(&route);
     ///
     /// assert_eq!(global.max_body_size(), Some(1024));
     /// assert_eq!(
     ///     global.allowed_methods(),
-    ///     Some(vec![HttpMethod::Post].as_slice())
+    ///     Some(vec![HttpMethod::POST].as_slice())
     /// );
     /// ```
     pub fn merge(&mut self, other: &HttpSafety) {

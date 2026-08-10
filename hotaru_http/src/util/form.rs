@@ -4,6 +4,10 @@ use std::collections::HashMap;
 
 use crate::message::http_value::ContentDisposition;
 
+// TODO: Split URL-encoded forms and multipart file handling into separate
+// submodules with dedicated parsing and error types, then make both parsers
+// return Result instead of silently accepting malformed input.
+
 #[derive(Debug, Clone)]
 pub struct UrlEncodedForm {
     pub data: HashMap<String, String>,
@@ -126,7 +130,7 @@ impl MultiForm {
     /// # Examples
     ///
     /// ```
-    /// use crate::form::MultiForm;
+    /// # use hotaru_http::form::MultiForm;
     /// let boundary = "boundary123";
     /// let body = concat!(
     ///     "--boundary123\r\n",

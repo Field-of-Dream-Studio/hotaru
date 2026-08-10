@@ -1,5 +1,6 @@
 use core::future::Future;
 
+use super::error::HotaruIoError;
 use super::super::MaybeSend;
 
 /// Async byte reader.
@@ -48,17 +49,26 @@ pub trait HotaruBufRead: HotaruRead {
     fn consume(&mut self, amt: usize);
 
     /// Reads bytes into `buf` until the delimiter `byte` is encountered,
-    /// inclusive. Stops at EOF without error. Returns `Self::Error` directly:
-    /// EOF is `Ok`, and the only failure path is `fill_buf`, which already
-    /// yields `Self::Error` (propagated via `?`). No sentinel is needed here,
-    /// so this stays a default method that never names `HotaruIOError`.
+    /// inclusive. Stops at EOF without error.
+    ///
+    /// Returns `Ok(bytes_read)` on success (delimiter found or EOF).
+    /// Returns `Err(Self::Error)` via [`HotaruIoError::size_exceeded`] when
+    /// `max_size` was reached before the delimiter was found. The accumulated
+    /// data remains in `buf`.
+    ///
+    /// `max_size` caps the total bytes read (including the delimiter). If the
+    /// buffer would grow beyond this limit, the read stops **before** the
+    /// allocation — `saturating_add` prevents overflow (reference: Bun
+    /// WebSocket fix, Swival/security-audits).
     fn read_until<'a>(
         &'a mut self,
         byte: u8,
         buf: &'a mut alloc::vec::Vec<u8>,
+        max_size: usize,
     ) -> impl Future<Output = Result<usize, Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend,
+        Self::Error: HotaruIoError,
     {
         async move {
             let mut read = 0;
@@ -67,6 +77,9 @@ pub trait HotaruBufRead: HotaruRead {
                     let available = self.fill_buf().await?;
                     if available.is_empty() {
                         return Ok(read);
+                    }
+                    if buf.len().saturating_add(available.len()) > max_size {
+                        return Err(HotaruIoError::size_exceeded());
                     }
                     if let Some(i) = available.iter().position(|b| *b == byte) {
                         buf.extend_from_slice(&available[..=i]);
@@ -85,20 +98,34 @@ pub trait HotaruBufRead: HotaruRead {
         }
     }
 
-    /// Reads a line into `buf` (up to and including the next `\n`). Also a
-    /// default method returning `Self::Error`; builds on `read_until`.
+    /// Reads a line into `buf` (up to and including the next `\n`).
+    ///
+    /// Returns `Ok(bytes_read)` on success. On truncation, `buf` receives the
+    /// partially-read line before returning `Err` — data is never lost.
+    ///
+    /// `max_size` is forwarded to `read_until`.
     fn read_line<'a>(
         &'a mut self,
         buf: &'a mut alloc::string::String,
+        max_size: usize,
     ) -> impl Future<Output = Result<usize, Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend,
+        Self::Error: HotaruIoError,
     {
         async move {
             let mut bytes = alloc::vec::Vec::new();
-            let n = self.read_until(b'\n', &mut bytes).await?;
-            buf.push_str(&alloc::string::String::from_utf8_lossy(&bytes));
-            Ok(n)
+            match self.read_until(b'\n', &mut bytes, max_size).await {
+                Ok(n) => {
+                    buf.push_str(&alloc::string::String::from_utf8_lossy(&bytes));
+                    Ok(n)
+                }
+                Err(e) => {
+                    // `bytes` already has the partial data — write it to buf directly.
+                    buf.push_str(&alloc::string::String::from_utf8_lossy(&bytes));
+                    Err(e)
+                }
+            }
         }
     }
 }

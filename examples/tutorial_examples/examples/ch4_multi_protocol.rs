@@ -121,10 +121,10 @@ endpoint! {
         }
 
         let json_data = match req.json().await {
-            Some(data) => data,
-            None => return json_response(object!({
-                error: "Invalid JSON"
-            }))
+            Ok(data) => data,
+            Err(error) => return json_response(object!({
+                error: error.to_string()
+            })).status(StatusCode::BAD_REQUEST)
         };
 
         let user = json_data.get("user").string();
@@ -194,10 +194,10 @@ endpoint! {
         }
 
         let json_data = match req.json().await {
-            Some(data) => data,
-            None => return json_response(object!({
-                error: "Invalid JSON"
-            }))
+            Ok(data) => data,
+            Err(error) => return json_response(object!({
+                error: error.to_string()
+            })).status(StatusCode::BAD_REQUEST)
         };
 
         let username = json_data.get("username").string();

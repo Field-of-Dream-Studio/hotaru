@@ -8,10 +8,11 @@
 #[cfg(test)]
 mod security_tests {
     use crate::message::body::HttpBody;
-    use crate::message::http_value::{HttpMethod, HttpVersion};
+    use crate::message::http_value::HttpMethod;
     use crate::message::meta::HttpMeta;
     use crate::message::start_line::RequestStartLine;
     use crate::security::safety::HttpSafety;
+    use hotaru_io_tokio::TokioIo;
     use std::io::Cursor;
     use tokio::io::BufReader;
 
@@ -153,7 +154,7 @@ mod security_tests {
         // Simulate headers with CRLF injection attempt
         let headers = b"Host: example.com\r\nUser-Agent: Test\r\nInjected: header\r\n\r\n";
         let cursor = Cursor::new(headers.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
             .append_from_request_stream(&mut reader, &safety, true)
             .await;
@@ -169,7 +170,7 @@ mod security_tests {
         // Header with null byte
         let headers = b"Host: example.com\0malicious.com\r\n\r\n";
         let cursor = Cursor::new(headers.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
             .append_from_request_stream(&mut reader, &safety, true)
             .await;
@@ -200,7 +201,7 @@ mod security_tests {
         let long_name = "X-".to_string() + &"A".repeat(2048);
         let headers = format!("{}: value\r\n\r\n", long_name);
         let cursor = Cursor::new(headers.as_bytes().to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
             .append_from_request_stream(&mut reader, &safety, true)
             .await;
@@ -217,7 +218,7 @@ mod security_tests {
         let long_value = "A".repeat(10240);
         let headers = format!("X-Large: {}\r\n\r\n", long_value);
         let cursor = Cursor::new(headers.as_bytes().to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
             .append_from_request_stream(&mut reader, &safety, true)
             .await;
@@ -237,7 +238,7 @@ mod security_tests {
         }
         headers.push_str("\r\n");
         let cursor = Cursor::new(headers.as_bytes().to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
             .append_from_request_stream(&mut reader, &safety, true)
             .await;
@@ -256,7 +257,7 @@ mod security_tests {
         // Multiple Host headers
         let headers = b"Host: example.com\r\nHost: malicious.com\r\n\r\n";
         let cursor = Cursor::new(headers.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
             .append_from_request_stream(&mut reader, &safety, true)
             .await;
@@ -277,7 +278,7 @@ mod security_tests {
         // Multiple Content-Length headers (security risk for request smuggling)
         let headers = b"Content-Length: 10\r\nContent-Length: 20\r\n\r\n";
         let cursor = Cursor::new(headers.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
             .append_from_request_stream(&mut reader, &safety, true)
             .await;
@@ -299,7 +300,7 @@ mod security_tests {
         // Complete HTTP request with line folding in header
         let request = b"GET / HTTP/1.1\r\nX-Long-Header: part1\r\n part2\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
             .append_from_request_stream(&mut reader, &safety, false)
             .await;
@@ -331,7 +332,7 @@ mod security_tests {
         // Header without colon separator
         let headers = b"InvalidHeader\r\n\r\n";
         let cursor = Cursor::new(headers.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
             .append_from_request_stream(&mut reader, &safety, true)
             .await;
@@ -347,7 +348,7 @@ mod security_tests {
         // Header with control characters (potential security risk)
         let headers = b"X-Control: value\x01\x02\x03\r\n\r\n";
         let cursor = Cursor::new(headers.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
             .append_from_request_stream(&mut reader, &safety, true)
             .await;
@@ -371,7 +372,7 @@ mod security_tests {
         // Invalid hex characters in chunk size
         let body_data = b"GGGG\r\ndata\r\n0\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Parser rejects invalid hex
         assert!(
@@ -390,7 +391,7 @@ mod security_tests {
         // Negative size (invalid hex)
         let body_data = b"-10\r\ndata\r\n0\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should fail with invalid chunk size
         assert!(result.is_err(), "Should reject negative chunk size");
@@ -406,7 +407,7 @@ mod security_tests {
         // Very large chunk size that could cause overflow
         let body_data = b"FFFFFFFFFFFFFFFF\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should fail - either overflow detection or read timeout
         assert!(result.is_err(), "Should reject overflow-sized chunk");
@@ -422,7 +423,7 @@ mod security_tests {
         // Missing CRLF after chunk size
         let body_data = b"5data\r\n0\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should fail or read incorrectly
         assert!(
@@ -441,7 +442,7 @@ mod security_tests {
         // Missing CRLF after chunk data
         let body_data = b"4\r\ndata0\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should fail with invalid terminator
         assert!(
@@ -460,7 +461,7 @@ mod security_tests {
         // LF only instead of CRLF
         let body_data = b"4\ndata\n0\n\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should fail - HTTP requires CRLF
         assert!(result.is_err(), "Should reject LF-only terminators");
@@ -476,7 +477,7 @@ mod security_tests {
         // Chunk size exceeds max_body_size
         let body_data = b"200\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should be rejected by safety check
         assert!(
@@ -495,7 +496,7 @@ mod security_tests {
         // Multiple small chunks that exceed limit cumulatively
         let body_data = b"1E\r\n012345678901234567890123456789\r\n1E\r\n012345678901234567890123456789\r\n0\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should fail when cumulative size exceeds limit
         assert!(
@@ -514,7 +515,7 @@ mod security_tests {
         // Zero-size chunk followed by more data (invalid)
         let body_data = b"0\r\n\r\n5\r\nhello\r\n0\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Parser should stop at first zero chunk
         assert!(result.is_ok());
@@ -530,7 +531,7 @@ mod security_tests {
         // Malicious trailer headers after final chunk
         let body_data = b"5\r\nhello\r\n0\r\nX-Injected: malicious\r\nX-Evil: header\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should parse successfully, check if trailers were added
         assert!(result.is_ok());
@@ -549,7 +550,7 @@ mod security_tests {
         let extension = "x".repeat(10000);
         let body_data = format!("5;{}\r\nhello\r\n0\r\n\r\n", extension);
         let cursor = Cursor::new(body_data.as_bytes().to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should handle or reject long extensions
         // Behavior depends on parser
@@ -566,7 +567,7 @@ mod security_tests {
         // Missing final zero chunk (incomplete)
         let body_data = b"5\r\nhello\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should fail or timeout waiting for more data
         assert!(result.is_err(), "Should reject missing final zero chunk");
@@ -582,7 +583,7 @@ mod security_tests {
         // Valid chunked encoding (baseline test)
         let body_data = b"5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should succeed
         assert!(result.is_ok(), "Valid chunked encoding should succeed");
@@ -601,7 +602,7 @@ mod security_tests {
         // Multiple zero-length chunks before final
         let body_data = b"0\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should succeed with empty body
         assert!(result.is_ok());
@@ -617,7 +618,7 @@ mod security_tests {
         // Uppercase hex digits (valid)
         let body_data = b"A\r\n0123456789\r\n0\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
-        let mut reader = BufReader::new(cursor);
+        let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should succeed (hex is case-insensitive)
         assert!(result.is_ok());
