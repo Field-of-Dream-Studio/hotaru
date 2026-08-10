@@ -2,7 +2,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.4-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.5-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
@@ -12,7 +12,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 > Small, sweet, easy framework with a protocol-neutral, no_std-ready core 
 
-**[Official Website](https://hotaru.rs)** | **[Example Project](https://github.com/Field-of-Dream-Studio/hotaru-example)**
+**[Official Website](https://hotaru.rs)** | **[Examples](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples)**
 
 > Repository transfer notice: the Hotaru repository has moved to
 > `https://github.com/Field-of-Dream-Studio/hotaru`.
@@ -21,7 +21,7 @@ MSRV: 1.88
 
 ### Stability in 0.8.x
 
-The **tokio + HTTP** stack (default features `trans`, `http`, `tokio`) is the tested, supported path and is safe for production use today.
+The **tokio + HTTP** stack (default features include `trans`, `auto-reg`, `http`, and `tokio`) is the tested, supported path and is safe for production use today.
 
 Everything else is **experimental** and will stabilize by 0.8.7:
 
@@ -41,11 +41,14 @@ If you are shipping something now, stick with the `tokio` default and revisit th
 - **Runtime-Neutral Core**: `hotaru_core` speaks to any async runtime through the `RuntimeSpec` trait. Tokio ships today via `hotaru_rt_tokio`; other runtimes can plug in via the same sibling-crate pattern. IO adapters are further along, with `hotaru_io_tokio`, `hotaru_io_futures`, and the experimental in-workspace `hotaru_io_embedded`
 - **`no_std`-Ready Core**: `hotaru_core` builds bare-metal on Cortex-M4/M7 and RISC-V (with atomics) under `alloc`. CI verified on `thumbv7em-none-eabihf` and `riscv32imac-unknown-none-elf`
 - **Sync main**: `fn main() { run_server!(APP); }`. No `async fn main`, no `#[tokio::main]`
-- **Ergonomic Macros**: `endpoint!` / `outpoint!` / `middleware!` DSL in three flavors (`trans`, `semi-trans`, `attr`)
+- **Endpoint Definition and Registration Choices**: use the `endpoint!` / `outpoint!` / `middleware!` DSL in three flavors (`trans`, `semi-trans`, `attr`) with default automatic registration, disable `auto-reg` and bind generated definitions explicitly, or construct endpoint definitions manually without the endpoint DSL
 - **Full-Stack**: Akari template rendering, form/URL-encoded body parsing, session cookies, HTTP body compression (gzip / deflate / brotli / zstd) all built in
 - **Flexible Routing**: Regex, literal, and pattern segments (`<int:id>`, `<uuid:token>`, `<**path>`) with a tree walker
 
 ## Quick Start
+
+The default configuration uses the `trans` endpoint DSL with the `auto-reg`
+feature. The generated `index` definition binds to `APP` during startup:
 
 ```rust
 use hotaru::prelude::*;
@@ -96,13 +99,12 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.8.3"
-tokio = { version = "1", features = ["full"] }
+hotaru = "0.8.5"
 ```
 
 ### Optional Features
 
-Default features: `trans`, `http`, `tokio`. Cargo's additive feature unification means sub-features pull in their prerequisites automatically — you never have to enable a base feature by hand.
+Default features: `trans`, `auto-reg`, `http`, `tokio`, `full_regex`, `template`, and `cli`. Cargo's additive feature unification means sub-features pull in their prerequisites automatically — you never have to enable a base feature by hand.
 
 **Protocol stack**
 
@@ -117,32 +119,33 @@ Default features: `trans`, `http`, `tokio`. Cargo's additive feature unification
 - **`semi-trans`** — stacked attributes above an `fn`
 - **`attr`** — single attribute with args
 
+**Registration**
+
+- **`auto-reg`** *(default-on)*: generated endpoint/outpoint constructors bind during startup. Disable it when registration must be explicit; the selected endpoint DSL still generates constructors that can be passed to `App::bind` or `Blueprint::bind`.
+
 **Misc**
 
 - **`debug`**: Enable debug logging for development and troubleshooting.
 - **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation. When enabling, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.8.3", features = ["external-ctor"] }
+  hotaru = { version = "0.8.5", features = ["external-ctor"] }
   ctor = "0.4.0"
-  tokio = { version = "1", features = ["full"] }
   ```
 
 **Example — HTTPS server with body compression:**
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.3", features = ["https", "http_compression"] }
-tokio = { version = "1", features = ["full"] }
+hotaru = { version = "0.8.5", features = ["https", "http_compression"] }
 ```
 
 **Example — gRPC-only (no HTTP):**
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.3", default-features = false, features = ["trans", "tokio"] }
+hotaru = { version = "0.8.5", default-features = false, features = ["trans", "tokio"] }
 hotaru_grpc = "..."
-tokio = { version = "1", features = ["full"] }
 ```
 
 ## Binary Commands
@@ -175,7 +178,7 @@ The build script copies `templates/` and `programfiles/` to the target directory
 
 ### Endpoints
 
-Three macro flavors, enabled by the `trans` / `semi-trans` / `attr` cargo features. Pick one per project; **`trans` is the default**. All three register the same route at startup; they only differ in syntax.
+Three macro flavors are enabled by the `trans` / `semi-trans` / `attr` cargo features. Pick one per project; **`trans` is the default**. All three produce the same route definition; the separate `auto-reg` feature controls whether that definition binds during startup.
 
 **`trans` (default) — bang macro with hotaru-blocks body:**
 
@@ -188,6 +191,74 @@ endpoint! {
     }
 }
 ```
+
+#### Registration modes
+
+**Macro definition with automatic registration (default):**
+
+```toml
+[dependencies]
+hotaru = { version = "0.8.5", default-features = false, features = [
+    "trans", "auto-reg", "http", "tokio", "full_regex", "template"
+] }
+```
+
+```rust
+fn main() {
+    run_server!(APP);
+}
+
+endpoint! {
+    APP.url("/"),
+    pub index<HTTP> {
+        text_response("Hello, Hotaru!")
+    }
+}
+```
+
+This complete configuration is available in
+[`examples/starter_trans`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_trans).
+
+**The same macro definition with explicit registration (`auto-reg` off):**
+
+```rust
+fn main() {
+    APP.bind(index).expect("bind index");
+    run_server!(APP);
+}
+
+endpoint! {
+    APP.url("/"),
+    pub index<HTTP> {
+        text_response("Hello, Hotaru!")
+    }
+}
+```
+
+See
+[`examples/starter_trans_no_auto_reg`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_trans_no_auto_reg)
+for its exact feature list.
+
+**Manual endpoint definition without the endpoint DSL:**
+
+```rust
+async fn index_body(_ctx: &mut HttpContext) -> HttpResponse {
+    text_response("Hello, Hotaru!")
+}
+
+fn main() {
+    let index = Endpoint::<HTTP>::endpoint(
+        "/",
+        "index",
+        |ctx: &mut HttpContext| Box::pin(index_body(ctx)),
+    );
+    APP.insert(index).expect("insert index");
+    run_server!(APP);
+}
+```
+
+This path does not enable `trans`, `semi-trans`, `attr`, or `auto-reg`. See
+[`examples/starter_manual`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_manual).
 
 **`semi-trans` — stacked attributes above an `fn`:**
 
@@ -214,9 +285,9 @@ pub fn get_user<HTTP>() {
 
 ### Macro Notes
 
-- Endpoints and middleware auto-register at startup — no manual `router.register()`.
+- With the default `auto-reg` feature, generated endpoint/outpoint definitions bind during startup. Without it, bind their constructors explicitly with `App::bind` or `Blueprint::bind`.
 - `trans` form: brace syntax `{}` with doc comments inside the block; angle-bracket body defaults to `req`. Optional fn-style `pub fn name(req: HTTP) { ... }` is also accepted.
-- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.3", default-features = false, features = ["semi-trans", "http", "tokio"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` and `tokio` since `default-features = false` also drops the default HTTP stack and Tokio facade defaults.
+- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.5", default-features = false, features = ["semi-trans", "auto-reg", "http", "tokio"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `auto-reg`, `http`, and `tokio` when those defaults are wanted.
 - See `macro_ra.md` for syntax details. Analyzer support is planned.
 
 ### Middleware
@@ -296,12 +367,13 @@ endpoint! {
 
 ## Examples
 
-Check out the [example repository](https://github.com/Field-of-Dream-Studio/hotaru-example) for:
-- Basic routing and handlers
-- Form processing and file uploads
-- Session management with cookies
-- CORS configuration
-- Multi-protocol applications
+Use the examples maintained in this repository:
+
+- [`starter_trans`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_trans) — `trans` DSL with default `auto-reg`
+- [`starter_trans_no_auto_reg`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_trans_no_auto_reg) — the same DSL with explicit `App::bind`
+- [`starter_manual`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_manual) — manual `Endpoint::<HTTP>::endpoint` plus `App::insert`
+- [`tutorial_examples`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/tutorial_examples) — routing, middleware, multi-protocol, and TCP examples
+- [All repository examples](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples)
 
 ## Crate Ecosystem
 
@@ -321,7 +393,22 @@ Hotaru is built on a modular architecture:
 
 ## Changelog
 
-### 0.8.4 (Current)
+### 0.8.5 (Current)
+
+- Made automatic endpoint/outpoint registration optional through the default-on `auto-reg` feature. Macro-generated constructors can be bound explicitly with `App::bind` or `Blueprint::bind` when it is disabled.
+- Added an experimental manual endpoint-definition path using `Endpoint::<P>::endpoint(...)` and `App::insert`, without requiring an endpoint DSL feature.
+- Added focused starters for default macro registration, macro syntax without `auto-reg`, and manual endpoint construction.
+- Updated CLI scaffolds to use synchronous `run_server!(APP)` and removed the redundant direct `tokio` dependency from generated manifests.
+- Refactored HTTP body processing around the typed `BodyError` model, including explicit missing, oversized, incomplete, invalid, unsupported, and backend-I/O failures.
+- Bounded HTTP line parsing and compressed-body expansion using configured `HttpSafety` limits, addressing unbounded line reads and decompression growth.
+- Added protocol-neutral `TransferOutcome` and `TransferTermination` types for reporting `ConditionReached`, `SourceEnded`, and `CapReached` without converting normal stopping events into backend errors.
+- Added bounded `read_to_end`, `read_until`, and `read_line` operations with explicitly named unbounded variants.
+- Added corresponding write-side count, delimiter, line, and capped helpers. `read_exact` and `write_all` remain strict operations that report incomplete backend transfers through `Self::Error`.
+- Removed the framework error-construction trait; concrete I/O implementations retain ownership of their associated `Self::Error`.
+
+The new manual-registration and transfer-outcome APIs remain experimental in 0.8.5.
+
+### 0.8.4
 - Continued backend split work by moving Tokio-specific IO/runtime support out of `hotaru_core`.
 - Clarified platform and task-mobility feature modes.
 - Added explicit local-executor refinements: `spawn_local_atomic` and `spawn_local_no_atomic`.

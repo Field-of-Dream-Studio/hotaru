@@ -8,7 +8,7 @@ use crate::message::http_value::*;
 use crate::message::start_line::HttpStartLine;
 use std::collections::{HashMap, HashSet};
 use std::str;
-use hotaru_core::connection::HotaruBufRead;
+use hotaru_core::connection::{HotaruBufRead, TransferTermination};
 
 /// RequestHeader is a struct that represents the headers of an HTTP request.
 #[derive(Debug, Clone)]
@@ -627,9 +627,13 @@ impl HttpMeta {
 
             loop {
                 let mut line = String::new();
-                let bytes_read = buf_reader
+                let outcome = buf_reader
                     .read_line(&mut line, config.effective_line_length())
                     .await?;
+                if outcome.termination == TransferTermination::CapReached {
+                    return Err(ConnectionError::PayloadTooLarge);
+                }
+                let bytes_read = outcome.transferred;
                 if print_raw {
                     println!("Read line: {}, buffer: {}", line, bytes_read);
                 }

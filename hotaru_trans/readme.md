@@ -19,14 +19,20 @@ Proc-macro crate for the [Hotaru](../hotaru) web framework. Provides the macros 
 - `LUrl!`, `LPattern!` — same idea for URL/pattern statics.
 
 **Constructor attribute:**
-- `#[ctor]` — built-in equivalent of the `ctor` crate. Used internally by registration macros so URL bindings install at program start. Use the `external-ctor` feature on `hotaru` to swap in the external `ctor` crate instead.
+- `#[ctor]` — built-in equivalent of the `ctor` crate. With `auto-reg` enabled,
+  endpoint/outpoint macros use it for startup registration hooks. Use the
+  `external-ctor` feature on `hotaru` to swap in the external `ctor` crate.
 
 ## Feature flags
 
 - `trans` (default) — function-style macros (`endpoint!`/`outpoint!`/`middleware!`).
 - `attr` — attribute-style: `#[endpoint("/path")]` over a free `fn`.
 - `semi-trans` — attribute-on-block hybrid.
-- `external-ctor` — opt out of the built-in `#[ctor]` and use the external `ctor = "0.4"` crate.
+- `auto-reg` (default) — emit endpoint/outpoint startup hooks that call
+  `App::bind`; disabling it keeps the generated definition constructors but
+  omits those hooks.
+- `external-ctor` — use the external `ctor = "0.4"` crate for emitted
+  automatic-registration hooks instead of the built-in `#[ctor]`.
 
 ## Layout
 
@@ -38,4 +44,5 @@ Proc-macro crate for the [Hotaru](../hotaru) web framework. Provides the macros 
 
 ## Version
 
-`0.8.2`. Depends on `hotaru_core = 0.8.2`, `hotaru_lib = 0.8.2`.
+The current workspace manifest is `0.8.4` and depends on
+`hotaru_core = 0.8.4`.

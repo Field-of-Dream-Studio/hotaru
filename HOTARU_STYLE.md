@@ -28,14 +28,12 @@ hotaru new [component]
 ```
 
 ### Dependencies
-**Important:** Always use `ctor = "0.4"` in your Cargo.toml:
+The default `hotaru` features already provide the Tokio runtime/backend and
+built-in automatic registration. Add Tokio directly only when application code
+uses Tokio APIs such as `tokio::time` or `tokio::spawn`:
 ```toml
 [dependencies]
-ctor = "0.4"
 hotaru = "*"
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 ```
 
 ### Directory Structure
@@ -70,16 +68,15 @@ use tokio::time::sleep;
 use hotaru::prelude::*;
 use hotaru::http::*;
 
-// Define app as static with lazy initialization
-pub static APP: SApp = Lazy::new(|| {
-    App::new()
+LServer!(
+    APP = Server::new()
         .binding("127.0.0.1:3003")
+        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
         .build()
-});
+);
 
-#[tokio::main]
-async fn main() {
-    APP.clone().run().await;
+fn main() {
+    run_server!(APP);
 }
 ```
 
@@ -974,13 +971,12 @@ Always import in this order:
 
 ### Test Commands in main.rs
 ```rust
-#[tokio::main]
-async fn main() {
+fn main() {
     println!("Test Commands:");
     println!("  curl http://localhost:3003/");
     println!("  curl -X POST http://localhost:3003/form -d 'username=test'");
-    
-    APP.clone().run().await;
+
+    run_server!(APP);
 }
 ```
 
@@ -1139,10 +1135,6 @@ serde_json = "1.0"  # Not needed!
 ```toml
 [dependencies]
 hotaru = { path = "../hotaru" }
-akari = "0.2"  # Provides JSON handling
-tokio = { version = "1", features = ["full"] }
-once_cell = "1"
-ctor = "0.4"  # Required for endpoint registration
 ```
 
 ## 16. Complete Working Example
