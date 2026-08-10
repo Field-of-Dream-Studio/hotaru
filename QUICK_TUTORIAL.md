@@ -206,18 +206,14 @@ endpoint! {
             return json_response(object!({ error: "Use POST" }));
         }
         
-        req.parse_body().await;
-        let json_body = match &req.request.body {
-            HttpBody::Json(v) => v,
-            _ => return json_response(object!({ error: "Invalid JSON" }))
+        let json_body = match req.json().await {
+            Ok(value) => value,
+            Err(error) => return json_response(object!({ error: error.to_string() }))
+                .status(StatusCode::BAD_REQUEST)
         };
         
-        let name = json_body.get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let description = json_body.get("description")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let name = json_body.get("name").string();
+        let description = json_body.get("description").string();
         
         if name.is_empty() {
             return json_response(object!({ error: "Name required" }));
@@ -283,20 +279,22 @@ endpoint! {
             .and_then(|s| s.parse::<u32>().ok())
             .unwrap_or(0);
         
-        req.parse_body().await;
-        let json_body = match &req.request.body {
-            HttpBody::Json(v) => v,
-            _ => return json_response(object!({ error: "Invalid JSON" }))
+        let json_body = match req.json().await {
+            Ok(value) => value,
+            Err(error) => return json_response(object!({ error: error.to_string() }))
+                .status(StatusCode::BAD_REQUEST)
         };
         
         let mut items = ITEMS.write().unwrap();
         match items.get_mut(&id) {
             Some(item) => {
-                if let Some(name) = json_body.get("name").and_then(|v| v.as_str()) {
+                let name = json_body.get("name").string();
+                if !name.is_empty() {
                     item.name = name.to_string();
                 }
-                if let Some(desc) = json_body.get("description").and_then(|v| v.as_str()) {
-                    item.description = desc.to_string();
+                let description = json_body.get("description").string();
+                if !description.is_empty() {
+                    item.description = description.to_string();
                 }
                 json_response(object!({
                     id: item.id,

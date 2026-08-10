@@ -95,7 +95,6 @@ fn init_project() {
     println!("build = \"build.rs\"");
     println!("\n[dependencies]");
     println!("hotaru = \"{VERSION}\"");
-    println!("{}", DEPS);
 }
 
 /// Update `src/main.rs` for the current public server names.
@@ -189,7 +188,7 @@ build = "build.rs"
 
 [dependencies]
 hotaru = "{VERSION}"
-{DEPS}"#,
+"#,
     );
     fs::write(&cargo_toml_path, cargo_toml_cont).unwrap_or_else(|e| {
         eprintln!("Failed to write to {}: {}", src_path.display(), e);
@@ -331,11 +330,6 @@ fn main() {
 const MAIN_RS_CONTENT: &'static str = r#"use hotaru::prelude::*;
 use hotaru::http::*;
 
-#[tokio::main]
-async fn main() {
-    APP.clone().run().await;
-}
-
 LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3003")
@@ -343,17 +337,18 @@ LServer!(
         .build()
 );
 
-endpoint!{
+fn main() {
+    run_server!(APP);
+}
+
+endpoint! {
     APP.url("/"),
 
     /// Hello world function
-    pub hello_world <HTTP> {
+    pub hello_world<HTTP> {
         text_response("Hello, world!")
     }
 }
-"#;
-
-const DEPS: &'static str = r#"tokio = { version = "1", features = ["full"] }
 "#;
 
 const BUILD_RS: &'static str = r###"//! This file is introduced in hotaru since v0.6.3-rc2 

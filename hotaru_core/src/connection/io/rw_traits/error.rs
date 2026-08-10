@@ -1,11 +1,15 @@
-/// Framework-owned IO error. Concrete, non-generic, no-alloc, and identical
+// ============================================================================
+// HotaruIOError — framework-owned error type
+// ============================================================================
+
+/// Framework-owned IO error. Concrete, non-generic, and identical
 /// across feature sets. It starts with only the framework-level sentinel
 /// conditions Hotaru itself needs to manufacture.
 ///
 /// Do **not** add a catch-all backend variant up front. When a concrete impl
 /// needs to surface another backend failure, add a concrete variant and the
 /// corresponding conversion at that impl point.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HotaruIOError {
     /// Reader returned 0 before `read_exact` filled its buffer.
     UnexpectedEof,

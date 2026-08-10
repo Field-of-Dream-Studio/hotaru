@@ -114,10 +114,10 @@ endpoint! {
 
         // Parse JSON from request body
         let json_data = match req.json().await {
-            Some(data) => data,
-            None => return json_response(object!({
-                error: "Invalid or missing JSON body"
-            }))
+            Ok(data) => data,
+            Err(error) => return json_response(object!({
+                error: error.to_string()
+            })).status(StatusCode::BAD_REQUEST)
         };
 
         // Extract fields using Akari's Value methods
@@ -169,10 +169,10 @@ endpoint! {
         let id = req.param("id").string().parse::<u32>().unwrap_or(0);
 
         let json_data = match req.json().await {
-            Some(data) => data,
-            None => return json_response(object!({
-                error: "Invalid or missing JSON body"
-            }))
+            Ok(data) => data,
+            Err(error) => return json_response(object!({
+                error: error.to_string()
+            })).status(StatusCode::BAD_REQUEST)
         };
 
         let mut users = USERS.write().unwrap();

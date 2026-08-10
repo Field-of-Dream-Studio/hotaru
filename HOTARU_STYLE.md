@@ -28,14 +28,12 @@ hotaru new [component]
 ```
 
 ### Dependencies
-**Important:** Always use `ctor = "0.4"` in your Cargo.toml:
+The default `hotaru` features already provide the Tokio runtime/backend and
+built-in automatic registration. Add Tokio directly only when application code
+uses Tokio APIs such as `tokio::time` or `tokio::spawn`:
 ```toml
 [dependencies]
-ctor = "0.4"
 hotaru = "*"
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 ```
 
 ### Directory Structure
@@ -70,16 +68,15 @@ use tokio::time::sleep;
 use hotaru::prelude::*;
 use hotaru::http::*;
 
-// Define app as static with lazy initialization
-pub static APP: SApp = Lazy::new(|| {
-    App::new()
+LServer!(
+    APP = Server::new()
         .binding("127.0.0.1:3003")
+        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
         .build()
-});
+);
 
-#[tokio::main]
-async fn main() {
-    APP.clone().run().await;
+fn main() {
+    run_server!(APP);
 }
 ```
 
@@ -665,28 +662,29 @@ if req.method() == POST {
 ### Form Data
 ```rust
 match req.form().await {
-    Some(form) => {
+    Ok(form) => {
         let username = form.data.get("username")
             .map(|s| s.as_str())
             .unwrap_or("anonymous");
         
         text_response(format!("Hello, {}!", username))
     }
-    None => {
-        text_response("Invalid form data")
+    Err(error) => {
+        text_response(format!("Invalid form data: {error}"))
+            .status(StatusCode::BAD_REQUEST)
     }
 }
 ```
 
 ### JSON Data
 ```rust
-// Generic JSON
-match req.json::<serde_json::Value>().await {
-    Some(json_data) => {
-        // Process JSON
+match req.json().await {
+    Ok(json_data) => {
+        // Process the Akari Value
     }
-    None => {
-        text_response("Invalid JSON")
+    Err(error) => {
+        text_response(format!("Invalid JSON: {error}"))
+            .status(StatusCode::BAD_REQUEST)
     }
 }
 ```
@@ -973,13 +971,12 @@ Always import in this order:
 
 ### Test Commands in main.rs
 ```rust
-#[tokio::main]
-async fn main() {
+fn main() {
     println!("Test Commands:");
     println!("  curl http://localhost:3003/");
     println!("  curl -X POST http://localhost:3003/form -d 'username=test'");
-    
-    APP.clone().run().await;
+
+    run_server!(APP);
 }
 ```
 
@@ -1064,8 +1061,9 @@ let user: User = serde_json::from_str(&req.body_string()).unwrap();
 ```rust
 // No struct needed!
 let json_data = match req.json().await {
-    Some(data) => data,
-    None => return json_response(object!({ error: "No JSON data" }))
+    Ok(data) => data,
+    Err(error) => return json_response(object!({ error: error.to_string() }))
+        .status(StatusCode::BAD_REQUEST)
 };
 let name = json_data.get("name").string();
 let age = json_data.get("age").numerical() as u32;
@@ -1137,10 +1135,6 @@ serde_json = "1.0"  # Not needed!
 ```toml
 [dependencies]
 hotaru = { path = "../hotaru" }
-akari = "0.2"  # Provides JSON handling
-tokio = { version = "1", features = ["full"] }
-once_cell = "1"
-ctor = "0.4"  # Required for endpoint registration
 ```
 
 ## 16. Complete Working Example

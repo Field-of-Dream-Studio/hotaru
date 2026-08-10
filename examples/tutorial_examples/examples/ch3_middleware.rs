@@ -210,7 +210,7 @@ middleware! {
             println!("[POST-LOG] POST request to {}", req.path());
 
             // Log request body if JSON
-            if let Some(json) = req.json().await {
+            if let Ok(json) = req.json().await {
                 println!("[POST-LOG] Body: {:?}", json);
             }
         }

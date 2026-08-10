@@ -16,7 +16,7 @@ The name 'Hotaru' comes from the Japanese Character '蛍' represents the firefly
 
 **[Official Website](https://hotaru.rs)**
 
-**[Example Project](https://github.com/Field-of-Dream-Studio/hotaru-example)**
+**[Examples](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples)**
 
 > Repository transfer notice: the Hotaru repository has moved to
 > `https://github.com/Field-of-Dream-Studio/hotaru`.
@@ -200,9 +200,14 @@ pub fn get_user<HTTP>() {
 
 ### Macro Notes
 
-- Endpoints and middleware auto-register at startup — no manual `router.register()`.
+- With the default `auto-reg` feature, macro-generated endpoints and outpoints
+  bind at startup. Without it, call their generated constructors and pass the
+  returned definitions to `App::bind` or `Blueprint::bind` explicitly.
 - `trans` form: brace syntax `{}` with doc comments inside the block; angle-bracket body defaults to `req`. Optional fn-style `pub fn name(req: HTTP) { ... }` is also accepted.
-- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.2", default-features = false, features = ["semi-trans", "http"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` since `default-features = false` also drops the default HTTP stack.
+- Remaining readme examples use `trans`. To switch while retaining automatic
+  registration, set `default-features = false` and enable the desired flavor
+  together with `auto-reg`, e.g. `features = ["semi-trans", "auto-reg", "http"]`.
+  Omit `auto-reg` only when definitions will be bound explicitly.
 - See `macro_ra.md` for syntax details. Analyzer support is planned.
 
 ### Middleware
@@ -282,7 +287,7 @@ endpoint! {
 
 ## Examples
 
-Check out the [example repository](https://github.com/Field-of-Dream-Studio/hotaru-example) for:
+Check out the [examples maintained in this repository](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples) for:
 - Basic routing and handlers
 - Form processing and file uploads
 - Session management with cookies

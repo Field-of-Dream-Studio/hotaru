@@ -23,7 +23,7 @@ pub enum EmbeddedBackend {}
 /// Driver-specific embedded IO errors are normalized to
 /// [`embedded_io_async::ErrorKind`]. Hotaru-owned sentinel conditions stay
 /// explicit because `embedded-io` has no exact EOF-before-buffer-filled kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EmbeddedIoError {
     /// Error returned by the wrapped embedded IO value.
     Backend(embedded_io_async::ErrorKind),

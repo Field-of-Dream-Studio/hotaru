@@ -5,8 +5,7 @@
 use hotaru::http::*;
 use hotaru::prelude::*;
 use htmstd::CookieSession;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde::Deserialize;
 
 use crate::APP;
 
@@ -78,7 +77,7 @@ endpoint! {
         } else {
             // Handle POST
             match req.form().await {
-                Some(form) => {
+                Ok(form) => {
                     let username = form.data.get("username")
                         .map(|s| s.as_str())
                         .unwrap_or("anonymous");
@@ -99,10 +98,10 @@ endpoint! {
                         }
                     }))
                 }
-                None => {
+                Err(error) => {
                     json_response(object!({
                         status: "error",
-                        message: "Invalid form data"
+                        message: error.to_string()
                     })).status(StatusCode::BAD_REQUEST)
                 }
             }
@@ -114,7 +113,7 @@ endpoint! {
 // JSON Data Handling
 // ============================================================================
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize)]
 struct UserInput {
     name: String,
     email: String,
@@ -128,23 +127,23 @@ endpoint! {
 
     /// Generic JSON handling
     pub json_handler <HTTP> {
-        match req.json::<serde_json::Value>().await {
-            Some(json_data) => {
+        match req.json().await {
+            Ok(json_data) => {
                 // Echo back the received JSON
                 json_response(object!({
                     status: "success",
                     message: "JSON received",
-                    received_data: json_data,
+                    received_data: json_data.clone(),
                     processed_at: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
                         .as_secs()
                 }))
             }
-            None => {
+            Err(error) => {
                 json_response(object!({
                     status: "error",
-                    message: "Invalid or missing JSON data"
+                    message: error.to_string()
                 })).status(StatusCode::BAD_REQUEST)
             }
         }
@@ -157,8 +156,16 @@ endpoint! {
 
     /// Typed JSON handling
     pub typed_json_handler <HTTP> {
-        match req.json::<UserInput>().await {
-            Some(user_data) => {
+        let json_data = match req.json().await {
+            Ok(json_data) => json_data,
+            Err(error) => return json_response(object!({
+                status: "error",
+                message: error.to_string()
+            })).status(StatusCode::BAD_REQUEST)
+        };
+
+        match serde_json::from_str::<UserInput>(&json_data.into_json()) {
+            Ok(user_data) => {
                 // Process typed data
                 json_response(object!({
                     status: "success",
@@ -171,7 +178,7 @@ endpoint! {
                     }
                 }))
             }
-            None => {
+            Err(_) => {
                 json_response(object!({
                     status: "error",
                     message: "Invalid user data format",
