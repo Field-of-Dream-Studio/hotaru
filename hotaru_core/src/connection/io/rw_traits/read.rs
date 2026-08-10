@@ -33,6 +33,85 @@ pub trait HotaruRead {
     ) -> impl Future<Output = Result<(), Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend;
+
+    /// Reads into `buf` until the source ends or `cap` is reached.
+    ///
+    /// `cap` bounds the final length of `buf`, including bytes already in it.
+    /// `SourceEnded` means the reader returned EOF, while `CapReached` means
+    /// the cap filled first. When both could coincide, the method reports
+    /// `CapReached` without performing an additional read to probe for EOF.
+    #[av::ver(
+        unstable,
+        since = "0.8.5",
+        note = "Bounded read-to-end with typed termination",
+        date = "2026-08-09"
+    )]
+    fn read_to_end<'a>(
+        &'a mut self,
+        buf: &'a mut alloc::vec::Vec<u8>,
+        cap: usize,
+    ) -> impl Future<Output = Result<TransferOutcome, Self::Error>> + MaybeSend + 'a
+    where
+        Self: MaybeSend,
+    {
+        async move {
+            let mut transferred = 0;
+            let mut chunk = [0_u8; 1024];
+
+            if buf.len() >= cap {
+                return Ok(TransferOutcome::new(
+                    transferred,
+                    TransferTermination::CapReached,
+                ));
+            }
+
+            loop {
+                let remaining = cap - buf.len();
+                let request = remaining.min(chunk.len());
+                let read = self.read(&mut chunk[..request]).await?;
+
+                if read == 0 {
+                    return Ok(TransferOutcome::new(
+                        transferred,
+                        TransferTermination::SourceEnded,
+                    ));
+                }
+
+                buf.extend_from_slice(&chunk[..read]);
+                transferred += read;
+
+                if buf.len() == cap {
+                    return Ok(TransferOutcome::new(
+                        transferred,
+                        TransferTermination::CapReached,
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Reads into `buf` until the source ends without an application-level
+    /// cap.
+    ///
+    /// This is an explicit opt-out from bounded accumulation. Prefer
+    /// [`HotaruRead::read_to_end`] for untrusted or otherwise size-unknown
+    /// input. `CapReached` is only theoretically possible at the address-space
+    /// limit.
+    #[av::ver(
+        unstable,
+        since = "0.8.5",
+        note = "Explicitly unbounded read-to-end",
+        date = "2026-08-09"
+    )]
+    fn read_to_end_unbounded<'a>(
+        &'a mut self,
+        buf: &'a mut alloc::vec::Vec<u8>,
+    ) -> impl Future<Output = Result<TransferOutcome, Self::Error>> + MaybeSend + 'a
+    where
+        Self: MaybeSend,
+    {
+        self.read_to_end(buf, usize::MAX)
+    }
 }
 
 /// Buffered async byte reader. Carries protocol-detection peeked bytes
@@ -50,10 +129,10 @@ pub trait HotaruBufRead: HotaruRead {
 
     /// Reads bytes into `buf` until `delimiter` is encountered, inclusive.
     ///
-    /// `TransferTermination::Complete` means the delimiter was consumed,
-    /// `SourceEnded` means EOF arrived first, and `CapReached` means `cap` was
-    /// filled before the delimiter was found. `Self::Error` is reserved for
-    /// failures reported by the underlying IO backend.
+    /// `TransferTermination::ConditionReached` means the delimiter was
+    /// consumed, `SourceEnded` means EOF arrived first, and `CapReached` means
+    /// `cap` was filled before the delimiter was found. `Self::Error` is
+    /// reserved for failures reported by the underlying IO backend.
     ///
     /// `cap` bounds the final length of `buf`, including any bytes already in
     /// it. On `CapReached`, the method consumes and appends exactly the prefix
@@ -103,7 +182,7 @@ pub trait HotaruBufRead: HotaruRead {
                         .position(|candidate| *candidate == delimiter)
                     {
                         buf.extend_from_slice(&available[..=i]);
-                        (Some(TransferTermination::Complete), i + 1)
+                        (Some(TransferTermination::ConditionReached), i + 1)
                     } else {
                         buf.extend_from_slice(available_within_cap);
                         let termination = (available_within_cap.len() == remaining)
@@ -127,8 +206,9 @@ pub trait HotaruBufRead: HotaruRead {
     /// This is an explicit opt-out from bounded accumulation. Prefer
     /// [`HotaruBufRead::read_until`] for protocol data or any other untrusted
     /// input. The returned [`TransferOutcome`] still distinguishes a delimiter
-    /// match (`Complete`) from EOF before the delimiter (`SourceEnded`).
-    /// `CapReached` is only theoretically possible at the address-space limit.
+    /// match (`ConditionReached`) from EOF before the delimiter
+    /// (`SourceEnded`). `CapReached` is only theoretically possible at the
+    /// address-space limit.
     #[av::ver(
         unstable,
         since = "0.8.5",
@@ -181,7 +261,7 @@ pub trait HotaruBufRead: HotaruRead {
     /// This is an explicit opt-out from bounded accumulation. Prefer
     /// [`HotaruBufRead::read_line`] for protocol data or any other untrusted
     /// input. The returned [`TransferOutcome`] still distinguishes a complete
-    /// line (`Complete`) from EOF before the newline (`SourceEnded`).
+    /// line (`ConditionReached`) from EOF before the newline (`SourceEnded`).
     #[av::ver(
         unstable,
         since = "0.8.5",
