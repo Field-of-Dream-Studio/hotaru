@@ -152,3 +152,31 @@ pub(crate) fn ensure_string_literal(literal: &Literal) -> Result<(), TokenStream
         ))
     }
 }
+
+/// Parse a comma-separated list of `key = "value"` pairs from the cursor.
+///
+/// This is a pure syntax parser: duplicate, unknown, and missing fields are
+/// validated separately by `AttrLiteralFields`. Pairs remain in source order.
+/// A trailing comma is accepted.
+///
+/// The parser stops after a pair not followed by a comma. Callers parsing a
+/// complete attribute must follow this with [`expect_end`] before constructing
+/// `AttrLiteralFields`, so malformed trailing input cannot be ignored.
+pub fn parse_kv_pairs(
+    cursor: &mut Peekable<impl Iterator<Item = TokenTree>>,
+) -> Result<Vec<(Ident, Literal)>, TokenStream> {
+    let mut pairs = Vec::new();
+
+    while cursor.peek().is_some() {
+        let key = expect_any_ident(cursor, "expected field name (identifier)")?;
+        expect_punct_consume(cursor, "=", "expected `=` after field name")?;
+        let value = expect_string_literal_consume(cursor)?;
+        pairs.push((key, value));
+
+        if !match_punct_consume(cursor, ",") {
+            break;
+        }
+    }
+
+    Ok(pairs)
+}
