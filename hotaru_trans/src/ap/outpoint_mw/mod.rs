@@ -58,7 +58,7 @@ impl OutpointMW {
             self.def.protocol().clone(),
             self.def.request().clone(),
             self.rewritten_body(), // send; already rewritten
-            OuterAttr::new(Vec::new()), // no user attrs on middleware
+            OuterAttr::default(),  // no user attrs on middleware
         );
         mw_func.expand()
     }

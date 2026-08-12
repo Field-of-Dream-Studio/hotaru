@@ -5,7 +5,6 @@ use super::{
     AttrFields, AttrFieldsError, AttrLiteralFields, AttrTokenFields,
     convert::first_duplicate,
     crud::{first_candidate_duplicate, position, remove_value, replace_value, upsert_value},
-    extract::first_unknown,
 };
 
 #[derive(Debug, Eq, PartialEq)]
@@ -116,29 +115,6 @@ fn lookup_accepts_string_like_names_and_preserves_order() {
         .map(|(key, value)| (key.name, *value))
         .collect::<Vec<_>>();
     assert_eq!(ordered, vec![("one", 11), ("two", 22), ("three", 31)]);
-}
-
-#[test]
-fn unknown_detection_reports_the_first_unknown_field() {
-    let fields = fields(vec![
-        (TestKey::new("known", "known source"), 1),
-        (TestKey::new("first_unknown", "first unknown source"), 2),
-        (TestKey::new("second_unknown", "second unknown source"), 3),
-    ]);
-
-    assert_eq!(
-        first_unknown(&fields, &["known"])
-            .expect("an unknown field exists")
-            .name,
-        "first_unknown"
-    );
-    assert_eq!(
-        first_unknown(&fields, &["known", "first_unknown"])
-            .expect("an unknown field exists")
-            .name,
-        "second_unknown"
-    );
-    assert!(first_unknown(&fields, &["known", "first_unknown", "second_unknown"]).is_none());
 }
 
 #[test]

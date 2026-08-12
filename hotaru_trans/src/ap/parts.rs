@@ -149,14 +149,9 @@ impl APParts {
 
     /// Extracts and parses AP-owned semi-trans attributes.
     pub(crate) fn from_outer_attrs(attrs: &mut OuterAttr) -> Result<Self, TokenStream> {
-        let address_fragment = attrs.remove_unique_inner("url")?.ok_or_else(|| {
-            generate_compile_error(
-                Span::call_site(),
-                "missing required `#[url(...)]` attribute",
-            )
-        })?;
-        let middleware_fragment = attrs.remove_unique_inner("middleware")?;
-        let config_fragment = attrs.remove_unique_inner("config")?;
+        let address_fragment = attrs.take_required_list("url")?;
+        let middleware_fragment = attrs.take_optional_list("middleware")?;
+        let config_fragment = attrs.take_optional_list("config")?;
 
         let mut no_inline_clauses = into_peekable_iter(TokenStream::new());
         let mut parts = Self::from_stream(address_fragment, &mut no_inline_clauses)?;

@@ -1,16 +1,5 @@
 use super::{AttrFields, AttrFieldsError};
 
-pub(super) fn first_unknown<'a, K, V, N>(pairs: &'a [(K, V)], allowed: &[N]) -> Option<&'a K>
-where
-    K: ToString,
-    N: AsRef<str>,
-{
-    pairs.iter().find_map(|(key, _)| {
-        let name = key.to_string();
-        (!allowed.iter().any(|allowed| allowed.as_ref() == name)).then_some(key)
-    })
-}
-
 impl<V> AttrFields<V> {
     /// Reject the first field whose name is not in `allowed`.
     ///
@@ -20,7 +9,10 @@ impl<V> AttrFields<V> {
     where
         N: AsRef<str>,
     {
-        if let Some(key) = first_unknown(&self.pairs, allowed) {
+        if let Some((key, _)) = self.pairs.iter().find(|(key, _)| {
+            let name = key.to_string();
+            !allowed.iter().any(|allowed| allowed.as_ref() == name)
+        }) {
             return Err(AttrFieldsError::unknown(key));
         }
 

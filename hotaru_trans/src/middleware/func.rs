@@ -54,7 +54,7 @@ impl MWFunc {
 
         // #[...] [pub] struct <Name>;
         let mut struct_decl = TokenStream::new();
-        struct_decl.extend(self.attrs.reform());
+        struct_decl.extend(self.attrs.emit());
 
         // #[allow(non_camel_case_types)]
         let mut inner = TokenStream::new();

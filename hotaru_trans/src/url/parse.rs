@@ -4,6 +4,7 @@ use proc_macro::{Delimiter, Ident, Span, TokenStream, TokenTree};
 
 use crate::ap::next_anonymous_ident;
 use crate::helper::*;
+use crate::outer_attr::parse_outer_attrs;
 use crate::url::url_func::UrlFunc;
 use crate::url::urlargs::UrlArgs;
 use crate::url::urlexpr::UrlExpr;
@@ -104,25 +105,16 @@ pub fn parse_semi_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
     let mut tokens = into_peekable_iter(args);
 
     let mut outer_attrs = parse_outer_attrs(&mut tokens)?;
-    let url_expr_raw = outer_attrs.remove("url").ok_or(generate_compile_error(
-        Span::call_site(),
-        "Missing required 'url' attribute",
-    ))?;
-    let url_expr = OuterAttr::get_inners(url_expr_raw, "Expected url(...)")?;
+    let url_expr = outer_attrs.take_required_list("url")?;
     let config = outer_attrs
-        .remove("config")
-        .map(|ts| {
-            expect_array_consume(
-                &mut into_peekable_iter(OuterAttr::get_inners(ts, "Expected config([...])")?),
-                "Expected an array for config",
-            )
-        })
+        .take_optional_list("config")?
+        .map(|ts| expect_array_consume(&mut into_peekable_iter(ts), "Expected an array for config"))
         .unwrap_or(Ok(vec![]))?;
     let middleware = outer_attrs
-        .remove("middleware")
+        .take_optional_list("middleware")?
         .map(|ts| {
             expect_array_consume(
-                &mut into_peekable_iter(OuterAttr::get_inners(ts, "Expected middleware([...])")?),
+                &mut into_peekable_iter(ts),
                 "Expected an array for middleware",
             )
         })
