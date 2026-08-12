@@ -27,7 +27,7 @@ Everything else is **experimental** and will stabilize by 0.8.7:
 
 - `RuntimeSpec` trait surface (`hotaru_rt_tokio` is the supported default; `hotaru_rt_embassy` is experimental)
 - `no_std` builds of `hotaru_core` (Cortex-M / RISC-V bare-metal, CI-verified and connected to experimental embedded backend crates, but not yet production-validated on hardware)
-- IO adapter crates: `hotaru_io_futures` ships as a standalone crate (limited real-world use). `hotaru_io_embedded` lives in the workspace and is still experimental and unpublished (crates.io). The `hotaru` facade exposes `EmbeddedIo` through its optional `io_embedded` feature.
+- IO adapter crates: `hotaru_io_futures` ships as a standalone crate (limited real-world use). [`hotaru_io_embedded`](https://crates.io/crates/hotaru_io_embedded) is published on crates.io and remains experimental. The `hotaru` facade exposes `EmbeddedIo` through its optional `io_embedded` feature.
 - Embassy runtime backend (`hotaru_rt_embassy`, experimental)
 
 If you are shipping something now, stick with the `tokio` default and revisit the experimental paths as they land.
@@ -387,7 +387,7 @@ Hotaru is built on a modular architecture:
 - **[hotaru_rt_tokio](https://crates.io/crates/hotaru_rt_tokio)** - Tokio runtime backend (`TokioRuntime`)
 - **[hotaru_io_tokio](https://crates.io/crates/hotaru_io_tokio)** - Tokio TCP/IO backend (`TcpTransport`, `TokioIo`)
 - **[hotaru_io_futures](https://crates.io/crates/hotaru_io_futures)** - `futures-io` adapter backend (`FuturesIo`, experimental)
-- **hotaru_io_embedded** - `embedded-io-async` adapter backend (`EmbeddedIo`) — *experimental; in-workspace, unpublished (crates.io), and re-exported by `hotaru` when `io_embedded` is enabled*
+- **[hotaru_io_embedded](https://crates.io/crates/hotaru_io_embedded)** - `embedded-io-async` adapter backend (`EmbeddedIo`) — *experimental and re-exported by `hotaru` when `io_embedded` is enabled*
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
@@ -425,7 +425,7 @@ The new manual-registration and transfer-outcome APIs remain experimental in 0.8
 - **Core/backend split**: `hotaru_core` is now backend-neutral at the public type layer. Concrete Tokio runtime and TCP/IO implementations moved into sibling crates (`hotaru_rt_tokio`, `hotaru_io_tokio`), while the umbrella `hotaru` crate keeps the familiar Tokio defaults.
 - **IO adapter crates**: futures-io and embedded-io-async adapters moved out of core into `hotaru_io_futures` and `hotaru_io_embedded`. Each backend uses local wrapper types (`TokioIo<T>`, `FuturesIo<T>`, `EmbeddedIo<T>`) so adapter impls stay additive and avoid trait-coherence conflicts.
 - **Simpler `hotaru_core` features**: core no longer owns `io_*`, `rt_*`, `tokio`, or `embassy` feature flags. It now keeps only the platform axis (`std` / `embedded`) and task-mobility axis (`spawn_send` / `spawn_local`); runtime and IO backends are selected through backend crates, or through optional facade features on `hotaru`.
-- **`hotaru` facade defaults to Tokio/std**: the umbrella keeps Tokio as the supported default path, while exposing experimental optional `embedded`, `embassy`, and `io_embedded` features for in-workspace backend work. `io_embedded` re-exports `EmbeddedIo`; the backend crate remains unpublished on crates.io.
+- **`hotaru` facade defaults to Tokio/std**: the umbrella keeps Tokio as the supported default path, while exposing experimental optional `embedded`, `embassy`, and `io_embedded` features for in-workspace backend work. `io_embedded` re-exports `EmbeddedIo`; at the time of the 0.8.3 release, the backend crate had not yet been published to crates.io.
 - **Runtime abstraction cleanup**: `RuntimeSpec` is the backend-neutral runtime trait, with Tokio implemented externally by `hotaru_rt_tokio::TokioRuntime`. Framework types (`Server`, `Client`, builders, and URL/protocol-entry types) now carry explicit transport/runtime parameters in core, while `hotaru` restores ergonomic defaults.
 - **`MaybeSend` task-mobility model**: async framework surfaces use `MaybeSend` so `spawn_send` builds keep real `Send` bounds and `spawn_local` builds can support local `!Send` futures. `hotaru_io_embedded` gates its actual embedded-io-async trait impls on `spawn_local`, not on the `embedded` platform flag.
 - **Framework-owned async IO traits**: `HotaruRead`, `HotaruWrite`, `HotaruBufRead`, `HotaruBufWrite`, `HotaruIOError`, `HotaruBufReader`, and `HotaruBufWriter` provide the common IO trait surface used by transports and protocols without hardcoding Tokio types in core.

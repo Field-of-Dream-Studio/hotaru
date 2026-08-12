@@ -1,6 +1,6 @@
 [package]
 name = "hotaru_lib"
-version = "0.8.3"
+version = "0.8.5"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"] 
 description = "Utilities for the Hotaru web framework: URL encoding, compression codecs, random helpers"

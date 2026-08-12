@@ -44,5 +44,5 @@ Proc-macro crate for the [Hotaru](../hotaru) web framework. Provides the macros 
 
 ## Version
 
-The current workspace manifest is `0.8.4` and depends on
-`hotaru_core = 0.8.4`.
+The current workspace manifest is `0.8.5` and depends on
+`hotaru_core = 0.8.5`.

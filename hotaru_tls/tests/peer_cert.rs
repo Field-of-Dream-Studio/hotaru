@@ -89,5 +89,6 @@ async fn server_captures_client_leaf_cert() {
         chain_len,
         Some(1),
         "server should have captured the client's leaf certificate, but got chain length {:?}",
+        chain_len,
     );
 }

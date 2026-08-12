@@ -2,8 +2,8 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.2-brightgreen)
-[![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
+![Latest Version](https://img.shields.io/badge/version-0.8.5-brightgreen)
+[![Crates.io](https://img.shields.io/crates/v/hotaru_core)](https://crates.io/crates/hotaru_core)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
 > Small, sweet, easy framework for full-stack Rust web applications 
@@ -21,7 +21,7 @@ The name 'Hotaru' comes from the Japanese Character '蛍' represents the firefly
 > Repository transfer notice: the Hotaru repository has moved to
 > `https://github.com/Field-of-Dream-Studio/hotaru`.
 
-MSRV: 1.86
+MSRV: 1.88
 
 ## Key Features
 
@@ -83,7 +83,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.8.2"
+hotaru = "0.8.5"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -109,7 +109,7 @@ Default features: `trans`, `http`. Cargo's additive feature unification means su
 - **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation. When enabling, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.8.2", features = ["external-ctor"] }
+  hotaru = { version = "0.8.5", features = ["external-ctor"] }
   ctor = "0.4.0"
   tokio = { version = "1", features = ["full"] }
   ```
@@ -118,7 +118,7 @@ Default features: `trans`, `http`. Cargo's additive feature unification means su
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.2", features = ["https", "http_compression"] }
+hotaru = { version = "0.8.5", features = ["https", "http_compression"] }
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -126,7 +126,7 @@ tokio = { version = "1", features = ["full"] }
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.2", default-features = false, features = ["trans"] }
+hotaru = { version = "0.8.5", default-features = false, features = ["trans"] }
 hotaru_grpc = "..."
 tokio = { version = "1", features = ["full"] }
 ```
@@ -308,7 +308,11 @@ Hotaru is built on a modular architecture:
 
 ## Changelog
 
-### 0.8.4 (Current)
+### 0.8.5 (Current)
+- Added protocol-neutral transfer outcomes and bounded read/write helpers.
+- Added explicit access-point definition and registration paths alongside default automatic registration.
+
+### 0.8.4
 - Replaced old `full` / `lite` regex feature names with additive `full_regex` / `lite_regex`; when neither is enabled, core drops the `regex` dependency and uses its regex-stub path.
 - Made sync primitive selection feature-based: `parking_lot` on `std`, `spin` when enabled, or a `RefCell` fallback otherwise.
 - Added explicit local-executor refinements: `spawn_local_atomic` (spin locks) and `spawn_local_no_atomic` (Rc/RefCell).
