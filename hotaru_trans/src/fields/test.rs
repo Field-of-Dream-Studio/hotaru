@@ -2,7 +2,7 @@ use core::fmt::{self, Display, Formatter};
 use proc_macro::{Ident, TokenStream};
 
 use super::{
-    AttrFields, AttrFieldsError,
+    AttrFields, AttrFieldsError, AttrLiteralFields, AttrTokenFields,
     convert::first_duplicate,
     crud::{first_candidate_duplicate, position, remove_value, replace_value, upsert_value},
     extract::first_unknown,
@@ -273,4 +273,13 @@ fn assert_proc_macro_api_compiles(
     let _ = fields.take_required(String::from("field"))?;
     let _ = error.name();
     Ok(error.into_compile_error())
+}
+
+#[allow(dead_code)]
+fn assert_specializations_compile(
+    literal_fields: AttrLiteralFields,
+    token_fields: AttrTokenFields,
+) {
+    let _: AttrFields<proc_macro::Literal> = literal_fields;
+    let _: AttrFields<TokenStream> = token_fields;
 }

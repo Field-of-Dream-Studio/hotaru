@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use proc_macro::{Ident, Literal};
+use proc_macro::{Ident, Literal, TokenStream};
 
 mod convert;
 mod crud;
@@ -18,8 +18,11 @@ pub struct AttrFields<V> {
     pairs: Vec<(Ident, V)>,
 }
 
-/// String-literal specialization used with `parse_kv_pairs`.
+/// String-literal specialization used with `parse_string_literal_fields`.
 pub type AttrLiteralFields = AttrFields<Literal>;
+
+/// Token-stream specialization used with `parse_bracketed_token_fields`.
+pub type AttrTokenFields = AttrFields<TokenStream>;
 
 #[cfg(test)]
 mod test;
