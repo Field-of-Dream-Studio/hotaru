@@ -241,7 +241,7 @@ use std::path::PathBuf;
         let mut meta = HttpMeta::new(start_line, HashMap::new());
         let file_path = match resolve_template_file(file) {
             Some(file_path) => file_path,
-            None => return return_status(StatusCode::NOT_FOUND),
+            None => return return_status(StatusCode::FORBIDDEN),
         };
         // println!("[Response] Loading template: {}", file_path.display());
         let body = match std::fs::read(file_path) {
@@ -257,7 +257,7 @@ use std::path::PathBuf;
         let mut meta = HttpMeta::new(start_line, HashMap::new());
         let file_path = match resolve_template_file(file) {
             Some(file_path) => file_path,
-            None => return return_status(StatusCode::NOT_FOUND),
+            None => return return_status(StatusCode::FORBIDDEN),
         };
 
         // Set the response content type based on the file extension
