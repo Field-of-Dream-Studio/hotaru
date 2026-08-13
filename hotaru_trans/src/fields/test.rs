@@ -2,9 +2,7 @@ use core::fmt::{self, Display, Formatter};
 use proc_macro::{Ident, TokenStream};
 
 use super::{
-    AttrFields, AttrFieldsError, AttrLiteralFields, AttrTokenFields,
-    convert::first_duplicate,
-    crud::{first_candidate_duplicate, position, remove_value, replace_value, upsert_value},
+    AttrFields, AttrFieldsError, AttrLiteralFields, AttrTokenFields, collection::FieldCollection,
 };
 
 #[derive(Debug, Eq, PartialEq)]
@@ -25,12 +23,11 @@ impl Display for TestKey {
     }
 }
 
-fn fields(pairs: Vec<(TestKey, i32)>) -> Vec<(TestKey, i32)> {
-    pairs
-}
-
-fn get<'a>(fields: &'a [(TestKey, i32)], name: &str) -> Option<&'a i32> {
-    position(fields, name).map(|index| &fields[index].1)
+fn fields(pairs: Vec<(TestKey, i32)>) -> FieldCollection<TestKey, i32> {
+    match FieldCollection::try_from_pairs(pairs) {
+        Ok(fields) => fields,
+        Err(key) => panic!("unexpected duplicate field `{}`", key.name),
+    }
 }
 
 #[test]
@@ -42,7 +39,10 @@ fn duplicate_detection_reports_the_second_occurrence_in_source_order() {
         (TestKey::new("two", "second two"), 4),
     ];
 
-    let duplicate = first_duplicate(&pairs).expect("one is duplicated");
+    let duplicate = match FieldCollection::try_from_pairs(pairs) {
+        Ok(_) => panic!("one should be duplicated"),
+        Err(key) => key,
+    };
     assert_eq!(duplicate.name, "one");
     assert_eq!(duplicate.origin, "second one");
 }
@@ -63,11 +63,13 @@ fn batch_duplicate_detection_checks_existing_fields_and_the_batch() {
         (TestKey::new("three", "second three"), 5),
     ];
 
-    let existing_duplicate = first_candidate_duplicate(&fields, &conflicts_with_existing)
-        .expect("two conflicts with an existing field");
+    let existing_duplicate = fields
+        .insert_many(conflicts_with_existing)
+        .expect_err("two conflicts with an existing field");
     assert_eq!(existing_duplicate.origin, "new two");
-    let batch_duplicate = first_candidate_duplicate(&fields, &conflicts_with_batch)
-        .expect("three occurs twice in the batch");
+    let batch_duplicate = fields
+        .insert_many(conflicts_with_batch)
+        .expect_err("three occurs twice in the batch");
     assert_eq!(batch_duplicate.origin, "second three");
     assert_eq!(
         fields.len(),
@@ -79,9 +81,24 @@ fn batch_duplicate_detection_checks_existing_fields_and_the_batch() {
         (TestKey::new("three", "new three"), 3),
         (TestKey::new("four", "new four"), 4),
     ];
-    assert!(first_candidate_duplicate(&fields, &valid).is_none());
-    fields.extend(valid);
+    fields.insert_many(valid).expect("batch is unique");
     assert_eq!(fields.len(), 4);
+}
+
+#[test]
+fn single_insert_rejects_duplicates_without_replacing_the_original() {
+    let mut fields = fields(vec![(TestKey::new("one", "stored one"), 1)]);
+
+    let duplicate = fields
+        .insert(TestKey::new("one", "new one"), 10)
+        .expect_err("one already exists");
+    assert_eq!(duplicate.origin, "new one");
+    assert_eq!(fields.get("one"), Some(&1));
+
+    fields
+        .insert(TestKey::new("two", "new two"), 2)
+        .expect("two is unique");
+    assert_eq!(fields.get("two"), Some(&2));
 }
 
 #[test]
@@ -93,20 +110,20 @@ fn lookup_accepts_string_like_names_and_preserves_order() {
     ]);
 
     assert_eq!(fields.len(), 3);
-    assert!(position(&fields, String::from("one")).is_some());
-    assert_eq!(get(&fields, "two"), Some(&20));
-    assert_eq!(get(&fields, "missing"), None);
+    assert!(fields.contains(String::from("one")));
+    assert!(fields.contains_all(&["one", "three"]));
+    assert!(!fields.contains_all(&["one", "missing"]));
+    assert!(fields.contains_any(&["missing", "two"]));
+    assert!(!fields.contains_any(&["missing", "absent"]));
+    assert_eq!(fields.get("two"), Some(&20));
+    assert_eq!(fields.get("missing"), None);
     assert_eq!(
-        [String::from("three"), String::from("missing")]
-            .iter()
-            .map(|name| get(&fields, name))
-            .collect::<Vec<_>>(),
+        fields.get_many(&[String::from("three"), String::from("missing")]),
         vec![Some(&30), None]
     );
 
-    let two = position(&fields, "two").expect("two exists");
-    fields[two].1 = 21;
-    for (_, value) in &mut fields {
+    *fields.get_mut("two").expect("two exists") = 21;
+    for (_, value) in fields.iter_mut() {
         *value += 1;
     }
 
@@ -118,22 +135,41 @@ fn lookup_accepts_string_like_names_and_preserves_order() {
 }
 
 #[test]
+fn unknown_lookup_reports_the_first_disallowed_key() {
+    let fields = fields(vec![
+        (TestKey::new("known", "known source"), 1),
+        (TestKey::new("first_unknown", "first unknown source"), 2),
+        (TestKey::new("second_unknown", "second unknown source"), 3),
+    ]);
+
+    assert_eq!(
+        fields
+            .first_not_in(&["known"])
+            .expect("an unknown field exists")
+            .origin,
+        "first unknown source"
+    );
+    assert!(
+        fields
+            .first_not_in(&["known", "first_unknown", "second_unknown"])
+            .is_none()
+    );
+}
+
+#[test]
 fn replace_and_upsert_preserve_existing_keys_and_positions() {
     let mut fields = fields(vec![
         (TestKey::new("one", "original one"), 1),
         (TestKey::new("two", "original two"), 2),
     ]);
 
-    assert_eq!(replace_value(&mut fields, "one", 10), Some(1));
-    assert_eq!(replace_value(&mut fields, "missing", 99), None);
+    assert_eq!(fields.replace("one", 10), Some(1));
+    assert_eq!(fields.replace("missing", 99), None);
     assert_eq!(
-        upsert_value(&mut fields, TestKey::new("two", "replacement two"), 20),
+        fields.upsert(TestKey::new("two", "replacement two"), 20),
         Some(2)
     );
-    assert_eq!(
-        upsert_value(&mut fields, TestKey::new("three", "new three"), 30),
-        None
-    );
+    assert_eq!(fields.upsert(TestKey::new("three", "new three"), 30), None);
 
     let ordered = fields
         .iter()
@@ -157,12 +193,9 @@ fn remove_operations_follow_request_order() {
         (TestKey::new("three", "source three"), 3),
     ]);
 
-    assert_eq!(remove_value(&mut fields, "two"), Some(2));
+    assert_eq!(fields.remove("two"), Some(2));
     assert_eq!(
-        ["three", "missing", "one", "one"]
-            .iter()
-            .map(|name| remove_value(&mut fields, name))
-            .collect::<Vec<_>>(),
+        fields.remove_many(&["three", "missing", "one", "one"]),
         vec![Some(3), None, Some(1), None]
     );
     assert!(fields.is_empty());

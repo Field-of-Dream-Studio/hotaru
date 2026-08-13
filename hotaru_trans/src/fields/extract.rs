@@ -9,10 +9,7 @@ impl<V> AttrFields<V> {
     where
         N: AsRef<str>,
     {
-        if let Some((key, _)) = self.pairs.iter().find(|(key, _)| {
-            let name = key.to_string();
-            !allowed.iter().any(|allowed| allowed.as_ref() == name)
-        }) {
+        if let Some(key) = self.collection.first_not_in(allowed) {
             return Err(AttrFieldsError::unknown(key));
         }
 
@@ -70,7 +67,7 @@ impl<V> AttrFields<V> {
     /// Consuming `self` prevents extraction from continuing after this final
     /// exhaustiveness check.
     pub fn reject_rest(self) -> Result<(), AttrFieldsError> {
-        if let Some((key, _)) = self.pairs.into_iter().next() {
+        if let Some((key, _)) = self.collection.into_pairs().into_iter().next() {
             return Err(AttrFieldsError::unknown(&key));
         }
 

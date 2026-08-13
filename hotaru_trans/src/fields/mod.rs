@@ -2,6 +2,7 @@
 
 use proc_macro::{Ident, Literal, TokenStream};
 
+mod collection;
 mod convert;
 mod crud;
 mod error;
@@ -15,7 +16,7 @@ pub use error::AttrFieldsError;
 /// names at the second occurrence, keeping syntax parsing separate from field
 /// validation.
 pub struct AttrFields<V> {
-    pairs: Vec<(Ident, V)>,
+    collection: collection::FieldCollection<Ident, V>,
 }
 
 /// String-literal specialization used with `parse_string_literal_fields`.
