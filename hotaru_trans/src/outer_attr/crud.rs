@@ -1,102 +1,91 @@
-use core::mem;
 use proc_macro::TokenStream;
-
-use crate::helper::{outer_attr_is_named, outer_attr_path};
 
 use super::{OuterAttr, OuterAttrError};
 
 impl OuterAttr {
     /// Return the number of stored attributes.
     pub fn len(&self) -> usize {
-        self.attrs.len()
+        self.collection.len()
     }
 
     /// Return whether no attributes are stored.
     pub fn is_empty(&self) -> bool {
-        self.attrs.is_empty()
+        self.collection.is_empty()
     }
 
     /// Iterate over attribute bodies in source order.
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &TokenStream> + ExactSizeIterator {
-        self.attrs.iter()
+        self.collection.iter().map(|(_, attr)| attr)
     }
 
-    /// Return whether an attribute with the exact path exists.
+    /// Return whether an attribute with the requested leading name exists.
     pub fn contains<N>(&self, name: N) -> bool
     where
         N: AsRef<str>,
     {
-        self.get(name).is_some()
+        self.collection.contains(name)
     }
 
-    /// Return whether every requested attribute path exists.
+    /// Return whether every requested attribute name exists.
     pub fn contains_all<N>(&self, names: &[N]) -> bool
     where
         N: AsRef<str>,
     {
-        names.iter().all(|name| self.contains(name.as_ref()))
+        self.collection.contains_all(names)
     }
 
-    /// Return whether at least one requested attribute path exists.
+    /// Return whether at least one requested attribute name exists.
     pub fn contains_any<N>(&self, names: &[N]) -> bool
     where
         N: AsRef<str>,
     {
-        names.iter().any(|name| self.contains(name.as_ref()))
+        self.collection.contains_any(names)
     }
 
-    /// Count attributes with the exact path.
+    /// Count attributes with the requested leading name.
     pub fn count<N>(&self, name: N) -> usize
     where
         N: AsRef<str>,
     {
-        self.get_all(name).count()
+        self.collection.count(name)
     }
 
-    /// Borrow the first attribute with the exact path.
+    /// Borrow the first attribute with the requested leading name.
     pub fn get<N>(&self, name: N) -> Option<&TokenStream>
     where
         N: AsRef<str>,
     {
-        let name = name.as_ref();
-        self.attrs
-            .iter()
-            .find(|attr| outer_attr_is_named(attr, name))
+        self.collection.get(name)
     }
 
-    /// Borrow the first match for every requested path in `names` order.
+    /// Borrow the first match for every requested name in `names` order.
     pub fn get_many<N>(&self, names: &[N]) -> Vec<Option<&TokenStream>>
     where
         N: AsRef<str>,
     {
-        names.iter().map(|name| self.get(name.as_ref())).collect()
+        self.collection.get_many(names)
     }
 
-    /// Borrow every attribute with the exact path in source order.
+    /// Borrow every attribute with the requested leading name in source order.
     pub fn get_all<N>(&self, name: N) -> impl DoubleEndedIterator<Item = &TokenStream> + '_
     where
         N: AsRef<str>,
     {
-        let name = name.as_ref().to_owned();
-        self.attrs
-            .iter()
-            .filter(move |attr| outer_attr_is_named(attr, &name))
+        self.collection.get_all(name)
     }
 
     /// Append one validated attribute body.
     pub fn push(&mut self, attr: TokenStream) -> Result<(), OuterAttrError> {
-        validate_attr(&attr)?;
-        self.attrs.push(attr);
-        Ok(())
+        self.collection
+            .push(attr)
+            .map_err(|attr| OuterAttrError::expected_attribute_name(&attr))
     }
 
     /// Atomically append several validated attribute bodies.
     pub fn extend(&mut self, attrs: Vec<TokenStream>) -> Result<(), OuterAttrError> {
-        for attr in &attrs {
-            validate_attr(attr)?;
-        }
-        self.attrs.extend(attrs);
-        Ok(())
+        self.collection
+            .extend(attrs)
+            .map_err(|attr| OuterAttrError::expected_attribute_name(&attr))
     }
 
     /// Replace the first matching attribute while preserving its position.
@@ -108,74 +97,37 @@ impl OuterAttr {
     where
         N: AsRef<str>,
     {
-        validate_attr(&attr)?;
-        let name = name.as_ref();
-        let Some(index) = self
-            .attrs
-            .iter()
-            .position(|stored| outer_attr_is_named(stored, name))
-        else {
-            return Ok(None);
-        };
-
-        Ok(Some(mem::replace(&mut self.attrs[index], attr)))
+        self.collection
+            .replace(name, attr)
+            .map_err(|attr| OuterAttrError::expected_attribute_name(&attr))
     }
 
-    /// Remove and return the first attribute with the exact path.
+    /// Remove and return the first attribute with the requested leading name.
     pub fn remove<N>(&mut self, name: N) -> Option<TokenStream>
     where
         N: AsRef<str>,
     {
-        let name = name.as_ref();
-        let index = self
-            .attrs
-            .iter()
-            .position(|attr| outer_attr_is_named(attr, name))?;
-        Some(self.attrs.remove(index))
+        self.collection.remove(name)
     }
 
-    /// Remove the first match for every requested path in `names` order.
+    /// Remove the first match for every requested name in `names` order.
     pub fn remove_many<N>(&mut self, names: &[N]) -> Vec<Option<TokenStream>>
     where
         N: AsRef<str>,
     {
-        names
-            .iter()
-            .map(|name| self.remove(name.as_ref()))
-            .collect()
+        self.collection.remove_many(names)
     }
 
-    /// Remove every attribute with the exact path, preserving source order.
+    /// Remove every attribute with the requested leading name, preserving order.
     pub fn remove_all<N>(&mut self, name: N) -> Vec<TokenStream>
     where
         N: AsRef<str>,
     {
-        let name = name.as_ref();
-        let mut retained = Vec::with_capacity(self.attrs.len());
-        let mut removed = Vec::new();
-
-        for attr in mem::take(&mut self.attrs) {
-            if outer_attr_is_named(&attr, name) {
-                removed.push(attr);
-            } else {
-                retained.push(attr);
-            }
-        }
-
-        self.attrs = retained;
-        removed
+        self.collection.remove_all(name)
     }
 
     /// Remove all stored attributes.
     pub fn clear(&mut self) {
-        self.attrs.clear();
-    }
-}
-
-fn validate_attr(attr: &TokenStream) -> Result<(), OuterAttrError> {
-    if outer_attr_path(attr).is_some() {
-        Ok(())
-    } else {
-        Err(OuterAttrError::expected_attribute_path(attr))
+        self.collection.clear();
     }
 }

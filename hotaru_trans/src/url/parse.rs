@@ -4,7 +4,7 @@ use proc_macro::{Delimiter, Ident, Span, TokenStream, TokenTree};
 
 use crate::ap::next_anonymous_ident;
 use crate::helper::*;
-use crate::outer_attr::parse_outer_attrs;
+use crate::outer_attr::OuterAttr;
 use crate::url::url_func::UrlFunc;
 use crate::url::urlargs::UrlArgs;
 use crate::url::urlexpr::UrlExpr;
@@ -25,7 +25,7 @@ pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
     fn parse_inner(
         tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
     ) -> Result<UrlFunc, TokenStream> {
-        let attrs = parse_outer_attrs(tokens)?;
+        let attrs = OuterAttr::try_from(parse_outer_attr_bodies(tokens)?)?;
         let is_pub = match_ident_consume(tokens, "pub");
         let fn_name = match match_ident_consume(tokens, "_") {
             true => next_anonymous_ident(),
@@ -104,14 +104,14 @@ pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
 pub fn parse_semi_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
     let mut tokens = into_peekable_iter(args);
 
-    let mut outer_attrs = parse_outer_attrs(&mut tokens)?;
-    let url_expr = outer_attrs.take_required_list("url")?;
+    let mut outer_attrs = OuterAttr::try_from(parse_outer_attr_bodies(&mut tokens)?)?;
+    let url_expr = outer_attrs.take_required("url")?;
     let config = outer_attrs
-        .take_optional_list("config")?
+        .take_optional("config")?
         .map(|ts| expect_array_consume(&mut into_peekable_iter(ts), "Expected an array for config"))
         .unwrap_or(Ok(vec![]))?;
     let middleware = outer_attrs
-        .take_optional_list("middleware")?
+        .take_optional("middleware")?
         .map(|ts| {
             expect_array_consume(
                 &mut into_peekable_iter(ts),
@@ -199,7 +199,7 @@ pub fn parse_attr(attr: TokenStream, args: TokenStream) -> Result<UrlArgs, Token
         )?);
     }
 
-    let outer_attrs = parse_outer_attrs(&mut tokens)?;
+    let outer_attrs = OuterAttr::try_from(parse_outer_attr_bodies(&mut tokens)?)?;
     let is_pub = match_ident_consume(&mut tokens, "pub");
     let _ = expect_ident_consume(
         &mut tokens,

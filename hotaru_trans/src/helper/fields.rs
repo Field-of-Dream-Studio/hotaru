@@ -9,7 +9,7 @@ use super::{
     },
 };
 
-fn parse_fields_with<I, V, F>(
+pub fn parse_fields_with<I, V, F>(
     cursor: &mut Peekable<I>,
     mut parse_value: F,
 ) -> Result<Vec<(Ident, V)>, TokenStream>

@@ -1,6 +1,6 @@
 use core::iter::Peekable;
 
-use proc_macro::{Delimiter, Group, Punct, Spacing, Span, TokenStream, TokenTree};
+use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
 use super::generate_compile_error;
 
@@ -51,43 +51,41 @@ pub fn parse_outer_attr_bodies(
     Ok(attrs)
 }
 
-/// Return the complete path at the start of an outer-attribute body.
+/// Clone the first identifier in an outer-attribute body.
 ///
-/// For example, this returns `"cfg"` for `cfg(test)` and
-/// `"rustfmt::skip"` for `rustfmt::skip`.
-pub fn outer_attr_path(body: &TokenStream) -> Option<String> {
-    let tokens = body.clone().into_iter().collect::<Vec<_>>();
-    path_and_end(&tokens).map(|(path, _)| path)
-}
-
-/// Return whether an outer-attribute body has the exact requested path.
-pub fn outer_attr_is_named<N>(body: &TokenStream, name: N) -> bool
-where
-    N: AsRef<str>,
-{
-    outer_attr_path(body).is_some_and(|path| path == name.as_ref())
+/// For example, this returns `cfg` for `cfg(test)` and `rustfmt` for
+/// `rustfmt::skip`.
+pub fn outer_attr_name(body: &TokenStream) -> Option<Ident> {
+    match body.clone().into_iter().next() {
+        Some(TokenTree::Ident(ident)) => Some(ident),
+        _ => None,
+    }
 }
 
 /// Match an outer attribute of the exact form `name(...)`.
 ///
-/// Returns the tokens inside the parentheses. A different path, a non-list
+/// Returns the tokens inside the parentheses. A different name, a non-list
 /// input, or tokens following the parenthesized input returns `None`.
 pub fn match_outer_attr_list<N>(body: &TokenStream, name: N) -> Option<TokenStream>
 where
     N: AsRef<str>,
 {
-    let tokens = body.clone().into_iter().collect::<Vec<_>>();
-    let (path, input_index) = path_and_end(&tokens)?;
-    if path != name.as_ref() || tokens.len() != input_index + 1 {
+    let mut tokens = body.clone().into_iter();
+    let Some(TokenTree::Ident(stored)) = tokens.next() else {
+        return None;
+    };
+    if stored.to_string() != name.as_ref() {
         return None;
     }
 
-    match &tokens[input_index] {
-        TokenTree::Group(group) if group.delimiter() == Delimiter::Parenthesis => {
-            Some(group.stream())
+    let arguments = match tokens.next() {
+        Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis => {
+            group.stream()
         }
-        _ => None,
-    }
+        _ => return None,
+    };
+
+    tokens.next().is_none().then_some(arguments)
 }
 
 /// Add the leading `#` and surrounding brackets to one attribute body.
@@ -107,31 +105,4 @@ pub fn emit_outer_attr(body: &TokenStream) -> TokenStream {
     [TokenTree::Punct(hash), TokenTree::Group(group)]
         .into_iter()
         .collect()
-}
-
-fn path_and_end(tokens: &[TokenTree]) -> Option<(String, usize)> {
-    let TokenTree::Ident(first) = tokens.first()? else {
-        return None;
-    };
-
-    let mut path = first.to_string();
-    let mut index = 1;
-
-    while matches!(tokens.get(index), Some(TokenTree::Punct(punct)) if punct.as_char() == ':') {
-        let Some(TokenTree::Punct(second_colon)) = tokens.get(index + 1) else {
-            return None;
-        };
-        let Some(TokenTree::Ident(segment)) = tokens.get(index + 2) else {
-            return None;
-        };
-        if second_colon.as_char() != ':' {
-            return None;
-        }
-
-        path.push_str("::");
-        path.push_str(&segment.to_string());
-        index += 3;
-    }
-
-    Some((path, index))
 }

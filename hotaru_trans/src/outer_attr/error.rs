@@ -6,8 +6,8 @@ use crate::helper::generate_compile_error;
 /// Semantic validation error produced by [`super::OuterAttr`].
 #[derive(Clone, Debug)]
 pub enum OuterAttrError {
-    /// An attribute body did not begin with a valid attribute path.
-    ExpectedAttributePath { span: Span },
+    /// An attribute body did not begin with an identifier.
+    ExpectedAttributeName { span: Span },
     /// An operation requiring a unique list attribute found a second match.
     Duplicate { name: String, span: Span },
     /// A required list attribute was absent.
@@ -17,8 +17,8 @@ pub enum OuterAttrError {
 }
 
 impl OuterAttrError {
-    pub(super) fn expected_attribute_path(attr: &TokenStream) -> Self {
-        Self::ExpectedAttributePath {
+    pub(super) fn expected_attribute_name(attr: &TokenStream) -> Self {
+        Self::ExpectedAttributeName {
             span: attr_span(attr),
         }
     }
@@ -44,10 +44,10 @@ impl OuterAttrError {
         }
     }
 
-    /// Return the attribute path associated with this error, if present.
+    /// Return the attribute name associated with this error, if present.
     pub fn name(&self) -> Option<&str> {
         match self {
-            Self::ExpectedAttributePath { .. } => None,
+            Self::ExpectedAttributeName { .. } => None,
             Self::Duplicate { name, .. }
             | Self::MissingRequired { name, .. }
             | Self::ExpectedList { name, .. } => Some(name),
@@ -57,7 +57,7 @@ impl OuterAttrError {
     /// Return the source span at which this error should be reported.
     pub fn span(&self) -> Span {
         match self {
-            Self::ExpectedAttributePath { span }
+            Self::ExpectedAttributeName { span }
             | Self::Duplicate { span, .. }
             | Self::MissingRequired { span, .. }
             | Self::ExpectedList { span, .. } => *span,
@@ -73,8 +73,8 @@ impl OuterAttrError {
 impl Display for OuterAttrError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ExpectedAttributePath { .. } => {
-                formatter.write_str("expected an outer attribute path")
+            Self::ExpectedAttributeName { .. } => {
+                formatter.write_str("expected an outer attribute body to begin with an identifier")
             }
             Self::Duplicate { name, .. } => {
                 write!(formatter, "duplicate `#[{name}(...)]` attribute")
