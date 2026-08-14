@@ -82,7 +82,7 @@ impl<K: ToString, V> FieldCollection<K, V> {
     }
 
     pub(super) fn insert(&mut self, key: K, value: V) -> Result<(), K> {
-        if self.check_unique(&key).is_err() {
+        if self.position(key.to_string()).is_some() {
             return Err(key);
         }
 
@@ -90,11 +90,15 @@ impl<K: ToString, V> FieldCollection<K, V> {
         Ok(())
     }
 
+    /// Inserts all pairs atomically, returning a key duplicated in the batch or collection.
     pub(super) fn insert_many(&mut self, pairs: Vec<(K, V)>) -> Result<(), K> {
         let mut candidates = Self::try_from_pairs(pairs)?;
 
         for index in 0..candidates.len() {
-            if self.check_unique(&candidates.pairs[index].0).is_err() {
+            if self
+                .position(candidates.pairs[index].0.to_string())
+                .is_some()
+            {
                 return Err(candidates.pairs.remove(index).0);
             }
         }
@@ -112,12 +116,11 @@ impl<K: ToString, V> FieldCollection<K, V> {
     }
 
     pub(super) fn upsert(&mut self, key: K, value: V) -> Option<V> {
-        match self.check_unique(&key) {
-            Ok(()) => {
-                self.pairs.push((key, value));
-                None
-            }
-            Err(index) => Some(core::mem::replace(&mut self.pairs[index].1, value)),
+        if let Some(index) = self.position(key.to_string()) {
+            Some(core::mem::replace(&mut self.pairs[index].1, value))
+        } else {
+            self.pairs.push((key, value));
+            None
         }
     }
 
@@ -155,13 +158,6 @@ impl<K: ToString, V> FieldCollection<K, V> {
 
     pub(super) fn into_pairs(self) -> Vec<(K, V)> {
         self.pairs
-    }
-
-    fn check_unique(&self, key: &K) -> Result<(), usize> {
-        match self.position(key.to_string()) {
-            Some(index) => Err(index),
-            None => Ok(()),
-        }
     }
 
     fn position<N>(&self, name: N) -> Option<usize>

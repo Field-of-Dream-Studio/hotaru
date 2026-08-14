@@ -46,10 +46,13 @@ impl<V> AttrFields<V> {
     where
         N: AsRef<str>,
     {
-        names
-            .iter()
-            .map(|name| self.take_required(name.as_ref()))
-            .collect()
+        let mut values = Vec::with_capacity(names.len());
+
+        for name in names {
+            values.push(self.take_required(name.as_ref())?);
+        }
+
+        Ok(values)
     }
 
     /// Consume several optional fields in `names` order.
