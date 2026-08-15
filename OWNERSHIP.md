@@ -54,8 +54,13 @@ Wire protocols, protocol-specific security, and standard middleware.
 | Short | Component | Files and directories | Component Maintainer |
 | --- | --- | --- | --- |
 | Web | HTTP, TLS, and web middleware | `hotaru_http/**`, `hotaru_tls/**`, `htmstd/**`, `ahttpm/**` | [@Redstone-D](https://github.com/Redstone-D) |
+<<<<<<< HEAD
 | MQTT | MQTT client and broker | [`Field-of-Dream-Studio/hotaru_mqtt`](https://github.com/fds-pmine/hotaru_mqtt) | [@JerrySu5379](https://github.com/JerrySu5379) |
 | Experimental | Experimental protocol integrations | `h2per/**`, `hotaru_grpc/**` | [@Redstone-D](https://github.com/Redstone-D), [@JerrySu5379](https://github.com/JerrySu5379) |
+=======
+| MQTT | MQTT client and broker | [`Field-of-Dream-Studio/hotaru_mqtt`](https://github.com/Field-of-Dream-Studio/hotaru_mqtt) | [@JerrySu5379](https://github.com/JerrySu5379) |
+| Experimental | Experimental protocol integrations | `hotaru_grpc/**` | [@Redstone-D](https://github.com/Redstone-D), [@JerrySu5379](https://github.com/JerrySu5379) |
+>>>>>>> f34fd464dc4f2979f0b1ba1cdc47d8ddc942e785
 
 The MQTT repository should maintain its own matching ownership rules.
 

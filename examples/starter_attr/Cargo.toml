@@ -7,4 +7,4 @@ publish = false
 [workspace]
 
 [dependencies]
-hotaru = { path = "../../hotaru", version = "=0.8.4", default-features = false, features = ["attr", "auto-reg", "http", "tokio", "full_regex", "template"] }
+hotaru = { path = "../../hotaru", version = "=0.8.5", default-features = false, features = ["attr", "auto-reg", "http", "tokio", "full_regex", "template"] }

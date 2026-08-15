@@ -1,6 +1,6 @@
 [package]
 name = "hotaru_trans"
-version = "0.8.4"
+version = "0.8.5"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "Procedural macros for Hotaru framework"
@@ -11,12 +11,17 @@ categories = ["development-tools::procedural-macro-helpers", "web-programming"]
 keywords = ["hotaru", "macros", "proc-macro", "web-framework", "dsl"]
 
 [dependencies]
-hotaru_core = { path = "../hotaru_core", version = "=0.8.4" }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.5" }
 cfg-if = "1.0" 
 ctor = { version = "0.4.0", optional = true }
 
 [dev-dependencies]
+<<<<<<< HEAD
 hotaru_http = { path = "../hotaru_http", version = "=0.8.4" }
+=======
+proc-macro2 = "1"
+hotaru_http = { path = "../hotaru_http", version = "=0.8.5" }
+>>>>>>> f34fd464dc4f2979f0b1ba1cdc47d8ddc942e785
 
 [features]
 default = ["trans", "auto-reg"]
