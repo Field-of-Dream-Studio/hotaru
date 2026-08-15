@@ -495,7 +495,7 @@ The new manual-registration and transfer-outcome APIs remain experimental in 0.8
 ## AI-assisted development
 
 Definitions and component declarations are maintained in
-[GOVERNANCE.md](https://github.com/Field-of-Dream-Studio/hotaru/blob/main/GOVERNANCE.md#3-ai-declarations).
+[POLICY.md](https://github.com/Field-of-Dream-Studio/hotaru/blob/main/POLICY.md#5-ai-declarations).
 
 ## 📄 License
 
