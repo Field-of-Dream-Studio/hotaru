@@ -23,16 +23,7 @@ MSRV: 1.88
 
 ### Stability in 0.8.x
 
-The **tokio + HTTP** stack (default features include `trans`, `auto-reg`, `http`, and `tokio`) is the tested, supported path and is safe for production use today.
-
-Everything else is **experimental** and will stabilize by 0.8.7:
-
-- `RuntimeSpec` trait surface (`hotaru_rt_tokio` is the supported default; `hotaru_rt_embassy` is experimental)
-- `no_std` builds of `hotaru_core` (Cortex-M / RISC-V bare-metal, CI-verified and connected to experimental embedded backend crates, but not yet production-validated on hardware)
-- IO adapter crates: `hotaru_io_futures` ships as a standalone crate (limited real-world use). [`hotaru_io_embedded`](https://crates.io/crates/hotaru_io_embedded) is published on crates.io and remains experimental. The `hotaru` facade exposes `EmbeddedIo` through its optional `io_embedded` feature.
-- Embassy runtime backend (`hotaru_rt_embassy`, experimental)
-
-If you are shipping something now, stick with the `tokio` default and revisit the experimental paths as they land.
+Be noticed everything before 0.8.9 will be experimental. 
 
 ## Key Features
 
@@ -385,6 +376,7 @@ Hotaru is built on a modular architecture:
 - **[hotaru_core](https://crates.io/crates/hotaru_core)** - Core protocol and routing engine
 - **[hotaru_trans](https://crates.io/crates/hotaru_trans)** - Procedural macros for endpoint! and middleware!
 - **[hotaru_http](https://crates.io/crates/hotaru_http)** - HTTP implementation for Hotaru
+- **[hotaru_mqtt](https://crates.io/crates/hotaru_mqtt)** - MQTT implementation for Hotaru and brokers. [Repo](https://github.com/fds-pmine/hotaru_mqtt) 
 - **[hotaru_tls](https://crates.io/crates/hotaru_tls)** - TLS/HTTPS implementation for Hotaru
 - **[hotaru_rt_tokio](https://crates.io/crates/hotaru_rt_tokio)** - Tokio runtime backend (`TokioRuntime`)
 - **[hotaru_io_tokio](https://crates.io/crates/hotaru_io_tokio)** - Tokio TCP/IO backend (`TcpTransport`, `TokioIo`)
