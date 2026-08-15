@@ -93,7 +93,7 @@ impl Outpoint {
     fn expand_signature(&self) -> TokenStream {
         let def = self.body.def();
         let mut out = TokenStream::new();
-        out.extend(def.attrs().reform());
+        out.extend(def.attrs().emit());
         if def.is_pub() {
             out.extend([TokenTree::Ident(Ident::new("pub", Span::call_site()))]);
         }
@@ -182,7 +182,7 @@ impl Outpoint {
         );
 
         let mut out = TokenStream::new();
-        out.extend(def.attrs().reform_cfg());
+        out.extend(def.attrs().emit_cfg());
         out.extend(gen_ctor());
         out.extend([
             TokenTree::Ident(Ident::new("fn", Span::call_site())),
