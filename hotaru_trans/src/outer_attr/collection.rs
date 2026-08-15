@@ -1,8 +1,6 @@
 use core::mem;
 
-use proc_macro::{Ident, TokenStream};
-
-use crate::helper::outer_attr_name;
+use proc_macro::{Ident, TokenStream, TokenTree};
 
 /// Ordered storage for validated outer-attribute bodies.
 ///
@@ -89,8 +87,7 @@ impl OuterAttrCollection {
     }
 
     pub(super) fn push(&mut self, attr: TokenStream) -> Result<(), TokenStream> {
-        let name = outer_attr_name(&attr).ok_or_else(|| attr.clone())?;
-        self.pairs.push((name, attr));
+        self.pairs.push(pair_from_attr(attr)?);
         Ok(())
     }
 
@@ -108,12 +105,12 @@ impl OuterAttrCollection {
     where
         N: AsRef<str>,
     {
-        let replacement_name = outer_attr_name(&attr).ok_or_else(|| attr.clone())?;
+        let replacement = pair_from_attr(attr)?;
         let Some(index) = self.position(name) else {
             return Ok(None);
         };
 
-        let (_, previous) = mem::replace(&mut self.pairs[index], (replacement_name, attr));
+        let (_, previous) = mem::replace(&mut self.pairs[index], replacement);
         Ok(Some(previous))
     }
 
@@ -205,11 +202,12 @@ impl OuterAttrCollection {
 }
 
 fn pairs_from_attrs(attrs: Vec<TokenStream>) -> Result<Vec<(Ident, TokenStream)>, TokenStream> {
-    attrs
-        .into_iter()
-        .map(|attr| {
-            let name = outer_attr_name(&attr).ok_or_else(|| attr.clone())?;
-            Ok((name, attr))
-        })
-        .collect()
+    attrs.into_iter().map(pair_from_attr).collect()
+}
+
+fn pair_from_attr(attr: TokenStream) -> Result<(Ident, TokenStream), TokenStream> {
+    match attr.clone().into_iter().next() {
+        Some(TokenTree::Ident(name)) => Ok((name, attr)),
+        _ => Err(attr),
+    }
 }

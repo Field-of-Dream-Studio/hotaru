@@ -1,6 +1,6 @@
 use core::iter::Peekable;
 
-use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
+use proc_macro::{Delimiter, Group, Punct, Spacing, Span, TokenStream, TokenTree};
 
 use super::generate_compile_error;
 
@@ -49,17 +49,6 @@ pub fn parse_outer_attr_bodies(
     }
 
     Ok(attrs)
-}
-
-/// Clone the first identifier in an outer-attribute body.
-///
-/// For example, this returns `cfg` for `cfg(test)` and `rustfmt` for
-/// `rustfmt::skip`.
-pub fn outer_attr_name(body: &TokenStream) -> Option<Ident> {
-    match body.clone().into_iter().next() {
-        Some(TokenTree::Ident(ident)) => Some(ident),
-        _ => None,
-    }
 }
 
 /// Match an outer attribute of the exact form `name(...)`.
