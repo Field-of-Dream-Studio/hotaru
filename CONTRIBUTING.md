@@ -88,57 +88,172 @@ We welcome contributions in the following areas:
    - Integration tests
    - Feature-matrix checks for default Tokio, no-default facade builds, and core-only builds
 
-## Governance and PR requirements
+## Pull request workflow
 
-Hotaru uses a two-tier branch system. See [GOVERNANCE.md](./GOVERNANCE.md) for
-the full rules, roles, and AI-collaboration tier definitions.
+This is the contributor-facing workflow derived from
+[POLICY.md Chapter 3](./POLICY.md#3-pull-request-governance).
+`POLICY.md` remains authoritative for applicability, approvals, merge
+eligibility, retention, and enforcement. `GOVERNANCE.md` records Hotaru's
+eligibility, appointments, ownership, reviewers, and AI tiers. The
+[form specification](./governance/forms/README.md) defines how to complete the
+required records. This workflow adds no requirement or exception of its own.
 
-**The rule is: any merge whose target is a `theme/xxx` branch or `master`
-requires an Update Report and live QA.** Everything else is your personal
-working branch — name it freely, no process required.
+### 1. Choose the route and identify the affected scope
 
-**Personal working branch → `theme/xxx` or `master`.** Submit a PR, complete
-the Update Report, and answer the live QA. One PR covers approximately ten
-changes at function or struct-definition granularity. If splitting still leaves
-CI passing, it must be split. Mechanical changes (renames, moves, formatting)
-must be in separate commits from semantic changes. To find out which theme
-branches are currently open, ask the Project Maintainer or the relevant Family
-Maintainer.
+For ordinary contribution work, create a personal working branch and target
+either an open `theme/xxx` branch or `master`. If you own a nested theme,
+target its parent theme. Final theme and permitted `master`-sync PRs use their
+existing branches. Look up every affected Family, Component, maintainer, and
+AI tier in [GOVERNANCE.md](./GOVERNANCE.md). Identify the live-QA questioner from
+the order in
+[POLICY.md Chapter 2](./POLICY.md#2-roles-and-ownership) and note every
+required cross-family approval.
 
-**Theme merge.** When a `theme/xxx` branch is ready to merge into a parent
-theme or into `master`, the theme branch owner submits a consolidated Update
-Report and answers a live QA. The Update Report records one entry per
-non-trivial design unit — typically a function, struct, enum, trait, or impl
-that carries its own design decision — and justifies both its design and why
-that design was chosen. Mechanical work (plain getters and setters, renames,
-re-exports, and similar obvious glue) may be grouped into a single entry.
+These records apply:
 
-**Can't complete the QA?** Ask another contributor or Maintainer to carry your
-changes in their own personal working branch. Your authorship is preserved;
-they own the Update Report and QA.
+| Source and target | Update Report | Live QA |
+| --- | --- | --- |
+| Personal working branch to `theme/xxx` | Required | Required |
+| Personal working branch to `master` | Required | Required |
+| Nested theme branch to its parent theme | Required | Required |
+| `theme/xxx` directly to `master` | Optional | Required |
+| `master` to `theme/xxx` for the permitted final sync | Required | Required |
 
-**Self-approval and cross-family approval rules still apply.**
+If you are a Contributor and cannot own the required report or answer live QA,
+ask another Contributor or Maintainer to carry the work from their personal
+working branch. They become the PR owner and take responsibility for every
+included change and record; your original authorship remains credited.
 
-## Contribution Guidelines
+### 2. Prepare a reviewable change
 
-1. **Fork the repository** and create a personal working branch; target an
-   open `theme/xxx` branch or `master` directly
-2. **Write clear commit messages** describing your changes
-3. **Add tests** for new functionality
-4. **Update documentation** if you change APIs
-5. **Follow the existing code style** (run `cargo fmt` on the files you touch)
-6. **Ensure the workspace builds** (`cargo check --workspace`) and tests pass (`cargo test`)
-7. **Open a Pull Request** with a clear description
+Follow the applicable AI tier and the [code standards](#code-standards). Keep
+mechanical work such as renames, moves, and formatting in commits separate
+from semantic changes. Aim for approximately ten Update Report units in a
+personal-branch PR. Split independent changes whenever each resulting branch
+can still pass its checks.
 
-> Note: use `cargo fmt` on changed files rather than `cargo fmt --all`, which
-> produces unrelated workspace-wide formatting noise. When testing example
-> crates, prefer the `hotaru build` / `hotaru run` CLI commands so templates and
-> static assets are copied correctly.
->
-> Internal Hotaru crate dependencies should use exact version pins such as
-> `version = "=0.8.5"` during release-prep updates. Third-party dependencies
-> should keep normal semver requirements unless there is a specific reason to
-> pin them.
+Write clear commit messages, add tests for new behavior, and update
+documentation when an API or contract changes. Do not commit directly to
+`theme/xxx` or `master`.
+
+### 3. Validate the proposed branch state
+
+Run every check applicable to the change, including formatting, build, tests,
+lint, feature combinations, target builds, and integration checks. Typical
+workspace checks include:
+
+```sh
+cargo fmt --check
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace
+```
+
+Record a check as `N/A` only when it cannot apply to the changed scope, and
+include the reason in the PR. A final theme branch must pass full CI before it
+can proceed to `master`.
+
+Use formatting on the files you touch rather than a workspace-wide rewrite
+that introduces unrelated noise. When testing example crates, prefer the
+`hotaru build` and `hotaru run` CLI commands so templates and static assets are
+copied correctly.
+
+### 4. Open the pull request
+
+Open the PR against the selected `theme/xxx` branch or `master`. Include its
+scope, affected components, split rationale, and validation results. You may
+open it as a draft while preparing the records; opening it first provides the
+PR number needed on them.
+
+A final `theme/xxx`-to-`master` PR must link every staged PR and identify its
+authors. The theme owner remains responsible for reviewing, understanding,
+testing, explaining, modifying, and debugging every integrated change.
+
+### 5. Complete and submit the Update Report when applicable
+
+Use [`report.pdf`](./governance/forms/report.pdf) with as many copies of
+[`report_sup.pdf`](./governance/forms/report_sup.pdf) as needed. Follow the
+[Update Report specification](./governance/forms/README.md#update-report).
+
+For a personal-branch or nested-theme PR, create an entry for each report unit
+and list every unit in a permitted group. For a voluntary consolidated
+theme report or the permitted final `master`-to-theme sync, record integration
+decisions and risks instead of repeating definition-level entries already
+reviewed in constituent PRs or on `master`.
+
+Complete every page by hand in ink and without AI assistance. Sign the cover
+only after the detail pages are complete, then make the complete report
+available to the assigned questioner before live QA. A final
+`theme/xxx`-to-`master` PR may omit its optional consolidated report entirely.
+
+### 6. Complete independent review and prepare live QA
+
+The assigned questioner independently reviews the diff, validation, and any
+required or voluntary Update Report, then prepares questions privately.
+
+For a final theme PR, the questioner also:
+
+1. checks the theme's first-parent history from its branch point
+   and traces every merge to its PR, records, and author;
+2. inspects the remerge diff of every merge commit for human conflict
+   resolution; and
+3. reviews integration seams and confirms full CI on the final branch state.
+
+Useful commands are:
+
+```sh
+git log --first-parent --no-merges <theme-branch-point>..HEAD
+git show --remerge-diff <merge-commit>
+```
+
+The first command must produce no direct theme commits. For a cross-family
+or multi-component PR, follow the designation rule in
+[POLICY.md Chapter 2](./POLICY.md#2-roles-and-ownership): the assigned
+questioner leads and keeps the record, while other affected maintainers may
+co-question within their areas.
+
+### 7. Conduct live QA
+
+Use [`qa.pdf`](./governance/forms/qa.pdf) with as many copies of
+[`qa_sup.pdf`](./governance/forms/qa_sup.pdf) as needed. Follow the
+[QA record specification](./governance/forms/README.md#live-qa-record).
+
+Meet on a real-time platform. The PR owner answers live without AI assistance
+and does not complete the QA record. The questioner completes the record by
+hand in ink and without AI assistance. Questions should follow risk and
+understanding rather than mechanically matching one question to each report
+entry.
+
+### 8. Resolve findings
+
+Make every code, test, documentation, and report correction required by review
+or QA. Update an affected report entry whenever its recorded design changes.
+Repeat review, CI, or live QA to the extent directed by the responsible
+authority. Unresolved required changes block the merge.
+
+### 9. Obtain approval and merge
+
+Confirm required CI, independent approval, live QA, and all cross-family
+approvals. A maintainer cannot be the sole approver of their own change.
+
+Merge personal-branch and nested-theme PRs into `theme/xxx` with merge commits
+that preserve authorship; do not squash them. A theme may sync from `master`
+through one PR-based merge commit when preparing for final integration.
+
+### 10. Retain the records
+
+After merge, the PR owner keeps any Update Report and the questioner keeps the
+QA record. Keep each original for four months and follow the delivery rules in
+[POLICY.md](./POLICY.md#record-retention).
+
+For an urgent direct-to-`master` change, follow the
+[hotfix variation](./POLICY.md#hotfix-variation); the records remain
+required even when review and QA are expedited.
+
+Internal Hotaru crate dependencies should use exact version pins such as
+`version = "=0.8.5"` during release-prep updates. Third-party dependencies
+should keep normal semver requirements unless there is a specific reason to
+pin them.
 
 ## Code standards
 
@@ -155,6 +270,17 @@ violation.
 **Commit separation.** Mechanical changes (renames, moves, formatting) must not
 be mixed with semantic changes in the same commit. Keep them in separate
 commits so reviewers can read semantic changes without noise.
+
+**Module layout.** Prefer one Rust module per file. If a module or `impl` block
+becomes too large to review comfortably or combines distinct responsibilities,
+split it into focused files or submodules and separate `impl` blocks. When a
+module uses a directory, keep its `mod.rs` focused on module declarations and
+public re-exports.
+
+**Test layout.** Tests totaling 50 lines or fewer for a module may remain beside
+the implementation. If that module's test code exceeds 50 lines, move it to
+`test.rs` in the module's directory and load it with
+`#[cfg(test)] mod test;`.
 
 ## Code style
 
