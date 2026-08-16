@@ -25,6 +25,12 @@ MSRV: 1.88
 
 Be noticed everything before 0.8.9 will be experimental. 
 
+### Our Repos 
+
+**[Hotaru](https://github.com/Field-of-Dream-Studio/hotaru)**: Hotaru Core and HTTP utils 
+
+**[Hotaru MQTT](https://github.com/fds-pmine/hotaru_mqtt)**: Hotaru MQTT and broker 
+
 ## Key Features
 
 <!--TODO: Make sure change this in 0.8.7-->
