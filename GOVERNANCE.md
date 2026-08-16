@@ -54,6 +54,7 @@ Core contracts and the procedural-macro DSL.
 | --- | --- | --- | --- |
 | Defs | Core contracts and semantics | `hotaru_core/**` except the URL paths below | [@Redstone-D](https://github.com/Redstone-D) |
 | DSL | DSL and procedural macros | `hotaru_trans/**` | [@Redstone-D](https://github.com/Redstone-D) |
+| AV | Api_Version | [`Field-of-Dreams-Studio/api_version`](https://github.com/Field-of-Dreams-Studio/api_version) | [@Redstone-D](https://github.com/Redstone-D) | 
 
 ### Facade — Facade and tooling
 
@@ -67,7 +68,7 @@ shared user-facing utilities.
 | URL | Routing and URL semantics | `hotaru_core/src/url.rs`, `hotaru_core/src/url/**` | [@JerrySu5379](https://github.com/JerrySu5379) |
 | Reexport | Facade and public feature surface | `hotaru/src/lib.rs`, `hotaru/src/prelude.rs`, `hotaru/src/http.rs`, `hotaru/src/test.rs`, `hotaru/Cargo.toml`, `hotaru/readme.md` | [@Redstone-D](https://github.com/Redstone-D) |
 | CLI | CLI and project templates | `hotaru/src/main.rs`, `templates/**`, `programfiles/**`, `hotaru_style_guide/**` | [@Redstone-D](https://github.com/Redstone-D) |
-| Utils | Shared utilities | `hotaru_lib/**` | [@Redstone-D](https://github.com/Redstone-D) |
+| Utils | Shared utilities | `hotaru_lib/**` | [@Redstone-D](https://github.com/Redstone-D) | 
 
 ### Protocol — Protocol implementations
 
