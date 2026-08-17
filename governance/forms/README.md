@@ -25,7 +25,7 @@ instructions so that printed forms remain usable offline.
   written values with commas; if the available line is insufficient, attach a
   clearly labeled continuation page and include it in the page count.
 - For project-level work that has no Family or Component assignment in
-  `GOVERNANCE.md`, write `N/A — project-level scope` in those two fields rather
+  `GOVERNANCE.md`, write `N/A: project-level scope` in those two fields rather
   than inventing an assignment. Select **Forbidden** for a documentation-only
   project-level change; other project-level work uses the AI tier recorded in
   `GOVERNANCE.md`.
@@ -41,9 +41,10 @@ instructions so that printed forms remain usable offline.
 
 ## Update Report
 
-Use [`report.pdf`](./report.pdf) as the cover sheet and attach as many copies
-of [`report_sup.pdf`](./report_sup.pdf) as needed. The corresponding sources
-are [`report.tex`](./report.tex) and [`report_sup.tex`](./report_sup.tex).
+Use [`report.pdf`](./report.pdf) as the cover sheet and attach at least one copy
+of [`report_sup.pdf`](./report_sup.pdf), with additional copies as needed. The
+corresponding sources are [`report.tex`](./report.tex) and
+[`report_sup.tex`](./report_sup.tex).
 
 Complete one cover sheet for each PR for which an Update Report is required or
 voluntarily submitted. The route table in
@@ -57,17 +58,17 @@ procedure.
 - **Repository, PR number, and target branch:** identify the exact PR.
 - **PR author:** the PR owner responsible for the complete submitted change,
   even when it preserves work authored by other contributors.
-- **Questioner:** the questioner assigned under the live-QA order and any
-  applicable designation rule in
+- **Reviewer:** the reviewer assigned under the review order and any applicable
+  designation rule in
   [POLICY.md Chapter 2](../../POLICY.md#2-roles-and-ownership).
 - **Families and Components:** every affected short name from
   [GOVERNANCE.md](../../GOVERNANCE.md). Do not collapse a cross-family or
   multi-component PR into one value.
 - **Date:** the date on which the PR author completes and signs the report.
 - **Supplementary pages:** the number of attached Update Report detail sheets.
-- **Role:** the PR author's actual role for this PR. Select one of Contributor,
-  Reviewer or Steward, Component Maintainer, Family Maintainer, or Project
-  Maintainer.
+- **Role:** select the PR author's highest role applicable to any affected scope
+  of this PR: Contributor, Reviewer or Steward, Component Maintainer, Family
+  Maintainer, or Project Maintainer.
 - **Applicable AI tier(s):** every tier that applies to the affected scopes. A
   documentation-only project-level change uses **Forbidden**.
 - **AI assistance used in this PR:** whether AI assisted the PR work. When the
@@ -113,6 +114,20 @@ required report for the permitted final `master`-to-`theme/xxx` sync uses the
 same integration-focused entry model and identifies the relevant changes
 already reviewed on `master`.
 
+For a PR using Trivial Update direct approval, every otherwise required Update
+Report remains required. The entire PR may be grouped into one detail entry.
+That entry must identify every changed scope, classify the eligible trivial
+work, explain why existing semantics and contracts are not altered, and state
+the relevant validation. It may omit design discussion that cannot apply, but
+must write `N/A` with a reason rather than leaving a required field blank.
+
+For that grouped entry, use **Work unit** to list every changed scope and select
+**No functional change** together with any other accurate **Change type**. Use
+**Design approach** to describe the edits and their Trivial Update
+classification. Use **Justification of the approach** to explain why no
+existing semantics or contracts are altered and to record the relevant
+validation.
+
 ### Detail entry fields
 
 - **Work unit:** for definition-level entries, write the
@@ -136,37 +151,63 @@ already reviewed on `master`.
   alternatives, risks, compatibility consequences, or unresolved doubts when
   they affect that judgment.
 
-## Live QA Record
+## QA Review Record
 
-Use [`qa.pdf`](./qa.pdf) as the cover sheet and attach as many copies of
-[`qa_sup.pdf`](./qa_sup.pdf) as needed. The corresponding sources are
-[`qa.tex`](./qa.tex) and [`qa_sup.tex`](./qa_sup.tex).
+Use both fixed pages of [`qa.pdf`](./qa.pdf). For Live QA, attach at least one
+copy of [`qa_sup.pdf`](./qa_sup.pdf), with additional copies as needed. The
+corresponding sources are [`qa.tex`](./qa.tex) and [`qa_sup.tex`](./qa_sup.tex).
 
-The assigned questioner completes one cover sheet for every PR requiring live
-QA. The questioner leads the session and keeps the record even when affected
-maintainers co-question within their areas.
+The assigned reviewer completes both fixed pages for every review round using
+either review type. For Live QA, the assigned reviewer acts as the questioner,
+leads the session, and keeps the record even when affected maintainers
+co-question within their areas. Trivial Update direct approval uses the two
+fixed pages without supplementary question sheets. The reviewer completes and
+signs the cover declaration only after page 2 and every applicable attached
+question sheet are complete.
 
 ### Cover sheet fields
 
 - **Project, repository, PR number, target branch, and PR author:** identify
   the exact PR and its owner.
-- **Questioner:** the independent questioner assigned under the live-QA order
-  and any applicable designation rule in
+- **Reviewer:** the independent reviewer assigned under the applicable review
+  order and any designation rule in
   [POLICY.md Chapter 2](../../POLICY.md#2-roles-and-ownership).
 - **Families and Components:** every affected short name from
   [GOVERNANCE.md](../../GOVERNANCE.md).
-- **Date:** the date of the live QA session.
-- **Supplementary pages:** the number of attached QA question sheets.
-- **Review conditions:** mark every statement that is true. Mark the Update
-  Report as received only if a required or voluntarily submitted report was
-  actually received before QA. Leave that statement unmarked when the optional
-  report for a final theme PR was not submitted.
-- **Applicable AI tier(s):** every tier that applies to the affected scopes. A
-  documentation-only project-level change uses **Forbidden**.
+- **Record date:** the date on which the reviewer completes the record.
+- **Supplementary pages:** the number of attached `qa_sup.pdf` question sheets.
+  The fixed review sheet on page 2 is not included in this field. The total in
+  every page footer includes both fixed pages and all attached question sheets.
+  Write `0` for Trivial Update direct approval.
+- **Reviewer role:** select the Maintainer role under which the reviewer is
+  assigned for this PR: Component Maintainer, Family Maintainer, or Project
+  Maintainer. Only a Maintainer may be the assigned reviewer.
+- **Co-reviewer:** with the assigned reviewer's consent, identify a Maintainer
+  or project Contributor joining to learn the QA process and prepare to conduct
+  QA independently in the future. The person need not yet be familiar with the
+  repository. Write `N/A` when no co-reviewer participated.
 
-The questioner completes and signs the declaration after the live session.
+### Review sheet fields
 
-### Question entry fields
+- **QA type:** on page 2, select exactly one of **Live QA** or **Trivial
+  Update** according to the eligibility rules in `POLICY.md`. Complete only the
+  selected row and leave the other row blank; the general `N/A` rule does not
+  apply to the unselected row.
+- **Live QA fields:** confirm that Live QA was conducted, record the session
+  date and time with its time zone, record the overall understanding
+  demonstrated by the PR author, select one final decision, state its reason,
+  and select whether follow-up is required. If **Yes** is selected, record the
+  required follow-up separately in the space provided. The overall choices are
+  **Sufficient**, **Partial**, and **Insufficient**.
+- **Trivial Update fields:** confirm that the entire PR consists only of one or
+  more of the enumerated eligible cases, then use **Basis for classification**
+  to state why it meets the applicable requirements in `POLICY.md`. The case
+  labels summarize the policy categories and do not expand their eligibility.
+
+### Live QA question entry fields
+
+These fields apply only to supplementary question sheets attached for Live QA.
+They do not apply to Trivial Update direct approval.
 
 - **Scope examined:** identify the module, work unit, symbol, integration seam,
   or topic examined. A single question may cover several related definitions,
@@ -174,7 +215,7 @@ The questioner completes and signs the declaration after the live session.
 - **Question asked:** record the question asked live.
 - **Change required:** record whether the questioner requires a code, test,
   documentation, report, or clarification change under the review outcome.
-- **PR author — Fully, Partly, or Unable:** record how completely the PR author
+- **PR author: Fully, Partly, or Unable:** record how completely the PR author
   demonstrated the required understanding in the live answer. This rating
   does not override the `Change required` selection; the questioner must record
   required follow-up explicitly.
@@ -182,14 +223,15 @@ The questioner completes and signs the declaration after the live session.
   is `Yes`, describe the required follow-up here. When it is `No`, this field
   is optional and may provide context supporting the question or evaluation.
 
-QA is risk-based and question-oriented, not mechanically matched to Update
-Report units. The questioner may examine any relevant area and must not use
-this specification to narrow the review required by governance.
+Live QA is risk-based and question-oriented, not mechanically matched to Update
+Report units. The questioner may examine any relevant area and must not use this
+specification to narrow the review required by governance.
 
 ## Retention
 
-The PR owner keeps the original Update Report, and the questioner keeps the
-original QA record. The project shall pay all fees incurred by delivery.
-Retention duration, delivery requests, and the consequences of missing records
-are governed by
+The PR owner keeps every original Update Report, and the assigned reviewer keeps
+every original QA record, including superseded and further-QA records. The
+project shall pay all fees incurred by delivery. Retention after merge or
+closure, delivery requests, and the consequences of missing records are
+governed by
 [POLICY.md](../../POLICY.md#record-retention).

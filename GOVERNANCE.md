@@ -7,7 +7,7 @@ succession rules are defined in [POLICY.md](./POLICY.md).
 
 **Project Maintainer**: [@Redstone-D](https://github.com/Redstone-D)
 
-`bug_fix` is a Maintainer-owned personal working branch open to PRs from
+`bug-fix` is a Maintainer-owned personal working branch open to PRs from
 anyone. PRs targeting it are outside the governed procedure in `POLICY.md`.
 
 ## Role eligibility

@@ -10,8 +10,15 @@
 
 \newcommand{\checkbox}{\(\square\)}
 \newcommand{\formsection}[1]{%
-  \vspace{0.65em}\noindent{\large\bfseries #1}\par\vspace{0.35em}}
+  \vspace{0.45em}\noindent{\large\bfseries #1}\par\vspace{0.25em}}
 \newcommand{\fieldline}[1]{\textbf{#1}\ \hrulefill}
+\newcommand{\writingline}{%
+  \par\vspace{0.45cm}\nointerlineskip%
+  \hbox to \linewidth{\leaders\hrule height 0.4pt\hfill}%
+  \vspace{0.10cm}}
+\newcommand{\cellendspace}{%
+  \par\nointerlineskip%
+  \hbox{\vrule width 0pt height 0.55\baselineskip depth 0pt}\par}
 
 \begin{document}
 
@@ -20,67 +27,164 @@
   {\large Cover Sheet}
 \end{center}
 
-Complete one cover sheet per PR requiring live QA. Attach \texttt{qa\_sup.pdf}
-sheets as needed. See the forms README for full completion rules.
+Complete both pages of this record for each review round using Live QA or
+Trivial Update direct approval. For Live QA, attach at least one
+\texttt{qa\_sup.pdf} sheet, with additional sheets as needed. See the forms
+README for full completion rules.
 
-\begin{enumerate}[leftmargin=*,itemsep=0.15em,topsep=0.4em]
+\begin{enumerate}[leftmargin=*,itemsep=0.1em,topsep=0.3em]
   \item Complete by hand in ink, without AI assistance, in English, Japanese,
         Traditional Chinese, or Simplified Chinese.
   \item Record every applicable value. Use \texttt{N/A} with a reason only when
         a field cannot apply; write the accurate value if no choice applies.
-  \item The assigned questioner conducts QA live and completes this record.
-        The PR author answers without AI assistance and must not complete it.
-  \item The questioner keeps the original for four months after merge. During
-        the first three months, the Project Maintainer may request delivery;
-        the project shall pay all fees incurred by delivery. Failure to produce
-        it may trigger governance review.
+  \item The assigned reviewer completes both pages. For Live QA, the PR author
+        answers without AI assistance and must not complete the record.
+  \item Complete page 2 and every attached question sheet before signing the
+        declaration on this cover sheet.
+  \item The reviewer keeps the original for four months after merge or
+        closure. During the first three months, the Project Maintainer may
+        request delivery; the project shall pay all fees incurred by delivery.
+        Failure to produce it may trigger governance review.
 \end{enumerate}
 
 \formsection{I. Pull request details}
 
 \begin{tabularx}{\textwidth}{@{}lX@{\hspace{1.5em}}lX@{}}
-  \textbf{Project:}       & \hrulefill & \textbf{Repository:}    & \hrulefill \\[0.9em]
-  \textbf{PR number:}     & \hrulefill & \textbf{Target branch:} & \hrulefill \\[0.9em]
-  \textbf{PR author:}     & \hrulefill & \textbf{Questioner:}    & \hrulefill \\[0.9em]
-  \textbf{Families:}      & \hrulefill & \textbf{Components:}    & \hrulefill \\[0.9em]
-  \textbf{Date:}          & \hrulefill & \textbf{Supplementary pages:} & \hrulefill
+  \textbf{Project:}       & \hrulefill & \textbf{Repository:}    & \hrulefill \\[0.75em]
+  \textbf{PR number:}     & \hrulefill & \textbf{Target branch:} & \hrulefill \\[0.75em]
+  \textbf{PR author:}     & \hrulefill & \textbf{Reviewer:}      & \hrulefill \\[0.75em]
+  \textbf{Families:}      & \hrulefill & \textbf{Components:}    & \hrulefill \\[0.75em]
+  \textbf{Record date:}   & \hrulefill & \textbf{Supplementary pages:} & \hrulefill
 \end{tabularx}
 
-\formsection{II. Review conditions}
+\formsection{II. Reviewer details}
 
-Mark every statement that applies.
+\textbf{Reviewer role:}\quad
+\checkbox\ Component Maintainer
 
-\begin{itemize}[label={},leftmargin=0pt,itemsep=0.25em,topsep=0.35em]
-  \item \checkbox\ The questioner is assigned under POLICY.md and project
-        GOVERNANCE.md.
-  \item \checkbox\ The questioner did not author the work being reviewed.
-  \item \checkbox\ The change introduces or alters a public module, type,
-        trait, function, or other stable API.
-  \item \checkbox\ The PR author's completed Update Report has been received.
-\end{itemize}
+\vspace{0.3em}
+\hspace{6.8em}
+\checkbox\ Family Maintainer \quad
+\checkbox\ Project Maintainer
 
-\textbf{Applicable AI tier(s):}\quad
-\checkbox\ Forbidden \quad
-\checkbox\ Author-Owned \quad
-\checkbox\ Human-Led \quad
-\checkbox\ Co-Authored
+\vspace{0.55em}
+\fieldline{Co-reviewer:}
 
 \formsection{III. Declaration}
 
-\textbf{Questioner declaration.} I conducted this QA live with the PR author
-on a real-time meeting platform. I reviewed and understand the work covered by
-this record. The PR author answered every question live without AI assistance
-and did not complete this document. I completed this record by hand in ink
-without AI assistance.
+\textbf{Reviewer declaration.} I was assigned under \texttt{POLICY.md} and
+\texttt{GOVERNANCE.md}, did not author the reviewed work, and independently
+reviewed the complete PR, applicable validation, and every required or
+submitted Update Report. I understand the work covered here. For Live QA, I
+conducted the recorded real-time session; the PR author answered without AI
+assistance and did not complete this record. I completed page 2 and every
+attached question sheet before signing. I completed this record by hand in ink
+without AI assistance and certify that every entry, selection, and reason is
+accurate.
 
-\vspace{0.75em}
-\fieldline{Questioner signature:}
+\vspace{0.8em}
+\fieldline{Reviewer signature:}
 \hspace{1.5em}
 \fieldline{Date:}
 
 \vfill
 \begin{center}
   \small Page 1 of \underline{\hspace{1.3cm}}
+\end{center}
+
+\newpage
+
+\noindent\hfill\fbox{\strut\textbf{FDS QA REVIEW SHEET}}\par
+\vspace{0.4em}
+
+\begin{tabularx}{\textwidth}{@{}lX@{\hspace{1.5em}}lX@{}}
+  \textbf{Repository:} & \hrulefill &
+  \textbf{PR number:} & \hrulefill
+\end{tabularx}
+
+\vspace{0.5em}
+Select one QA type. Complete only the selected row; leave the other row blank.
+
+\vspace{0.85em}
+{%
+\hbadness=10000
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{0.23\textwidth}|>{\raggedright\arraybackslash}X|}
+  \hline
+  \textbf{QA type} & \textbf{Details and result} \\
+  \hline
+  \checkbox\ \textbf{Live QA}
+  &
+  I conducted Live QA with the PR author on a real-time meeting platform.
+
+  \vspace{0.35em}
+  \makebox[7em][l]{\textbf{Date:}}\rule{0.50\linewidth}{0.4pt}
+
+  \vspace{0.35em}
+  \makebox[7em][l]{\textbf{Time (TZ):}}\rule{0.50\linewidth}{0.4pt}
+
+  \vspace{0.35em}
+  \textbf{Overall understanding demonstrated by the PR author:}\par
+  \checkbox\ Sufficient\par
+  \checkbox\ Partial\par
+  \checkbox\ Insufficient
+
+  \vspace{0.35em}
+  \textbf{Final decision:}\par
+  \checkbox\ Approve\par
+  \checkbox\ Further QA required\par
+  \checkbox\ Do not approve; close PR
+
+  \vspace{0.35em}
+  \textbf{Decision reason}
+  \writingline
+  \writingline
+  \writingline
+
+  \vspace{0.25em}
+  \textbf{Required follow-up:}\par
+  \checkbox\ No\par
+  \checkbox\ Yes. Required changes are:
+  \writingline
+  \writingline
+  \writingline
+  \writingline
+  \writingline
+  \writingline
+  \writingline
+  \cellendspace
+  \tabularnewline
+  \hline
+  \checkbox\ \textbf{Trivial Update}\par
+  Live QA not required
+  &
+  \textbf{Direct approval}\par
+  \vspace{0.15em}
+  I confirm that the entire PR consists exclusively of one or more of these
+  eligible cases:
+  \begin{enumerate}[leftmargin=1.5em,itemsep=0pt,topsep=0.15em,parsep=0pt]
+    \item Typo or editorial fixes.
+    \item Test-only additions or corrections.
+    \item Non-normative documentation corrections.
+  \end{enumerate}
+  \vspace{-0.15em}
+  It does not alter program semantics or an existing contract and satisfies
+  \texttt{POLICY.md}.
+
+  \vspace{0.35em}
+  \textbf{Basis for classification}
+  \writingline
+  \writingline
+  \cellendspace
+  \tabularnewline
+  \hline
+\end{tabularx}\par
+}
+
+\vfill
+\begin{center}
+  \small Page 2 of \underline{\hspace{1.3cm}}
 \end{center}
 
 \end{document}

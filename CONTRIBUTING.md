@@ -100,18 +100,39 @@ required records. This workflow adds no requirement or exception of its own.
 
 ### 1. Choose the route and identify the affected scope
 
-For ordinary contribution work, create a personal working branch and target
-either an open `theme/xxx` branch or `master`. If you own a nested theme,
-target its parent theme. Final theme and permitted `master`-sync PRs use their
-existing branches. Look up every affected Family, Component, maintainer, and
-AI tier in [GOVERNANCE.md](./GOVERNANCE.md). Identify the live-QA questioner from
-the order in
-[POLICY.md Chapter 2](./POLICY.md#2-roles-and-ownership) and note every
-required cross-family approval.
+#### Personal-branch contribution route
+
+Anyone may submit a pull request to the Maintainer-owned
+[`bug-fix`](https://github.com/Field-of-Dream-Studio/hotaru/tree/bug-fix)
+branch or, with the branch owner's agreement, to another Contributor's or
+Maintainer's personal working branch. These personal-to-personal pull requests
+are outside the governed procedure in `POLICY.md`: no Update Report or QA
+review record is required for that pull request.
+
+Merging work into a personal branch is not acceptance into Hotaru's canonical
+codebase. If the owner of the target branch later carries the work forward to
+`theme/xxx` or `master`, they become the owner of the governed integration PR
+and take responsibility for understanding the contributed work and for its
+validation, required records, review, QA, and approvals. The original author's
+authorship remains credited.
+
+This route lowers the cost of contributing or handing off work; it does not
+bypass the quality gates for `theme/xxx` or `master`.
+
+#### Governed integration route
+
+To submit work directly for canonical or theme integration, create a personal
+working branch and target either an open `theme/xxx` branch or `master`. If you
+own a nested theme, target its parent theme. Final theme and permitted
+`master`-sync PRs use their existing branches. Look up every affected Family,
+Component, maintainer, and AI tier in [GOVERNANCE.md](./GOVERNANCE.md). Identify
+the assigned reviewer from the review order in
+[POLICY.md Chapter 2](./POLICY.md#2-roles-and-ownership) and note every required
+cross-family approval.
 
 These records apply:
 
-| Source and target | Update Report | Live QA |
+| Source and target | Update Report | QA review record |
 | --- | --- | --- |
 | Personal working branch to `theme/xxx` | Required | Required |
 | Personal working branch to `master` | Required | Required |
@@ -119,10 +140,15 @@ These records apply:
 | `theme/xxx` directly to `master` | Optional | Required |
 | `master` to `theme/xxx` for the permitted final sync | Required | Required |
 
-If you are a Contributor and cannot own the required report or answer live QA,
-ask another Contributor or Maintainer to carry the work from their personal
-working branch. They become the PR owner and take responsibility for every
-included change and record; your original authorship remains credited.
+Each QA review record uses Live QA or, when the entire PR qualifies under
+Policy, Trivial Update direct approval. Trivial Update waives only the live
+session and supplementary question sheets.
+
+If you are a Contributor and cannot own the required report or, when Live QA is
+required, answer it, ask another Contributor or Maintainer to carry the work
+from their personal working branch. They become the PR owner and take
+responsibility for every included change and record; your original authorship
+remains credited.
 
 ### 2. Prepare a reviewable change
 
@@ -171,8 +197,9 @@ testing, explaining, modifying, and debugging every integrated change.
 
 ### 5. Complete and submit the Update Report when applicable
 
-Use [`report.pdf`](./governance/forms/report.pdf) with as many copies of
-[`report_sup.pdf`](./governance/forms/report_sup.pdf) as needed. Follow the
+Use [`report.pdf`](./governance/forms/report.pdf) with at least one copy of
+[`report_sup.pdf`](./governance/forms/report_sup.pdf), adding more copies as
+needed. Follow the
 [Update Report specification](./governance/forms/README.md#update-report).
 
 For a personal-branch or nested-theme PR, create an entry for each report unit
@@ -183,15 +210,23 @@ reviewed in constituent PRs or on `master`.
 
 Complete every page by hand in ink and without AI assistance. Sign the cover
 only after the detail pages are complete, then make the complete report
-available to the assigned questioner before live QA. A final
+available to the assigned reviewer before review. A final
 `theme/xxx`-to-`master` PR may omit its optional consolidated report entirely.
 
-### 6. Complete independent review and prepare live QA
+For an eligible Trivial Update, a required report remains required but may
+group the entire PR as one unit. Record only the changed scope, classification,
+why existing semantics and contracts are not altered, and relevant validation
+needed to establish eligibility and understand the change.
 
-The assigned questioner independently reviews the diff, validation, and any
-required or voluntary Update Report, then prepares questions privately.
+### 6. Complete independent review and select the review type
 
-For a final theme PR, the questioner also:
+The assigned reviewer independently reviews the complete diff, validation, and
+every required or voluntary Update Report. The reviewer selects Trivial Update
+direct approval only when the entire PR qualifies under Policy; otherwise the
+PR uses Live QA. For Live QA, the reviewer prepares questions privately.
+
+For a final theme PR, which cannot use Trivial Update direct approval, the
+reviewer also:
 
 1. checks the theme's first-parent history from its branch point
    and traces every merge to its PR, records, and author;
@@ -209,32 +244,54 @@ git show --remerge-diff <merge-commit>
 The first command must produce no direct theme commits. For a cross-family
 or multi-component PR, follow the designation rule in
 [POLICY.md Chapter 2](./POLICY.md#2-roles-and-ownership): the assigned
-questioner leads and keeps the record, while other affected maintainers may
-co-question within their areas.
+reviewer leads and keeps the record. For Live QA, other affected maintainers
+may co-question within their areas.
+With the assigned reviewer's consent, a Maintainer or project Contributor may
+join as a co-reviewer to learn the QA process, even before becoming familiar
+with the repository. The assigned reviewer continues to lead the QA.
 
-### 7. Conduct live QA
+### 7. Complete the QA review
 
-Use [`qa.pdf`](./governance/forms/qa.pdf) with as many copies of
-[`qa_sup.pdf`](./governance/forms/qa_sup.pdf) as needed. Follow the
-[QA record specification](./governance/forms/README.md#live-qa-record).
+Use [`qa.pdf`](./governance/forms/qa.pdf) and follow the
+[QA review record specification](./governance/forms/README.md#qa-review-record).
 
-Meet on a real-time platform. The PR owner answers live without AI assistance
-and does not complete the QA record. The questioner completes the record by
-hand in ink and without AI assistance. Questions should follow risk and
-understanding rather than mechanically matching one question to each report
-entry.
+For Live QA, meet on a real-time platform and attach at least one copy of
+[`qa_sup.pdf`](./governance/forms/qa_sup.pdf), with additional copies as needed.
+The PR owner answers without AI assistance and does not complete the QA record.
+The questioner completes the record by hand in ink and without AI assistance.
+Questions should follow risk and understanding rather than mechanically
+matching one question to each report entry. Select one final decision. Further
+QA requires a new round and record; a decision to close prevents merge and ends
+that PR.
+
+For Trivial Update direct approval, do not hold a live session or attach
+question sheets. The reviewer completes both fixed pages, records why the
+complete PR qualifies, and signs the cover sheet. A final state that no longer
+qualifies must use Live QA.
+
+For either review type, the assigned reviewer uploads the completed QA record
+through the pull request's review function, not as an ordinary comment.
+
+Any change to the reviewed PR state invalidates an earlier approving QA record.
+Update or replace affected Update Report coverage, rerun applicable validation
+and CI, and repeat the independent review and applicable QA record for the new
+PR state.
+
+The permitted final `master`-to-theme sync also cannot use Trivial Update direct
+approval.
 
 ### 8. Resolve findings
 
 Make every code, test, documentation, and report correction required by review
 or QA. Update an affected report entry whenever its recorded design changes.
-Repeat review, CI, or live QA to the extent directed by the responsible
+Repeat review, CI, or Live QA to the extent directed by the responsible
 authority. Unresolved required changes block the merge.
 
 ### 9. Obtain approval and merge
 
-Confirm required CI, independent approval, live QA, and all cross-family
-approvals. A maintainer cannot be the sole approver of their own change.
+Confirm required reports, CI, independent approval, an approving QA record, and
+all cross-family approvals. A maintainer cannot be the sole approver of their
+own change.
 
 Merge personal-branch and nested-theme PRs into `theme/xxx` with merge commits
 that preserve authorship; do not squash them. A theme may sync from `master`
@@ -242,13 +299,15 @@ through one PR-based merge commit when preparing for final integration.
 
 ### 10. Retain the records
 
-After merge, the PR owner keeps any Update Report and the questioner keeps the
-QA record. Keep each original for four months and follow the delivery rules in
+After merge or closure, the PR owner keeps every Update Report and the assigned
+reviewer keeps every QA record, including superseded and further-QA records.
+Keep each original for four months and follow the delivery rules in
 [POLICY.md](./POLICY.md#record-retention).
 
 For an urgent direct-to-`master` change, follow the
 [hotfix variation](./POLICY.md#hotfix-variation); the records remain
-required even when review and QA are expedited.
+required even when review is expedited. Urgency alone does not make a hotfix a
+Trivial Update.
 
 Internal Hotaru crate dependencies should use exact version pins such as
 `version = "=0.8.5"` during release-prep updates. Third-party dependencies
@@ -259,7 +318,7 @@ pin them.
 
 **Function size.** Keep functions small and single-purpose. If a function
 performs several independently meaningful operations, split it. Unusually long
-functions are a live QA focus area.
+functions are a review focus area and, when used, a Live QA focus area.
 
 **Coupling.** Eliminate coupling between independent changes wherever possible.
 If two changes must ship together because splitting would break the build, be
