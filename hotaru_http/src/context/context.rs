@@ -227,12 +227,12 @@ impl<TS: TransportSpec> HttpContext<TS> {
     where
         R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
     {
-        Ok(HttpRequest::parse_lazy(
+        HttpRequest::parse_lazy(
             reader,
             &runtime.get_config::<HttpSafety>().unwrap_or_default(),
             runtime.mode() == RunMode::Build,
         )
-        .await)
+        .await
     }
 
     /// Sends the response
@@ -283,7 +283,13 @@ impl<TS: TransportSpec> HttpContext<TS> {
         if let Some(ep) = endpoint.get_params::<HttpSafety>() {
             config.update(&ep);
         }
-        if !config.check_body_size(self.request.meta.get_content_length().unwrap_or(0)) {
+        let content_length = self
+            .request
+            .meta
+            .get_content_length()
+            .map_err(|error| HttpError::InvalidHeader(error.to_string()))?
+            .unwrap_or(0);
+        if content_length > config.effective_body_size() as u64 {
             return Err(HttpError::PayloadTooLarge);
         }
         if !config.check_method(&self.request.meta.method()) {

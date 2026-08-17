@@ -20,7 +20,7 @@ pub struct HttpMeta {
     content_type: Option<HttpContentType>,
 
     // Content-length header, overrides the content length from the hashmap if present
-    content_length: Option<usize>,
+    content_length: Option<u64>,
 
     // Cookies header in request, Set-Cookie header in response
     cookies: Option<CookieMap>,
@@ -569,7 +569,19 @@ impl HttpMeta {
             println!("Parsed start line: {:?}", start_line);
         }
 
-        Ok(HttpMeta::new(start_line, header))
+        let mut meta = HttpMeta::new(start_line, header);
+
+        if meta.header.contains_key("content-length")
+            && meta.header.contains_key("transfer-encoding")
+        {
+            return Err(ConnectionError::BadRequest(
+                "Content-Length cannot be combined with Transfer-Encoding".to_string(),
+            ));
+        }
+
+        meta.parse_content_length()?;
+
+        Ok(meta)
     }
 
     async fn header_lines_raw_from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
@@ -860,7 +872,7 @@ impl HttpMeta {
     ///
     /// # Returns
     ///
-    /// * `Option<usize>` - The content length, or None if not available or invalid.
+    /// * `Result<Option<u64>, ConnectionError>` - The content length, absence, or a parsing error.
     ///
     /// # Examples
     ///
@@ -873,11 +885,11 @@ impl HttpMeta {
     /// headers.insert("content-length".to_string(), HeaderValue::new("123"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
-    /// assert_eq!(meta.get_content_length(), Some(123));
+    /// assert_eq!(meta.get_content_length().unwrap(), Some(123));
     /// ```
-    pub fn get_content_length(&mut self) -> Option<usize> {
+    pub fn get_content_length(&mut self) -> Result<Option<u64>, ConnectionError> {
         if let Some(length) = self.content_length {
-            return Some(length);
+            return Ok(Some(length));
         }
         self.parse_content_length()
     }
@@ -886,7 +898,7 @@ impl HttpMeta {
     ///
     /// # Returns
     ///
-    /// * `Option<usize>` - The parsed Content-Length value, or None if not present or invalid.
+    /// * `Result<Option<u64>, ConnectionError>` - The parsed value, absence, or a parsing error.
     ///
     /// # Examples
     ///
@@ -900,16 +912,33 @@ impl HttpMeta {
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// let length = meta.parse_content_length();
-    /// assert_eq!(length, Some(123));
-    /// assert_eq!(meta.get_content_length(), Some(123));
+    /// assert_eq!(length.unwrap(), Some(123));
+    /// assert_eq!(meta.get_content_length().unwrap(), Some(123));
     /// ```
-    pub fn parse_content_length(&mut self) -> Option<usize> {
-        let length = self
-            .header
-            .get("content-length")
-            .and_then(|s| s.first().parse::<usize>().ok());
+    pub fn parse_content_length(&mut self) -> Result<Option<u64>, ConnectionError> {
+        let length = match self.header.get("content-length") {
+            None => None,
+            Some(HeaderValue::Single(value)) => {
+                if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+                    return Err(ConnectionError::BadRequest(
+                        "invalid Content-Length".to_string(),
+                    ));
+                }
+
+                Some(value.parse::<u64>().map_err(|_| {
+                    ConnectionError::BadRequest("Content-Length is too large".to_string())
+                })?)
+            }
+            Some(HeaderValue::Multiple(_)) => {
+                return Err(ConnectionError::BadRequest(
+                    "multiple Content-Length values".to_string(),
+                ));
+            }
+        };
+
         self.content_length = length;
-        length
+
+        Ok(length)
     }
 
     /// Sets the content_length field.
@@ -926,10 +955,10 @@ impl HttpMeta {
     /// let mut meta = HttpMeta::default();
     /// meta.set_content_length(456);
     ///
-    /// assert_eq!(meta.get_content_length(), Some(456));
+    /// assert_eq!(meta.get_content_length().unwrap(), Some(456));
     /// ```
     pub fn set_content_length(&mut self, length: usize) {
-        self.content_length = Some(length);
+        self.content_length = Some(length as u64);
     }
 
     /// Clears the cached content_length field without modifying the header map.

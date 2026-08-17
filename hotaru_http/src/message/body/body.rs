@@ -67,9 +67,16 @@ impl HttpBody {
             safety_setting: &HttpSafety,
             content_length: usize,
         ) -> std::io::Result<Vec<u8>> {
-            let effective_content_length =
-                std::cmp::min(content_length, safety_setting.effective_body_size());
-            let mut body_buffer = vec![0; effective_content_length];
+            // Security: reject before reading. Truncating (min(cl, cap)) would leave
+            // the excess body bytes on the wire and let the keep-alive loop parse
+            // them as the next request — CL desync / request smuggling.
+            if !safety_setting.check_body_size(content_length) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Content-Length exceeds maximum body size",
+                ));
+            }
+            let mut body_buffer = vec![0; content_length];
             buf_reader.read_exact(&mut body_buffer).await?;
             Ok(body_buffer)
         }
@@ -184,12 +191,31 @@ impl HttpBody {
             Ok(body_buffer)
         }
 
+        // Validate Content-Length before selecting the framing mode. This also
+        // protects callers that construct HttpMeta directly instead of using
+        // HttpMeta::from_stream.
+        let content_length = header
+            .get_content_length()
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+
+        if content_length.is_some() && header.header.contains_key("transfer-encoding") {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Content-Length cannot be combined with Transfer-Encoding",
+            ));
+        }
+
         // Read raw body data
         let encoding = header.get_encoding().unwrap_or_default();
         let raw_data = if encoding.transfer().is_chunked() {
             read_chunked_body(buf_reader, header, parse_config).await?
         } else {
-            let content_length = header.get_content_length().unwrap_or(0);
+            let content_length = usize::try_from(content_length.unwrap_or(0)).map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Content-Length exceeds the platform limit",
+                )
+            })?;
             read_content_length_body(buf_reader, parse_config, content_length).await?
         };
 
