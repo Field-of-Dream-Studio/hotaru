@@ -1,4 +1,4 @@
-﻿use std::collections::HashMap;
+use std::collections::HashMap;
 
 use crate::message::meta::HeaderValue;
 
@@ -95,6 +95,14 @@ impl CookieMap {
 
     pub fn clear(&mut self) {
         self.0.clear();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 
     pub fn response(&self) -> HeaderValue {
