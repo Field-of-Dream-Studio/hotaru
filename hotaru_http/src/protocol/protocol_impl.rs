@@ -176,14 +176,7 @@ where
     ) -> Result<ProtocolFlow, <Self::Context as RequestContext>::Error> {
         // 1. Parse one request using the channel-stored safety baseline
         //    (no per-request HashMap lookup against RuntimeConfig).
-        let request = match channel.parse_request(channel.safety()).await {
-            Ok(request) => request,
-            Err(error @ HttpError::InvalidHeader(_)) => {
-                channel.send_response(error_response_from(&error)).await?;
-                return Ok(ProtocolFlow::Close);
-            }
-            Err(error) => return Err(error),
-        };
+        let request = channel.parse_request(channel.safety()).await?;
         let keep_alive = is_keep_alive(&request);
 
         // 2. Walk URL tree.

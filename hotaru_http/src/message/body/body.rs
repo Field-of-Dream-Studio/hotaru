@@ -67,16 +67,9 @@ impl HttpBody {
             safety_setting: &HttpSafety,
             content_length: usize,
         ) -> std::io::Result<Vec<u8>> {
-            // Security: reject before reading. Truncating (min(cl, cap)) would leave
-            // the excess body bytes on the wire and let the keep-alive loop parse
-            // them as the next request — CL desync / request smuggling.
-            if !safety_setting.check_body_size(content_length) {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Content-Length exceeds maximum body size",
-                ));
-            }
-            let mut body_buffer = vec![0; content_length];
+            let effective_content_length =
+                std::cmp::min(content_length, safety_setting.effective_body_size());
+            let mut body_buffer = vec![0; effective_content_length];
             buf_reader.read_exact(&mut body_buffer).await?;
             Ok(body_buffer)
         }
@@ -138,28 +131,26 @@ impl HttpBody {
                     break; // End of chunks
                 }
 
-                // Security: Cumulative size validation prevents chunked encoding DoS attacks.
-                // This is the CORE security mechanism - validating size limits, not every byte.
+                // Security: Cumulative size validation prevents chunked encoding DoS attacks
+                // This is the CORE security mechanism - validating size limits, not every byte
                 //
-                // Protects against:
-                // 1. Single giant chunk: e.g., chunk_size = 1GB rejected immediately.
-                // 2. Multiple chunks exceeding limit: e.g., 9 bytes + 9 bytes when limit is 10.
-                // 3. Death by a thousand cuts: many small chunks accumulating beyond limit.
-                // 4. Integer overflow: attacker crafts chunk sizes whose sum wraps `usize`,
-                //    which would bypass a plain `+=` guard (PR #26). `check_body_size_delta`
-                //    uses checked addition and rejects both overflow and over-cap.
+                // This check protects against:
+                // 1. Single giant chunk: e.g., chunk_size = 1GB rejected immediately
+                // 2. Multiple chunks exceeding limit: e.g., 9 bytes + 9 bytes when limit is 10
+                //    - 1st iteration: current_size = 9, check passes, allocate 9 bytes
+                //    - 2nd iteration: current_size = 18, check fails, return error BEFORE allocation
+                // 3. Death by a thousand cuts: Many small chunks accumulating beyond limit
                 //
-                // Validation happens BEFORE memory allocation, so attacker cannot force
-                // excessive allocation by sending large chunk size declarations.
-                current_size = match safety_setting.check_body_size_delta(current_size, chunk_size) {
-                    Some(new_total) => new_total,
-                    None => {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            "Chunked body exceeds maximum size",
-                        ));
-                    }
-                };
+                // Key: Validation happens BEFORE memory allocation (line 138), so attacker
+                // cannot force excessive memory allocation by sending large chunk size declarations.
+                // The check_body_size() uses max_body_size from HttpSafety (default: 10MB).
+                current_size += chunk_size;
+                if !safety_setting.check_body_size(current_size) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Chunked body exceeds maximum size",
+                    ));
+                }
 
                 // Read chunk data (only reached if validation passed)
                 let mut chunk_data = vec![0; chunk_size];
@@ -191,31 +182,12 @@ impl HttpBody {
             Ok(body_buffer)
         }
 
-        // Validate Content-Length before selecting the framing mode. This also
-        // protects callers that construct HttpMeta directly instead of using
-        // HttpMeta::from_stream.
-        let content_length = header
-            .get_content_length()
-            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
-
-        if content_length.is_some() && header.header.contains_key("transfer-encoding") {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Content-Length cannot be combined with Transfer-Encoding",
-            ));
-        }
-
         // Read raw body data
         let encoding = header.get_encoding().unwrap_or_default();
         let raw_data = if encoding.transfer().is_chunked() {
             read_chunked_body(buf_reader, header, parse_config).await?
         } else {
-            let content_length = usize::try_from(content_length.unwrap_or(0)).map_err(|_| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Content-Length exceeds the platform limit",
-                )
-            })?;
+            let content_length = header.get_content_length().unwrap_or(0);
             read_content_length_body(buf_reader, parse_config, content_length).await?
         };
 

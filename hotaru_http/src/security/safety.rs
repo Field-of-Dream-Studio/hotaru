@@ -122,30 +122,6 @@ impl HttpSafety {
         size <= self.effective_max_body_size()
     }
 
-    /// Checks whether `current + delta` fits within the effective body size limit.
-    ///
-    /// Returns `Some(new_total)` when the addition both (a) does not overflow `usize`
-    /// and (b) stays within the limit. Returns `None` in either failure case — callers
-    /// must not distinguish between them (both are treated as "body too large").
-    ///
-    /// Prefer this over calling `check_body_size` on a manually accumulated total. 
-    /// This gates the overflow case and prevents silent overflow bugs
-    ///
-    /// # Examples
-    /// ```
-    /// # use hotaru_http::safety::HttpSafety;
-    /// let safety = HttpSafety::default().with_max_body_size(100);
-    /// assert_eq!(safety.check_body_size_delta(40, 30), Some(70));
-    /// assert_eq!(safety.check_body_size_delta(80, 30), None); // over cap
-    /// assert_eq!(safety.check_body_size_delta(usize::MAX, 1), None); // overflow
-    /// ```
-    pub fn check_body_size_delta(&self, current: usize, delta: usize) -> Option<usize> {
-        match current.checked_add(delta){ 
-            Some(sum) => if self.check_body_size(sum) { Some(sum) } else { None }, // over cap 
-            None => None, // overflow
-        } 
-    }
-
     // --------------------------------------------------
     // Method Allow List Configuration
     // --------------------------------------------------
