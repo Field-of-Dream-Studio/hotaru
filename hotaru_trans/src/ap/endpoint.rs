@@ -93,7 +93,7 @@ impl Endpoint {
     fn expand_signature(&self) -> TokenStream {
         let def = self.handler.def();
         let mut out = TokenStream::new();
-        out.extend(def.attrs().reform());
+        out.extend(def.attrs().emit());
         if def.is_pub() {
             out.extend([TokenTree::Ident(Ident::new("pub", Span::call_site()))]);
         }
@@ -173,7 +173,7 @@ impl Endpoint {
 
         let mut out = TokenStream::new();
         // #[cfg(...)] copied only if the user's attrs contain cfg/cfg_attr.
-        out.extend(def.attrs().reform_cfg());
+        out.extend(def.attrs().emit_cfg());
         // #[ctor] attribute for the current build shape.
         out.extend(gen_ctor());
         // fn __register_<name>()

@@ -6,7 +6,7 @@ use crate::message::body::{BodyError, HttpBody};
 use crate::message::http_value::*;
 use crate::message::meta::HttpMeta;
 use crate::message::start_line::HttpStartLine;
-use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
+use hotaru_core::connection::{HotaruBufRead, HotaruWrite, error::ConnectionError};
 use std::collections::HashMap;
 
 /// Represents an HTTP request with metadata and body.
@@ -35,11 +35,9 @@ impl HttpRequest {
         stream: &mut R,
         config: &HttpSafety,
         print_raw: bool,
-    ) -> Self {
-        match io::parse_lazy(stream, config, true, print_raw).await {
-            Ok((meta, body)) => Self::new(meta, body),
-            Err(_) => Self::default(),
-        }
+    ) -> Result<Self, ConnectionError> {
+        let (meta, body) = io::parse_lazy(stream, config, true, print_raw).await?;
+        Ok(Self::new(meta, body))
     }
 
     /// Parses the HTTP Body from buffer

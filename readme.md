@@ -6,6 +6,8 @@ The Hotaru 0.8 era starts from 23/May/2026.
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
+<img width="1634" height="910" alt="7db7cf68-ebaa-476f-a306-4521ff4c1321" src="https://github.com/user-attachments/assets/6a8aae85-f14b-404b-8aa5-986f486eec3c" /> 
+
 ## Overview
 
 <!--The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represents the firefly.--> 

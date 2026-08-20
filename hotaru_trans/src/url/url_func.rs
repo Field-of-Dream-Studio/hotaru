@@ -1,7 +1,7 @@
 use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
-use crate::OuterAttr;
 use crate::middleware::MWFunc;
+use crate::outer_attr::OuterAttr;
 use crate::url::send::rewrite_send;
 
 pub struct UrlFunc {
@@ -52,7 +52,7 @@ impl UrlFunc {
         let mut tokens = TokenStream::new();
 
         // Re-emit captured attributes (includes #[doc = "..."] if provided)
-        tokens.extend(self.attrs.reform());
+        tokens.extend(self.attrs.emit());
 
         if self.is_pub {
             tokens.extend(vec![TokenTree::Ident(Ident::new("pub", Span::call_site()))]);
