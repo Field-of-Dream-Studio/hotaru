@@ -7,16 +7,16 @@ use proc_macro::{Delimiter, Ident, Span, TokenStream, TokenTree};
 
 use crate::helper::{
     expect_any_ident, expect_end, expect_group_consume_return_inner, expect_ident_consume,
-    expect_punct_consume, into_peekable_iter, match_ident_consume,
+    expect_punct_consume, into_peekable_iter, match_ident_consume, parse_outer_attr_bodies,
 };
-use crate::outer_attr::parse_outer_attrs;
+use crate::outer_attr::OuterAttr;
 
 pub(crate) use chain::{MWChain, MWSlot};
 pub(crate) use func::MWFunc;
 
 pub(crate) fn parse_trans(input: TokenStream) -> Result<MWFunc, TokenStream> {
     let mut tokens = into_peekable_iter(input);
-    let attrs = parse_outer_attrs(&mut tokens)?;
+    let attrs = OuterAttr::try_from(parse_outer_attr_bodies(&mut tokens)?)?;
     let is_pub = match_ident_consume(&mut tokens, "pub");
     let name = expect_any_ident(&mut tokens, "Expect middleware name")?;
     let _ = expect_punct_consume(&mut tokens, "<", "Expect '<' before the protocol type")?;
@@ -45,7 +45,7 @@ pub(crate) fn parse_trans(input: TokenStream) -> Result<MWFunc, TokenStream> {
 /// }
 pub(crate) fn parse_semi_trans_or_attr(input: TokenStream) -> Result<MWFunc, TokenStream> {
     let mut tokens = into_peekable_iter(input);
-    let attrs = parse_outer_attrs(&mut tokens)?;
+    let attrs = OuterAttr::try_from(parse_outer_attr_bodies(&mut tokens)?)?;
     let is_pub = match_ident_consume(&mut tokens, "pub");
     let _ = expect_ident_consume(&mut tokens, "fn", "Expect 'fn' for middleware function")?;
     let name = expect_any_ident(&mut tokens, "Expect middleware function name")?;

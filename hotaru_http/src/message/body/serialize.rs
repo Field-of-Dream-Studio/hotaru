@@ -65,7 +65,13 @@ impl HttpBody {
             _ => (Vec::new(), None),
         };
 
-        if meta.get_content_length().is_none() {
+        if meta
+            .get_content_length()
+            .map_err(|error| {
+                BodyError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
+            })?
+            .is_none()
+        {
             meta.set_content_length(bin.len());
         }
         if meta.get_content_type().is_none()
@@ -110,7 +116,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(body, b"hello");
-        assert_eq!(meta.get_content_length(), Some(5));
+        assert_eq!(meta.get_content_length().unwrap(), Some(5));
         assert!(matches!(
             meta.get_content_type(),
             Some(HttpContentType::Text { subtype, .. }) if subtype == "html"

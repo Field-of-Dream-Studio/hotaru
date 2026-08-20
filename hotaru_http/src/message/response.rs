@@ -7,7 +7,7 @@ use crate::message::http_value::HttpContentType;
 use crate::message::meta::HttpMeta;
 use crate::message::start_line::{HttpStartLine, ResponseStartLine};
 use crate::util::cookie::Cookie;
-use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
+use hotaru_core::connection::{HotaruBufRead, HotaruWrite, error::ConnectionError};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -25,11 +25,9 @@ impl HttpResponse {
         stream: &mut R,
         config: &HttpSafety,
         print_raw: bool,
-    ) -> Self {
-        match io::parse_lazy(stream, config, false, print_raw).await {
-            Ok((meta, body)) => Self::new(meta, body),
-            Err(_) => Self::default(),
-        }
+    ) -> Result<Self, ConnectionError> {
+        let (meta, body) = io::parse_lazy(stream, config, false, print_raw).await?;
+        Ok(Self::new(meta, body))
     }
 
     /// Parses the HTTP Body from buffer

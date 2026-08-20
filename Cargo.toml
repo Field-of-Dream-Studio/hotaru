@@ -17,7 +17,6 @@ members = [
     "ahttpm",
 
     "htmstd",
-    # "h2per",
     # "hotaru_grpc",
 
     "examples/multi_protocol_example",

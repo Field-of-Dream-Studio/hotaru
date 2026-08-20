@@ -43,7 +43,7 @@ pub use protocol::HttpError;
 pub use send_request::send_request;
 
 // ============================================================================
-// Backward-compatible re-exports for external crates (e.g. hotaru, htmstd, h2per)
+// Backward-compatible re-exports for external crates (e.g. hotaru, htmstd)
 // These allow old `hotaru_http::body`, `hotaru_http::cookie`, etc. paths to work.
 // ============================================================================
 
