@@ -181,6 +181,11 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
     ///
     /// If a future design introduces dynamic route creation or cyclic node graphs,
     /// depth validation should be revisited at that layer.
+    #[av::ver(
+        deprecated,
+        since = "0.8.5",
+        note = "Legacy iterator-based wrapper; Hotaru no longer calls this internally. Use walk_str, walk_str_with_limit, or WalkCursor directly. Scheduled for removal in 0.9."
+    )]
     pub fn walk<'a>(
         self: Arc<Self>,
         path: Iter<'a, &str>,

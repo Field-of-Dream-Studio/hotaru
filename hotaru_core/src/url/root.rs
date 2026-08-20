@@ -16,7 +16,7 @@ use crate::{
 };
 
 use super::{
-    node::{PartialState, StepName, UrlNode},
+    node::{StepName, UrlNode},
     parser::parse,
 };
 
@@ -130,6 +130,11 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
     }
 
     /// Walks the URL tree using a segment iterator.
+    #[av::ver(
+        deprecated,
+        since = "0.8.5",
+        note = "Legacy iterator-based wrapper; Hotaru no longer calls this internally. Use walk_str, walk_str_with_limit, or walk_cursor directly. Scheduled for removal in 0.9."
+    )]
     pub fn walk<'a>(
         &self,
         path: Iter<'a, &str>,
