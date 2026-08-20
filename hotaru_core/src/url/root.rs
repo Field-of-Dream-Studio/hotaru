@@ -70,41 +70,17 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
     /// If the iterator is exhausted on entry the root endpoint is returned.
     fn walk<'a>(
         self: Arc<Self>,
-        mut path: Iter<'a, &str>,
+        path: Iter<'a, &str>,
     ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
-        let this_segment = match path.next() {
-            Some(s) => *s,
-            None => {
-                let endpoint = self.endpoint.read().clone();
-                return Box::pin(async move { endpoint });
-            }
-        };
+        let segments: Vec<&str> = path.copied().collect();
 
         Box::pin(async move {
-            let mut state = PartialState::NotStart;
-
-            while !state.is_end() {
-                let (matched_child, next_state) = self.children.match_step(this_segment, state);
-                state = next_state;
-
-                let Some(child) = matched_child else {
-                    continue;
-                };
-
-                if path.len() >= 1 && !child.path().is_any_path() {
-                    if let Some(result) = child
-                        .clone()
-                        .walk(path.clone(), PartialState::NotStart)
-                        .await
-                    {
-                        return Some(result);
-                    }
-                } else {
-                    return Some(child);
-                }
+            if segments.is_empty() {
+                return self.endpoint.read().clone();
             }
 
-            None
+            let mut cursor = super::node::WalkCursor::from_root(self);
+            cursor.find_next(&segments)
         })
     }
 }
