@@ -133,16 +133,22 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         Box::pin(async move { root.walk_segments(&segments) })
     }
 
+    pub(crate) fn walk_segments(&self, segments: &[&str]) -> Option<Arc<UrlNode<C, TS>>> {
+        self.root.clone().walk_segments(segments)
+    }
+
     /// Walks the URL tree using a segment iterator, rejecting paths deeper than `max_depth`.
     pub fn walk_with_limit<'a>(
         &self,
         path: Iter<'a, &str>,
         max_depth: u32,
     ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
-        if path.len() > max_depth as usize {
+        let segments: Vec<&str> = path.copied().collect();
+        if segments.len() > max_depth as usize {
             Box::pin(async { None })
         } else {
-            self.walk(path)
+            let root = self.root.clone();
+            Box::pin(async move { root.walk_segments(&segments) })
         }
     }
 
@@ -156,7 +162,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
             return self.root.endpoint.read().clone();
         }
         let segments: Vec<&str> = path.split('/').collect();
-        self.root.clone().walk_segments(&segments)
+        self.walk_segments(&segments)
     }
 
     /// Resumable cursor over every node matching `path`, in priority
@@ -195,7 +201,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         if segments.len() > max_depth as usize {
             return None;
         }
-        self.root.clone().walk_segments(&segments)
+        self.walk_segments(&segments)
     }
 
     /// Registers `path` under the root, returning a [`UrlRegistration`] on success.

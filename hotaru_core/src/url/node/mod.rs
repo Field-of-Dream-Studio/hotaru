@@ -379,8 +379,7 @@ mod tests {
 
         let path = segments(&["a"]);
         let matched = root
-            .walk(path.iter(), PartialState::NotStart)
-            .await
+            .walk_segments(&path, PartialState::NotStart)
             .expect("literal child should match");
 
         assert!(Arc::ptr_eq(&matched, &a));
@@ -396,8 +395,7 @@ mod tests {
 
         let path = segments(&["a", "b"]);
         let matched = root
-            .walk(path.iter(), PartialState::NotStart)
-            .await
+            .walk_segments(&path, PartialState::NotStart)
             .expect("nested literal child should match");
 
         assert!(Arc::ptr_eq(&matched, &b));
@@ -411,8 +409,7 @@ mod tests {
 
         let path = segments(&["a"]);
         let matched = root
-            .walk(path.iter(), PartialState::NotStart)
-            .await
+            .walk_segments(&path, PartialState::NotStart)
             .expect("AnyPath currently matches one segment");
 
         assert!(Arc::ptr_eq(&matched, &rest));
@@ -426,11 +423,34 @@ mod tests {
 
         let path = segments(&["a", "b", "c"]);
         let matched = root
-            .walk(path.iter(), PartialState::NotStart)
-            .await
+            .walk_segments(&path, PartialState::NotStart)
             .expect("AnyPath should match /files/a/b/c");
 
         assert!(Arc::ptr_eq(&matched, &rest));
+    }
+
+    #[tokio::test]
+    async fn walk_segments_handles_deep_literal_chain_without_recursive_poll_stack() {
+        const DEPTH: usize = 4096;
+
+        let root = empty_node(PathPattern::literal_path("root"));
+        let mut current = root.clone();
+        let mut path = Vec::with_capacity(DEPTH);
+
+        for i in 0..DEPTH {
+            let segment: &'static str = Box::leak(format!("seg{i}").into_boxed_str());
+            path.push(segment);
+
+            let child = empty_node(PathPattern::literal_path(segment));
+            current.insert_child(child.clone());
+            current = child;
+        }
+
+        let matched = root
+            .walk_segments(&path, PartialState::NotStart)
+            .expect("deep literal chain should match without recursive polling");
+
+        assert!(Arc::ptr_eq(&matched, &current));
     }
 
     #[test]
