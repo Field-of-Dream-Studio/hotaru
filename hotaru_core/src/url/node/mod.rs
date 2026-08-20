@@ -181,40 +181,28 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
     ///
     /// If a future design introduces dynamic route creation or cyclic node graphs,
     /// depth validation should be revisited at that layer.
+    #[av::ver(
+        deprecated,
+        since = "0.8.5",
+        note = "Legacy iterator-based wrapper; Hotaru no longer calls this internally. Use walk_str, walk_str_with_limit, or WalkCursor directly. Scheduled for removal in 0.9."
+    )]
     pub fn walk<'a>(
         self: Arc<Self>,
-        mut path: Iter<'a, &str>,
-        mut state: PartialState,
+        path: Iter<'a, &str>,
+        state: PartialState,
     ) -> MaybeSendBoxFuture<'a, Option<Arc<Self>>> {
-        let this_segment = match path.next() {
-            Some(segment) => *segment,
-            None => return Box::pin(async move { Some(self) }),
-        };
+        let segments: Vec<&str> = path.copied().collect();
 
-        Box::pin(async move {
-            while !state.is_end() {
-                let (matched_child, next_state) = self.children.match_step(this_segment, state);
-                state = next_state;
+        Box::pin(async move { self.walk_segments(&segments, state) })
+    }
 
-                let Some(child) = matched_child else {
-                    continue;
-                };
+    fn walk_segments(self: Arc<Self>, segments: &[&str], state: PartialState) -> Option<Arc<Self>> {
+        if segments.is_empty() {
+            return Some(self);
+        }
 
-                if path.len() >= 1 && !child.path().is_any_path() {
-                    if let Some(result) = child
-                        .clone()
-                        .walk(path.clone(), PartialState::NotStart)
-                        .await
-                    {
-                        return Some(result);
-                    }
-                } else {
-                    return Some(child);
-                }
-            }
-
-            None
-        })
+        let mut cursor = WalkCursor::from_node_with_state(self, state);
+        cursor.find_next(segments)
     }
 
     pub async fn walk_str(self: Arc<Self>, path: &str) -> Option<Arc<Self>> {
@@ -222,7 +210,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
             .split('/')
             .filter(|segment| !segment.is_empty())
             .collect();
-        self.walk(segments.iter(), PartialState::NotStart).await
+        self.walk_segments(&segments, PartialState::NotStart)
     }
 
     /// Walks the URL tree from a string path, rejecting paths deeper than `max_depth`.
@@ -238,7 +226,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
         if segments.len() > max_depth as usize {
             return None;
         }
-        self.walk(segments.iter(), PartialState::NotStart).await
+        self.walk_segments(&segments, PartialState::NotStart)
     }
 
     #[av::ver(
@@ -391,8 +379,7 @@ mod tests {
 
         let path = segments(&["a"]);
         let matched = root
-            .walk(path.iter(), PartialState::NotStart)
-            .await
+            .walk_segments(&path, PartialState::NotStart)
             .expect("literal child should match");
 
         assert!(Arc::ptr_eq(&matched, &a));
@@ -408,8 +395,7 @@ mod tests {
 
         let path = segments(&["a", "b"]);
         let matched = root
-            .walk(path.iter(), PartialState::NotStart)
-            .await
+            .walk_segments(&path, PartialState::NotStart)
             .expect("nested literal child should match");
 
         assert!(Arc::ptr_eq(&matched, &b));
@@ -423,8 +409,7 @@ mod tests {
 
         let path = segments(&["a"]);
         let matched = root
-            .walk(path.iter(), PartialState::NotStart)
-            .await
+            .walk_segments(&path, PartialState::NotStart)
             .expect("AnyPath currently matches one segment");
 
         assert!(Arc::ptr_eq(&matched, &rest));
@@ -438,11 +423,34 @@ mod tests {
 
         let path = segments(&["a", "b", "c"]);
         let matched = root
-            .walk(path.iter(), PartialState::NotStart)
-            .await
+            .walk_segments(&path, PartialState::NotStart)
             .expect("AnyPath should match /files/a/b/c");
 
         assert!(Arc::ptr_eq(&matched, &rest));
+    }
+
+    #[tokio::test]
+    async fn walk_segments_handles_deep_literal_chain_without_recursive_poll_stack() {
+        const DEPTH: usize = 4096;
+
+        let root = empty_node(PathPattern::literal_path("root"));
+        let mut current = root.clone();
+        let mut path = Vec::with_capacity(DEPTH);
+
+        for i in 0..DEPTH {
+            let segment: &'static str = Box::leak(format!("seg{i}").into_boxed_str());
+            path.push(segment);
+
+            let child = empty_node(PathPattern::literal_path(segment));
+            current.insert_child(child.clone());
+            current = child;
+        }
+
+        let matched = root
+            .walk_segments(&path, PartialState::NotStart)
+            .expect("deep literal chain should match without recursive polling");
+
+        assert!(Arc::ptr_eq(&matched, &current));
     }
 
     #[test]

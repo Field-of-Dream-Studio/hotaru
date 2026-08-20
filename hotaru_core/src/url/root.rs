@@ -16,7 +16,7 @@ use crate::{
 };
 
 use super::{
-    node::{PartialState, StepName, UrlNode},
+    node::{StepName, UrlNode},
     parser::parse,
 };
 
@@ -65,47 +65,13 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
         self.endpoint.read().clone()
     }
 
-    /// Walks from the root's children using a segment iterator.
-    ///
-    /// If the iterator is exhausted on entry the root endpoint is returned.
-    fn walk<'a>(
-        self: Arc<Self>,
-        mut path: Iter<'a, &str>,
-    ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
-        let this_segment = match path.next() {
-            Some(s) => *s,
-            None => {
-                let endpoint = self.endpoint.read().clone();
-                return Box::pin(async move { endpoint });
-            }
-        };
+    fn walk_segments(self: Arc<Self>, segments: &[&str]) -> Option<Arc<UrlNode<C, TS>>> {
+        if segments.is_empty() {
+            return self.endpoint.read().clone();
+        }
 
-        Box::pin(async move {
-            let mut state = PartialState::NotStart;
-
-            while !state.is_end() {
-                let (matched_child, next_state) = self.children.match_step(this_segment, state);
-                state = next_state;
-
-                let Some(child) = matched_child else {
-                    continue;
-                };
-
-                if path.len() >= 1 && !child.path().is_any_path() {
-                    if let Some(result) = child
-                        .clone()
-                        .walk(path.clone(), PartialState::NotStart)
-                        .await
-                    {
-                        return Some(result);
-                    }
-                } else {
-                    return Some(child);
-                }
-            }
-
-            None
-        })
+        let mut cursor = super::node::WalkCursor::from_root(self);
+        cursor.find_next(segments)
     }
 }
 
@@ -153,11 +119,22 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
     }
 
     /// Walks the URL tree using a segment iterator.
+    #[av::ver(
+        deprecated,
+        since = "0.8.5",
+        note = "Legacy iterator-based wrapper; Hotaru no longer calls this internally. Use walk_str, walk_str_with_limit, or walk_cursor directly. Scheduled for removal in 0.9."
+    )]
     pub fn walk<'a>(
         &self,
         path: Iter<'a, &str>,
     ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
-        self.root.clone().walk(path)
+        let segments: Vec<&str> = path.copied().collect();
+        let root = self.root.clone();
+        Box::pin(async move { root.walk_segments(&segments) })
+    }
+
+    pub(crate) fn walk_segments(&self, segments: &[&str]) -> Option<Arc<UrlNode<C, TS>>> {
+        self.root.clone().walk_segments(segments)
     }
 
     /// Walks the URL tree using a segment iterator, rejecting paths deeper than `max_depth`.
@@ -166,10 +143,12 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         path: Iter<'a, &str>,
         max_depth: u32,
     ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
-        if path.len() > max_depth as usize {
+        let segments: Vec<&str> = path.copied().collect();
+        if segments.len() > max_depth as usize {
             Box::pin(async { None })
         } else {
-            self.walk(path)
+            let root = self.root.clone();
+            Box::pin(async move { root.walk_segments(&segments) })
         }
     }
 
@@ -183,7 +162,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
             return self.root.endpoint.read().clone();
         }
         let segments: Vec<&str> = path.split('/').collect();
-        self.root.clone().walk(segments.iter()).await
+        self.walk_segments(&segments)
     }
 
     /// Resumable cursor over every node matching `path`, in priority
@@ -222,7 +201,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         if segments.len() > max_depth as usize {
             return None;
         }
-        self.root.clone().walk(segments.iter()).await
+        self.walk_segments(&segments)
     }
 
     /// Registers `path` under the root, returning a [`UrlRegistration`] on success.
