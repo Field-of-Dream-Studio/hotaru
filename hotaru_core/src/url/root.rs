@@ -74,14 +74,15 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
     ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
         let segments: Vec<&str> = path.copied().collect();
 
-        Box::pin(async move {
-            if segments.is_empty() {
-                return self.endpoint.read().clone();
-            }
+/    }
 
-            let mut cursor = super::node::WalkCursor::from_root(self);
-            cursor.find_next(&segments)
-        })
+    fn walk_segments(self: Arc<Self>, segments: &[&str]) -> Option<Arc<UrlNode<C, TS>>> {
+        if segments.is_empty() {
+            return self.endpoint.read().clone();
+        }
+
+        let mut cursor = super::node::WalkCursor::from_root(self);
+        cursor.find_next(segments)
     }
 }
 
@@ -159,7 +160,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
             return self.root.endpoint.read().clone();
         }
         let segments: Vec<&str> = path.split('/').collect();
-        self.root.clone().walk(segments.iter()).await
+        self.root.clone().walk_segments(&segments)
     }
 
     /// Resumable cursor over every node matching `path`, in priority
@@ -198,7 +199,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         if segments.len() > max_depth as usize {
             return None;
         }
-        self.root.clone().walk(segments.iter()).await
+        self.root.clone().walk_segments(&segments)
     }
 
     /// Registers `path` under the root, returning a [`UrlRegistration`] on success.

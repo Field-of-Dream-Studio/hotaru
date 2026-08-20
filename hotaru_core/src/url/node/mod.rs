@@ -188,14 +188,16 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
     ) -> MaybeSendBoxFuture<'a, Option<Arc<Self>>> {
         let segments: Vec<&str> = path.copied().collect();
 
-        Box::pin(async move {
-            if segments.is_empty() {
-                return Some(self);
-            }
+        Box::pin(async move { self.walk_segments(&segments, state) })
+    }
 
-            let mut cursor = WalkCursor::from_node_with_state(self, state);
-            cursor.find_next(&segments)
-        })
+    fn walk_segments(self: Arc<Self>, segments: &[&str], state: PartialState) -> Option<Arc<Self>> {
+        if segments.is_empty() {
+            return Some(self);
+        }
+
+        let mut cursor = WalkCursor::from_node_with_state(self, state);
+        cursor.find_next(segments)
     }
 
     pub async fn walk_str(self: Arc<Self>, path: &str) -> Option<Arc<Self>> {
@@ -203,7 +205,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
             .split('/')
             .filter(|segment| !segment.is_empty())
             .collect();
-        self.walk(segments.iter(), PartialState::NotStart).await
+        self.walk_segments(&segments, PartialState::NotStart)
     }
 
     /// Walks the URL tree from a string path, rejecting paths deeper than `max_depth`.
@@ -219,7 +221,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
         if segments.len() > max_depth as usize {
             return None;
         }
-        self.walk(segments.iter(), PartialState::NotStart).await
+        self.walk_segments(&segments, PartialState::NotStart)
     }
 
     #[av::ver(
