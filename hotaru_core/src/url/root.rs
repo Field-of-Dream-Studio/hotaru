@@ -65,17 +65,6 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
         self.endpoint.read().clone()
     }
 
-    /// Walks from the root's children using a segment iterator.
-    ///
-    /// If the iterator is exhausted on entry the root endpoint is returned.
-    fn walk<'a>(
-        self: Arc<Self>,
-        path: Iter<'a, &str>,
-    ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
-        let segments: Vec<&str> = path.copied().collect();
-
-/    }
-
     fn walk_segments(self: Arc<Self>, segments: &[&str]) -> Option<Arc<UrlNode<C, TS>>> {
         if segments.is_empty() {
             return self.endpoint.read().clone();
@@ -139,7 +128,9 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         &self,
         path: Iter<'a, &str>,
     ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
-        self.root.clone().walk(path)
+        let segments: Vec<&str> = path.copied().collect();
+        let root = self.root.clone();
+        Box::pin(async move { root.walk_segments(&segments) })
     }
 
     /// Walks the URL tree using a segment iterator, rejecting paths deeper than `max_depth`.
