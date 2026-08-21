@@ -2,9 +2,13 @@ name: hotaru-trans
 
 on:
   push:
-    branches: [master]
+    branches:
+      - master
+      - 'theme/**'
   pull_request:
-    branches: [master]
+    branches:
+      - master
+      - 'theme/**'
 
 concurrency:
   group: hotaru-trans-${{ github.workflow }}-${{ github.ref }}

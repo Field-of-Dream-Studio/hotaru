@@ -5,7 +5,6 @@ mod content_type;
 mod cookie;
 mod encoding;
 mod error;
-mod header;
 mod host_language;
 mod location;
 mod meta;
@@ -13,5 +12,4 @@ mod serialize;
 mod stream;
 
 pub use error::MetaError;
-pub use header::HeaderValue;
 pub use meta::HttpMeta;

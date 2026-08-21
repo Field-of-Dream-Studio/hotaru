@@ -1,5 +1,6 @@
-use super::{HeaderValue, HttpMeta};
+use super::HttpMeta;
 use crate::connection::error::ConnectionError;
+use crate::message::header::HeaderValue;
 
 impl HttpMeta {
     /// Gets the content length from the HTTP meta data.
@@ -15,7 +16,7 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::header::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -41,7 +42,7 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::header::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -107,7 +108,7 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::header::HeaderValue;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_content_length(123);
@@ -127,7 +128,7 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::header::HeaderValue;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_header("content-length", "123");

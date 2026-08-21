@@ -1,16 +1,16 @@
-use super::{HeaderValue, HttpMeta};
+use super::HttpMeta;
+use crate::message::header::{HeaderMap, HeaderValue};
 use crate::message::http_value::HttpMethod;
-use std::collections::HashMap;
 
 impl HttpMeta {
-    pub fn set_header_hashmap(&mut self, header: HashMap<String, HeaderValue>) {
-        self.header = header;
+    pub fn set_header_hashmap(&mut self, header: impl Into<HeaderMap>) {
+        self.header = header.into();
     }
 
     /// Returns the hashed, unparsed header.
     /// Note this reference is not intended for you to mutate.
     /// If yo do want to mutate, please use .set_attribute() method
-    pub fn get_header_hashmap(&self) -> &HashMap<String, HeaderValue> {
+    pub fn get_header_hashmap(&self) -> &HeaderMap {
         &self.header
     }
 

@@ -11,7 +11,7 @@ mod security_tests {
     use crate::message::http_value::HttpMethod;
     use crate::message::meta::HttpMeta;
     use crate::message::request::HttpRequest;
-    use crate::message::start_line::RequestStartLine;
+    use crate::message::start_line::{RequestStartLine, StartLineError};
     use crate::security::safety::HttpSafety;
     use hotaru_io_tokio::TokioIo;
     use std::io::Cursor;
@@ -28,7 +28,7 @@ mod security_tests {
             result.is_err(),
             "Should reject start line without HTTP version"
         );
-        assert_eq!(result.unwrap_err(), "Malformed request line");
+        assert!(matches!(result.unwrap_err(), StartLineError::Unrecognised));
     }
 
     #[test]
@@ -149,7 +149,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_header_crlf_injection_in_value() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default();
 
         // Simulate headers with CRLF injection attempt
@@ -165,7 +165,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_header_null_byte_injection() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default();
 
         // Header with null byte
@@ -180,10 +180,10 @@ mod security_tests {
         // Verify null byte is in the header value
         if let Some(host) = meta.header.get("Host") {
             match host {
-                crate::message::meta::HeaderValue::Single(s) => {
+                crate::message::header::HeaderValue::Single(s) => {
                     assert!(s.contains('\0'), "Header contains null byte");
                 }
-                crate::message::meta::HeaderValue::Multiple(v) => {
+                crate::message::header::HeaderValue::Multiple(v) => {
                     assert!(
                         v.iter().any(|s| s.contains('\0')),
                         "Header contains null byte"
@@ -195,7 +195,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_header_oversized_header_name() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default().with_max_header_size(1024);
 
         // Create a very long header name (2KB)
@@ -212,7 +212,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_header_oversized_header_value() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default().with_max_header_size(1024);
 
         // Create a very long header value (10KB)
@@ -229,7 +229,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_header_many_headers_exceeding_limit() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default().with_max_header_size(2048);
 
         // Create 100 headers, total size > 2KB
@@ -252,7 +252,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_header_duplicate_host_header() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default();
 
         // Multiple Host headers
@@ -351,7 +351,7 @@ mod security_tests {
     /// Line folding is deprecated and a security risk in modern HTTP/1.1
     #[tokio::test]
     async fn test_header_line_folding() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default();
 
         // HTTP line folding (obsolete in HTTP/1.1, security risk)
@@ -384,7 +384,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_header_no_colon_separator() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default();
 
         // Header without colon separator
@@ -400,7 +400,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_header_control_characters() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default();
 
         // Header with control characters (potential security risk)
@@ -422,7 +422,7 @@ mod security_tests {
     /// Status: Parser CORRECTLY rejects this
     #[tokio::test]
     async fn test_chunked_invalid_hex_size() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -441,7 +441,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_negative_size() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -457,7 +457,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_size_overflow() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -473,7 +473,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_missing_crlf_after_size() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -492,7 +492,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_missing_crlf_after_data() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -511,7 +511,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_only_lf_terminator() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -527,7 +527,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_size_exceeds_body_limit() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default().with_max_body_size(100);
@@ -546,7 +546,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_cumulative_size_exceeds_limit() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default().with_max_body_size(50);
@@ -565,7 +565,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_zero_size_not_last() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -581,7 +581,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_trailer_header_injection() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -599,7 +599,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_chunk_extension_overflow() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -617,7 +617,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_no_final_zero_chunk() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -633,7 +633,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_valid_simple() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -652,7 +652,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_empty_chunks() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
@@ -668,7 +668,7 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_uppercase_hex() {
-        let mut meta = HttpMeta::new(Default::default(), Default::default());
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();

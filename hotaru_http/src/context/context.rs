@@ -10,7 +10,6 @@ use hotaru_core::protocol::{
 use hotaru_core::url::UrlNode;
 
 use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
-use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
@@ -454,12 +453,12 @@ impl<TS: TransportSpec> HttpContext<TS> {
 
     /// Convenience method to get request headers directly.
     /// Avoids the long chain: req.request.meta.header
-    pub fn headers(&self) -> &HashMap<String, crate::message::meta::HeaderValue> {
+    pub fn headers(&self) -> &crate::message::header::HeaderMap {
         &self.request.meta.header
     }
 
     /// Convenience method to get a specific header value.
-    pub fn header(&self, key: &str) -> Option<&crate::message::meta::HeaderValue> {
+    pub fn header(&self, key: &str) -> Option<&crate::message::header::HeaderValue> {
         self.request.meta.header.get(key)
     }
 
@@ -467,8 +466,8 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// Returns the first value if multiple values exist.
     pub fn header_str(&self, key: &str) -> Option<&str> {
         self.request.meta.header.get(key).and_then(|hv| match hv {
-            crate::message::meta::HeaderValue::Single(s) => Some(s.as_str()),
-            crate::message::meta::HeaderValue::Multiple(v) => v.first().map(|s| s.as_str()),
+            crate::message::header::HeaderValue::Single(s) => Some(s.as_str()),
+            crate::message::header::HeaderValue::Multiple(v) => v.first().map(|s| s.as_str()),
         })
     }
 

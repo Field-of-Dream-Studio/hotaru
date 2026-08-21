@@ -1,4 +1,5 @@
-use super::{HeaderValue, HttpMeta};
+use super::HttpMeta;
+use crate::message::header::HeaderValue;
 use crate::util::cookie::{Cookie, CookieMap};
 
 impl HttpMeta {
@@ -15,7 +16,7 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::header::HeaderValue;
     /// # use hotaru_http::cookie::{Cookie, CookieMap};
     /// use std::collections::HashMap;
     ///
@@ -52,7 +53,7 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::header::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -87,7 +88,7 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::header::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -241,7 +242,7 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::header::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -273,7 +274,7 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::meta::HeaderValue;
+    /// # use hotaru_http::header::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();

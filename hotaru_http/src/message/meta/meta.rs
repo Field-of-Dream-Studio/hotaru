@@ -1,9 +1,8 @@
-use super::HeaderValue;
+use crate::message::header::HeaderMap;
 use crate::message::http_value::*;
 use crate::message::start_line::HttpStartLine;
 use crate::util::cookie::CookieMap;
 use crate::util::encoding::HttpEncoding;
-use std::collections::HashMap;
 
 /// RequestHeader is a struct that represents the headers of an HTTP request.
 ///
@@ -15,7 +14,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct HttpMeta {
     pub start_line: HttpStartLine,
-    pub header: HashMap<String, HeaderValue>,
+    pub header: HeaderMap,
 
     // Content-type header, overrides the content type from the hashmap if present
     pub(in crate::message::meta) content_type: Option<HttpContentType>,
@@ -45,10 +44,13 @@ pub struct HttpMeta {
 
 impl HttpMeta {
     /// It is used to create a new RequestHeader object.
-    pub fn new(start_line: HttpStartLine, headers: HashMap<String, HeaderValue>) -> Self {
+    ///
+    /// `headers` accepts any type that converts into [`HeaderMap`], including
+    /// a bare `HashMap<String, HeaderValue>` for backwards compatibility.
+    pub fn new(start_line: HttpStartLine, headers: impl Into<HeaderMap>) -> Self {
         Self {
             start_line,
-            header: headers,
+            header: headers.into(),
             content_type: None,
             content_length: None,
             content_disposition: None,
@@ -69,7 +71,7 @@ impl Default for HttpMeta {
                 HttpMethod::GET,
                 "/".to_string(),
             ),
-            header: HashMap::new(),
+            header: HeaderMap::new(),
             content_type: None,
             content_length: None,
             content_disposition: None,
