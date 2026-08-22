@@ -3,13 +3,11 @@ use core::iter::Peekable;
 use proc_macro::{TokenStream, TokenTree};
 
 use crate::{
-    helper::{
-        expect_end, expect_stream_before_comma_consume,
-    },
-    outer_attr::parse_outer_attrs,
+    helper::{expect_end, expect_stream_before_comma_consume, parse_outer_attr_bodies},
+    outer_attr::OuterAttr,
 };
 
-use super::{APHandlerDef, APParts}; 
+use super::{APHandlerDef, APParts};
 
 /// Fully parsed components shared before endpoint/outpoint wrapping.
 pub(crate) struct ParsedAP {
@@ -44,7 +42,7 @@ impl ParsedAP {
     pub(crate) fn from_semi_trans_stream(
         tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
     ) -> Result<Self, TokenStream> {
-        let mut attrs = parse_outer_attrs(tokens)?;
+        let mut attrs = OuterAttr::try_from(parse_outer_attr_bodies(tokens)?)?;
         let parts = APParts::from_outer_attrs(&mut attrs)?;
         let handler = APHandlerDef::from_fn_stream(tokens, attrs)?;
         Ok(Self::new(parts, handler))

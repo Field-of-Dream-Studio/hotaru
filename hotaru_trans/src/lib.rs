@@ -12,6 +12,7 @@ pub(crate) mod middleware;
 // re-enable temporarily.
 // pub(crate) mod url;
 
+pub(crate) mod fields;
 pub(crate) mod helper;
 pub(crate) mod outer_attr;
 use helper::*;

@@ -6,8 +6,9 @@ use crate::{
     helper::{
         expect_any_ident, expect_end, expect_group_consume_return_inner, expect_ident_consume,
         expect_punct_consume, generate_compile_error, into_peekable_iter, match_ident_consume,
+        parse_outer_attr_bodies,
     },
-    outer_attr::{OuterAttr, parse_outer_attrs},
+    outer_attr::OuterAttr,
 };
 
 use super::next_anonymous_ident;
@@ -80,7 +81,7 @@ impl APHandlerDef {
     pub(crate) fn from_trans_stream(
         tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
     ) -> Result<Self, TokenStream> {
-        let attrs = parse_outer_attrs(tokens)?;
+        let attrs = OuterAttr::try_from(parse_outer_attr_bodies(tokens)?)?;
         let is_pub = match_ident_consume(tokens, "pub");
         let name = parse_route_name(tokens)?;
         let protocol = parse_protocol(tokens)?;
@@ -108,7 +109,7 @@ impl APHandlerDef {
     pub(crate) fn from_fn_item_stream(
         tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
     ) -> Result<Self, TokenStream> {
-        let attrs = parse_outer_attrs(tokens)?;
+        let attrs = OuterAttr::try_from(parse_outer_attr_bodies(tokens)?)?;
         Self::from_fn_stream(tokens, attrs)
     }
 
