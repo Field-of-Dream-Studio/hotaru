@@ -2,9 +2,13 @@ name: hotaru-core
 
 on:
   push:
-    branches: [master]
+    branches:
+      - master
+      - 'theme/**'
   pull_request:
-    branches: [master]
+    branches:
+      - master
+      - 'theme/**'
 
 concurrency:
   group: hotaru-core-${{ github.workflow }}-${{ github.ref }}

@@ -1,5 +1,6 @@
-use super::{HeaderValue, HttpMeta};
+use super::HttpMeta;
 use crate::connection::error::ConnectionError;
+use crate::message::header::{HeaderMap, HeaderValue};
 use crate::message::start_line::HttpStartLine;
 use crate::security::safety::HttpSafety;
 use hotaru_core::connection::{HotaruBufRead, TransferTermination};
@@ -146,17 +147,14 @@ impl HttpMeta {
     // Helper function to parse the start line
     fn parse_start_line(line: &str, is_request: bool) -> HttpStartLine {
         if is_request {
-            HttpStartLine::parse_request(line)
+            HttpStartLine::parse_request_or_default(line)
         } else {
-            HttpStartLine::parse_response(line)
+            HttpStartLine::parse_response_or_default(line)
         }
     }
 
     // Helper function to parse headers with special handling for specific header types
-    fn parse_headers(
-        header_lines: Vec<String>,
-        _is_response: bool,
-    ) -> HashMap<String, HeaderValue> {
+    fn parse_headers(header_lines: Vec<String>, _is_response: bool) -> HeaderMap {
         let mut headers: HashMap<String, HeaderValue> = HashMap::new();
 
         // // List of headers that should not be combined (kept as separate values)
@@ -198,7 +196,7 @@ impl HttpMeta {
             }
         }
 
-        headers
+        headers.into()
     }
 
     // Expose the specific methods that call the shared implementation

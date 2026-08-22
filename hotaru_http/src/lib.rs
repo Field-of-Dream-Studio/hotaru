@@ -67,6 +67,11 @@ pub mod form {
     pub use crate::util::form::*;
 }
 
+pub mod header {
+    //! Re-exported from `message::header`
+    pub use crate::message::header::*;
+}
+
 pub mod http_value {
     //! Re-exported from `message::http_value`
     pub use crate::message::http_value::*;

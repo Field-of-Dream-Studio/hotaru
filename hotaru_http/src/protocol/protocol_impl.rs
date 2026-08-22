@@ -285,7 +285,7 @@ where
 mod tests {
     use super::*;
     use crate::message::http_value::StatusCode;
-    use crate::message::meta::HeaderValue;
+    use crate::message::header::HeaderValue;
     use crate::message::request::HttpRequest;
 
     #[test]
