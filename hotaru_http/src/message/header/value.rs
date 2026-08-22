@@ -1,3 +1,5 @@
+//! Invariant: the discriminant is authoritative — a `Multiple` header is multi-value regardless of element count.
+
 /// A header value: one string, or several kept separately.
 ///
 /// Most HTTP headers combine multiple values with commas, but some
@@ -166,14 +168,18 @@ impl HeaderValue {
     /// assert_eq!(cookies.try_get(1), Some(&"theme=dark; Path=/; Max-Age=3600".to_string()));
     /// ```
     pub fn add_without_combining<T: Into<String>>(&mut self, value: T) {
+        // Compute the new value before touching `self` so a panic in
+        // `value.into()` cannot leave `self` in a transient state.
+        let new = value.into();
         match self {
             HeaderValue::Single(_) => {
-                let original = std::mem::replace(self, HeaderValue::Multiple(Vec::new()));
+                let original =
+                    std::mem::replace(self, HeaderValue::Single(String::new()));
                 if let HeaderValue::Single(s) = original {
-                    *self = HeaderValue::Multiple(vec![s, value.into()]);
+                    *self = HeaderValue::Multiple(vec![s, new]);
                 }
             }
-            HeaderValue::Multiple(v) => v.push(value.into()),
+            HeaderValue::Multiple(v) => v.push(new),
         }
     }
 

@@ -1,4 +1,5 @@
 //! Typed collection of HTTP header name/value pairs.
+//! Relies on the `HeaderValue` invariant: `Multiple` means multi-value regardless of element count.
 
 use std::collections::HashMap;
 use std::collections::hash_map;
@@ -74,15 +75,13 @@ impl HeaderMap {
     }
 
     /// Returns the unique value under `name`: `Ok(None)` absent,
-    /// `Ok(Some(&str))` one value, `Err(MultipleValues)` more than one.
+    /// `Ok(Some(&str))` when stored as `Single`, `Err(MultipleValues)` when
+    /// stored as `Multiple` (regardless of element count).
     pub fn get_only<Q: AsRef<str>>(&self, name: Q) -> Result<Option<&str>, HeaderError> {
         let name = name.as_ref();
         match self.inner.get(name) {
             None => Ok(None),
             Some(HeaderValue::Single(value)) => Ok(Some(value.as_str())),
-            Some(HeaderValue::Multiple(values)) if values.len() == 1 => {
-                Ok(Some(values[0].as_str()))
-            }
             Some(HeaderValue::Multiple(_)) => {
                 Err(HeaderError::MultipleValues(name.to_string()))
             }
@@ -240,12 +239,27 @@ mod tests {
     }
 
     #[test]
-    fn get_only_errors_when_multiple() {
+    fn get_only_errors_for_multiple_variant_regardless_of_count() {
         let mut map = HeaderMap::new();
         map.insert(
             "content-length".to_string(),
             HeaderValue::Multiple(vec!["10".to_string(), "20".to_string()]),
         );
+        assert_eq!(
+            map.get_only("content-length"),
+            Err(HeaderError::MultipleValues("content-length".to_string()))
+        );
+
+        map.insert(
+            "content-length".to_string(),
+            HeaderValue::Multiple(vec!["42".to_string()]),
+        );
+        assert_eq!(
+            map.get_only("content-length"),
+            Err(HeaderError::MultipleValues("content-length".to_string()))
+        );
+
+        map.insert("content-length".to_string(), HeaderValue::Multiple(vec![]));
         assert_eq!(
             map.get_only("content-length"),
             Err(HeaderError::MultipleValues("content-length".to_string()))
