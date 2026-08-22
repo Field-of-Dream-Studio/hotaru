@@ -43,5 +43,5 @@ mod transfer;
 
 pub use content::{ContentCoding, ContentCodings};
 pub use encoding::HttpEncoding;
-pub use error::{CompressionFailure, EncodingError};
+pub use error::{CompressionError, CompressionFailure, EncodingError};
 pub use transfer::{TransferCoding, TransferCodings};

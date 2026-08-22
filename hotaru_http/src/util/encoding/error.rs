@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-/// Errors raised while parsing, validating, or applying a coding.
+/// Errors from parsing or validating a Transfer-Encoding / Content-Encoding header.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum EncodingError {
@@ -14,8 +14,19 @@ pub enum EncodingError {
     UnsupportedTransferCoding(String),
     /// Content coding not implemented. Payload is the token from the header.
     UnsupportedContentCoding(String),
-    /// Coding is known but the `compression` feature is off in this build.
-    CompressionUnavailable(&'static str),
+}
+
+/// Errors from applying a content coding to a body payload.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum CompressionError {
+    /// Coding is recognised but not usable in this build — either the
+    /// `compression` feature is off, or the coding is one we never implement
+    /// (e.g. `compress`).
+    Unavailable(&'static str),
+    /// Coding token from the wire is not implemented — reached apply-time
+    /// because header parsing was lenient. Payload is the token as sent.
+    UnsupportedCoding(String),
     /// Compressor failed while encoding.
     EncodeFailed(CompressionFailure),
     /// Decompressor failed while decoding.
@@ -51,11 +62,18 @@ impl fmt::Display for EncodingError {
             Self::UnsupportedContentCoding(token) => {
                 write!(formatter, "unsupported content coding: {token}")
             }
-            Self::CompressionUnavailable(coding) => {
-                write!(
-                    formatter,
-                    "content coding `{coding}` is unavailable in this build"
-                )
+        }
+    }
+}
+
+impl fmt::Display for CompressionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unavailable(coding) => {
+                write!(formatter, "content coding `{coding}` is unavailable")
+            }
+            Self::UnsupportedCoding(token) => {
+                write!(formatter, "unsupported content coding: {token}")
             }
             Self::EncodeFailed(reason) => {
                 write!(formatter, "compression failed while encoding: {reason}")
@@ -82,7 +100,9 @@ impl fmt::Display for CompressionFailure {
     }
 }
 
-impl std::error::Error for EncodingError {
+impl std::error::Error for EncodingError {}
+
+impl std::error::Error for CompressionError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::EncodeFailed(reason) | Self::DecodeFailed(reason) => Some(reason),
@@ -100,11 +120,11 @@ mod tests {
     #[test]
     fn display_propagates_the_wrapped_compression_failure() {
         assert_eq!(
-            EncodingError::EncodeFailed(CompressionFailure::Truncated).to_string(),
+            CompressionError::EncodeFailed(CompressionFailure::Truncated).to_string(),
             "compression failed while encoding: input ended before the frame was complete",
         );
         assert_eq!(
-            EncodingError::DecodeFailed(CompressionFailure::InvalidStream).to_string(),
+            CompressionError::DecodeFailed(CompressionFailure::InvalidStream).to_string(),
             "compression failed while decoding: input stream is malformed",
         );
     }
@@ -112,16 +132,18 @@ mod tests {
     #[test]
     fn source_is_present_only_for_wrapping_variants() {
         assert!(
-            std::error::Error::source(&EncodingError::EncodeFailed(
+            std::error::Error::source(&CompressionError::EncodeFailed(
                 CompressionFailure::LimitExceeded
             ))
             .is_some()
         );
         assert!(
-            std::error::Error::source(&EncodingError::DecodeFailed(CompressionFailure::Truncated))
-                .is_some()
+            std::error::Error::source(&CompressionError::DecodeFailed(
+                CompressionFailure::Truncated
+            ))
+            .is_some()
         );
-        assert!(std::error::Error::source(&EncodingError::DuplicateChunked).is_none());
-        assert!(std::error::Error::source(&EncodingError::DecodedBodyTooLarge).is_none());
+        assert!(std::error::Error::source(&CompressionError::Unavailable("gzip")).is_none());
+        assert!(std::error::Error::source(&CompressionError::DecodedBodyTooLarge).is_none());
     }
 }

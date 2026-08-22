@@ -124,7 +124,7 @@ impl HttpMeta {
     ///
     /// let mut headers = HashMap::new();
     /// headers.insert("cookie".to_string(), HeaderValue::new("sessionId=abc123; theme=dark"));
-    /// let mut meta = HttpMeta::new(HttpStartLine::parse_request("GET / HTTP/1.1"), headers);
+    /// let mut meta = HttpMeta::new(HttpStartLine::parse_request_or_default("GET / HTTP/1.1"), headers);
     ///
     /// let cookies = meta.parse_cookies();
     /// assert_eq!(cookies.get("sessionId").unwrap().value, "abc123");
@@ -136,7 +136,7 @@ impl HttpMeta {
     ///
     /// let mut headers = HashMap::new();
     /// headers.insert("set-cookie".to_string(), HeaderValue::new("sessionId=abc123; Path=/; Secure"));
-    /// let mut meta = HttpMeta::new(HttpStartLine::parse_response("HTTP/1.1 200 OK"), headers);
+    /// let mut meta = HttpMeta::new(HttpStartLine::parse_response_or_default("HTTP/1.1 200 OK"), headers);
     ///
     /// let cookies = meta.parse_cookies();
     /// assert_eq!(cookies.get("sessionId").unwrap().value, "abc123");

@@ -42,7 +42,7 @@ impl HttpStartLine {
         Self::Response(ResponseStartLine::new(http_version, status_code))
     }
 
-    /// Attempts to parse a string into an HTTP start line.
+    /// Parses a string into an HTTP start line.
     ///
     /// This method attempts to parse the string as a request first, and if that fails,
     /// it tries to parse it as a response.
@@ -61,24 +61,24 @@ impl HttpStartLine {
     /// ```rust
     /// # use hotaru_http::start_line::HttpStartLine;
     /// let line = "GET /index.html HTTP/1.1";
-    /// let start_line = HttpStartLine::try_parse(line).unwrap();
+    /// let start_line = HttpStartLine::parse(line).unwrap();
     /// assert!(start_line.is_request());
     /// ```
-    pub fn try_parse<T: AsRef<str>>(line: T) -> Result<Self, StartLineError> {
+    pub fn parse<T: AsRef<str>>(line: T) -> Result<Self, StartLineError> {
         let line = line.as_ref();
 
-        if let Ok(request) = Self::try_parse_request(line) {
+        if let Ok(request) = Self::parse_request(line) {
             return Ok(request);
         }
 
-        if let Ok(response) = Self::try_parse_response(line) {
+        if let Ok(response) = Self::parse_response(line) {
             return Ok(response);
         }
 
         Err(StartLineError::Unrecognised)
     }
 
-    /// Attempts to parse a string specifically as an HTTP request start line.
+    /// Parses a string specifically as an HTTP request start line.
     ///
     /// # Arguments
     ///
@@ -93,14 +93,14 @@ impl HttpStartLine {
     /// ```rust
     /// # use hotaru_http::start_line::HttpStartLine;
     /// let line = "GET /index.html HTTP/1.1";
-    /// let start_line = HttpStartLine::try_parse_request(line).unwrap();
+    /// let start_line = HttpStartLine::parse_request(line).unwrap();
     /// assert!(start_line.is_request());
     /// ```
-    pub fn try_parse_request<T: AsRef<str>>(line: T) -> Result<Self, StartLineError> {
+    pub fn parse_request<T: AsRef<str>>(line: T) -> Result<Self, StartLineError> {
         RequestStartLine::parse(line).map(Self::Request)
     }
 
-    /// Attempts to parse a string specifically as an HTTP response start line.
+    /// Parses a string specifically as an HTTP response start line.
     ///
     /// # Arguments
     ///
@@ -115,10 +115,10 @@ impl HttpStartLine {
     /// ```rust
     /// # use hotaru_http::start_line::HttpStartLine;
     /// let line = "HTTP/1.1 200 OK";
-    /// let start_line = HttpStartLine::try_parse_response(line).unwrap();
+    /// let start_line = HttpStartLine::parse_response(line).unwrap();
     /// assert!(start_line.is_response());
     /// ```
-    pub fn try_parse_response<T: AsRef<str>>(line: T) -> Result<Self, StartLineError> {
+    pub fn parse_response<T: AsRef<str>>(line: T) -> Result<Self, StartLineError> {
         ResponseStartLine::parse(line).map(Self::Response)
     }
 
@@ -133,10 +133,10 @@ impl HttpStartLine {
     ///
     /// Either the parsed HttpStartLine or the caller-supplied default.
     pub fn parse_or<T: AsRef<str>>(line: T, default: Self) -> Self {
-        Self::try_parse(line).unwrap_or(default)
+        Self::parse(line).unwrap_or(default)
     }
 
-    /// Parses a string into an HTTP start line.
+    /// Parses a string into an HTTP start line, returning the type default if parsing fails.
     ///
     /// # Arguments
     ///
@@ -145,11 +145,11 @@ impl HttpStartLine {
     /// # Returns
     ///
     /// The parsed HTTP start line, or a default value if parsing fails.
-    pub fn parse<T: AsRef<str>>(line: T) -> Self {
-        Self::try_parse(line).unwrap_or_else(|_| Default::default())
+    pub fn parse_or_default<T: AsRef<str>>(line: T) -> Self {
+        Self::parse(line).unwrap_or_else(|_| Default::default())
     }
 
-    /// Parses a string specifically as an HTTP request start line.
+    /// Parses a string specifically as an HTTP request start line, or a default request on failure.
     ///
     /// # Arguments
     ///
@@ -158,14 +158,14 @@ impl HttpStartLine {
     /// # Returns
     ///
     /// The parsed HTTP request start line, or a default request if parsing fails.
-    pub fn parse_request<T: AsRef<str>>(line: T) -> Self {
-        Self::try_parse_request(line).unwrap_or_else(|_| {
+    pub fn parse_request_or_default<T: AsRef<str>>(line: T) -> Self {
+        Self::parse_request(line).unwrap_or_else(|_| {
             // Default to a GET request to "/"
             Self::Request(Default::default())
         })
     }
 
-    /// Parses a string specifically as an HTTP response start line.
+    /// Parses a string specifically as an HTTP response start line, or a default response on failure.
     ///
     /// # Arguments
     ///
@@ -174,8 +174,8 @@ impl HttpStartLine {
     /// # Returns
     ///
     /// The parsed HTTP response start line, or a default response if parsing fails.
-    pub fn parse_response<T: AsRef<str>>(line: T) -> Self {
-        Self::try_parse_response(line).unwrap_or_else(|_| {
+    pub fn parse_response_or_default<T: AsRef<str>>(line: T) -> Self {
+        Self::parse_response(line).unwrap_or_else(|_| {
             // Default to HTTP/1.1 200 OK
             Self::Response(Default::default())
         })

@@ -147,9 +147,9 @@ impl HttpMeta {
     // Helper function to parse the start line
     fn parse_start_line(line: &str, is_request: bool) -> HttpStartLine {
         if is_request {
-            HttpStartLine::parse_request(line)
+            HttpStartLine::parse_request_or_default(line)
         } else {
-            HttpStartLine::parse_response(line)
+            HttpStartLine::parse_response_or_default(line)
         }
     }
 
