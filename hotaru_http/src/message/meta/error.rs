@@ -3,8 +3,13 @@
 use core::fmt;
 
 use crate::message::header::HeaderError;
+use crate::message::http_value::StatusCode;
 use crate::message::start_line::StartLineError;
 use crate::util::encoding::EncodingError;
+use crate::util::streamed::Streamed;
+
+/// Ergonomic alias for the read+parse boundary type at meta-parsing functions.
+pub type StreamedMetaError = Streamed<MetaError>;
 
 /// Errors raised while parsing or framing HTTP metadata.
 ///
@@ -76,6 +81,39 @@ impl From<HeaderError> for MetaError {
 impl From<EncodingError> for MetaError {
     fn from(error: EncodingError) -> Self {
         Self::Encoding(error)
+    }
+}
+
+impl MetaError {
+    /// Whether the connection can continue after this error. Header
+    /// boundary-loss variants (owned by MetaError) force `false`; wrapped
+    /// component variants delegate to the component's own policy.
+    pub fn can_continue(&self) -> bool {
+        match self {
+            Self::StartLine(error) => error.can_continue(),
+            Self::Header(error) => error.can_continue(),
+            Self::Encoding(error) => error.can_continue(),
+            // Header block boundary lost — cannot trust where the next request starts.
+            Self::HeaderLineTooLong | Self::HeadersTooLarge | Self::TooManyHeaders => false,
+            Self::InvalidHeader => true,
+        }
+    }
+}
+
+/// Maps a metadata failure to the HTTP status code the aggregate should
+/// serve. Wrapped component variants delegate to the component's own
+/// mapping; meta-owned variants map inline.
+impl From<&MetaError> for StatusCode {
+    fn from(error: &MetaError) -> Self {
+        match error {
+            MetaError::StartLine(error) => StatusCode::from(error),
+            MetaError::Header(error) => StatusCode::from(error),
+            MetaError::Encoding(error) => StatusCode::from(error),
+            MetaError::HeaderLineTooLong
+            | MetaError::HeadersTooLarge
+            | MetaError::TooManyHeaders => StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
+            MetaError::InvalidHeader => StatusCode::BAD_REQUEST,
+        }
     }
 }
 

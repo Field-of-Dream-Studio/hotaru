@@ -83,10 +83,10 @@ impl HttpBody {
         let content_coding = meta
             .get_encoding()
             .map(|encoding| encoding.content().clone())
-            .unwrap_or_default();
-        content_coding
-            .encode_compressed(bin)
-            .map_err(|_| BodyError::InvalidEncoding)
+            .map_err(|error| {
+                BodyError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
+            })?;
+        content_coding.encode_compressed(bin).map_err(BodyError::Io)
     }
 
     /// Returns the raw data from a binary HTTP body.

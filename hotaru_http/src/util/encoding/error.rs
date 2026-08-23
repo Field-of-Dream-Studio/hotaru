@@ -2,6 +2,8 @@
 
 use core::fmt;
 
+use crate::message::http_value::StatusCode;
+
 /// Errors from parsing or validating a Transfer-Encoding / Content-Encoding header.
 #[derive(Debug)]
 #[non_exhaustive]
@@ -112,6 +114,48 @@ impl std::error::Error for CompressionError {
 }
 
 impl std::error::Error for CompressionFailure {}
+
+impl EncodingError {
+    /// Chunked framing violations force the socket to close (smuggling
+    /// class per RFC 9112 §6.1). Other coding rejections are safe to
+    /// respond to and keep the socket.
+    pub fn can_continue(&self) -> bool {
+        match self {
+            Self::DuplicateChunked | Self::CodingAfterChunked => false,
+            _ => true,
+        }
+    }
+}
+
+impl From<&EncodingError> for StatusCode {
+    fn from(error: &EncodingError) -> Self {
+        match error {
+            EncodingError::UnsupportedTransferCoding(_) => StatusCode::NOT_IMPLEMENTED,
+            EncodingError::UnsupportedContentCoding(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            _ => StatusCode::BAD_REQUEST,
+        }
+    }
+}
+
+impl CompressionError {
+    /// Compression-apply failures happen after body framing is intact 
+    /// respond and keep the socket.
+    pub fn can_continue(&self) -> bool {
+        true
+    }
+}
+
+impl From<&CompressionError> for StatusCode {
+    fn from(error: &CompressionError) -> Self {
+        match error {
+            CompressionError::DecodedBodyTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            CompressionError::Unavailable(_) | CompressionError::UnsupportedCoding(_) => {
+                StatusCode::UNSUPPORTED_MEDIA_TYPE
+            }
+            _ => StatusCode::BAD_REQUEST,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
