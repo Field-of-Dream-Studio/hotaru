@@ -24,8 +24,8 @@
 //! // Parse from headers
 //! let encoding = HttpEncoding::from_headers(
 //!     Some("chunked".to_string()),
-//!     Some("br".to_string())
-//! );
+//!     Some("br".to_string()),
+//! ).unwrap();
 //!
 //! // Check if chunked encoding is used
 //! assert!(encoding.transfer().is_chunked());

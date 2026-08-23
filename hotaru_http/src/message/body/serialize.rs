@@ -126,10 +126,9 @@ mod tests {
     #[tokio::test]
     async fn returns_content_coding_failure() {
         let mut meta = HttpMeta::default();
-        meta.set_encoding(Some(HttpEncoding::from_headers(
-            None,
-            Some("compress".to_string()),
-        )));
+        meta.set_encoding(Some(
+            HttpEncoding::from_headers(None, Some("compress".to_string())).unwrap(),
+        ));
 
         let result = HttpBody::Text("hello".to_string())
             .into_static(&mut meta)

@@ -1,15 +1,11 @@
 use super::HttpMeta;
+use super::error::MetaError;
 use crate::util::encoding::HttpEncoding;
 
 impl HttpMeta {
-    /// Gets the HTTP encoding (both transfer and content encoding) from the HTTP meta data.
-    ///
-    /// Returns the cached encoding if available, otherwise parses
-    /// the transfer-encoding and content-encoding headers from the headers map.
-    ///
-    /// # Returns
-    ///
-    /// * `Option<HttpEncoding>` - The HTTP encodings, or None if not available.
+    /// Returns the cached encoding, otherwise parses the Transfer-Encoding
+    /// and Content-Encoding headers. Missing headers yield an identity
+    /// encoding; invalid Transfer-Encoding framing returns an error.
     ///
     /// # Examples
     ///
@@ -18,29 +14,23 @@ impl HttpMeta {
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("chunked")]);
-    /// headers.insert("content-encoding".to_string(), vec![HeaderValue::new("gzip")]);
+    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("chunked"));
+    /// headers.insert("content-encoding".to_string(), HeaderValue::new("gzip"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
-    /// let encoding = meta.get_encoding();
-    /// assert!(encoding.is_some());
-    /// let encoding = encoding.unwrap();
+    /// let encoding = meta.get_encoding().unwrap();
     /// assert!(encoding.transfer().is_chunked());
     /// assert!(!encoding.content().is_identity());
     /// ```
-    pub fn get_encoding(&mut self) -> Option<HttpEncoding> {
+    pub fn get_encoding(&mut self) -> Result<HttpEncoding, MetaError> {
         if let Some(ref enc) = self.encoding {
-            return Some(enc.clone());
+            return Ok(enc.clone());
         }
         self.parse_encoding()
     }
 
-    /// Parses the Transfer-Encoding and Content-Encoding headers from the headers map
-    /// and stores them in the encoding field.
-    ///
-    /// # Returns
-    ///
-    /// * `Option<HttpEncoding>` - The parsed HTTP encodings
+    /// Parses the Transfer-Encoding and Content-Encoding headers and caches
+    /// the result. Missing headers yield an identity encoding.
     ///
     /// # Examples
     ///
@@ -49,18 +39,15 @@ impl HttpMeta {
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("chunked")]);
-    /// headers.insert("content-encoding".to_string(), vec![HeaderValue::new("br")]);
+    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("chunked"));
+    /// headers.insert("content-encoding".to_string(), HeaderValue::new("br"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
-    /// let encoding = meta.parse_encoding();
-    /// assert!(encoding.is_some());
-    /// let encoding = encoding.unwrap();
+    /// let encoding = meta.parse_encoding().unwrap();
     /// assert!(encoding.transfer().is_chunked());
     /// assert_eq!(encoding.content().to_header(), "br");
     /// ```
-    pub fn parse_encoding(&mut self) -> Option<HttpEncoding> {
-        // Get header values as comma-separated strings
+    pub fn parse_encoding(&mut self) -> Result<HttpEncoding, MetaError> {
         let transfer_header = self
             .header
             .get("transfer-encoding")
@@ -71,9 +58,10 @@ impl HttpMeta {
             .get("content-encoding")
             .map(|values| values.first());
 
-        let encoding = HttpEncoding::from_headers(transfer_header, content_header);
+        let encoding = HttpEncoding::from_headers(transfer_header, content_header)
+            .map_err(MetaError::from)?;
         self.encoding = Some(encoding.clone());
-        Some(encoding)
+        Ok(encoding)
     }
 
     /// Sets the encoding field with both transfer and content encodings

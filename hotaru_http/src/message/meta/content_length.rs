@@ -62,6 +62,28 @@ impl HttpMeta {
         Ok(length)
     }
 
+    /// Returns the request's declared Content-Length in bytes.
+    ///
+    /// Absent Content-Length is treated as 0 per RFC 9112 §6.3 (request
+    /// without framing headers has zero-length body). Use this on the request
+    /// path; response bodies without Content-Length can be close-delimited
+    /// and need different handling.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use hotaru_http::meta::HttpMeta;
+    ///
+    /// let mut meta = HttpMeta::default();
+    /// assert_eq!(meta.get_content_length_request().unwrap(), 0);
+    ///
+    /// meta.set_content_length(42);
+    /// assert_eq!(meta.get_content_length_request().unwrap(), 42);
+    /// ```
+    pub fn get_content_length_request(&mut self) -> Result<u64, MetaError> {
+        Ok(self.get_content_length()?.unwrap_or(0))
+    }
+
     /// Sets the cached Content-Length.
     ///
     /// # Examples
@@ -165,6 +187,26 @@ mod tests {
         assert!(matches!(
             err,
             MetaError::Header(HeaderError::HeaderValueOverflow(ref name)) if name == "content-length"
+        ));
+    }
+
+    #[test]
+    fn get_content_length_request_treats_absent_as_zero() {
+        let mut meta = HttpMeta::default();
+        assert_eq!(meta.get_content_length_request().unwrap(), 0);
+
+        let mut meta_with_value =
+            meta_with("content-length", HeaderValue::Single("42".to_string()));
+        assert_eq!(meta_with_value.get_content_length_request().unwrap(), 42);
+    }
+
+    #[test]
+    fn get_content_length_request_propagates_parse_errors() {
+        let mut meta = meta_with("content-length", HeaderValue::Single("abc".to_string()));
+        let err = meta.get_content_length_request().unwrap_err();
+        assert!(matches!(
+            err,
+            MetaError::Header(HeaderError::InvalidHeaderValue(ref name)) if name == "content-length"
         ));
     }
 
