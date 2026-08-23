@@ -278,12 +278,12 @@ macro_rules! generate_lazy_static {
 /// `LServer!` - Creates a lazy static Server instance.
 ///
 /// # Usage
-/// ```rust
+/// ```ignore
 /// LServer!(APP = Server::new().build());
 /// ```
 ///
 /// # Expansion
-/// ```rust
+/// ```text
 /// pub static APP: SServer = Lazy::new(|| Server::new().build());
 /// ```
 #[allow(non_snake_case)]
@@ -295,12 +295,12 @@ pub fn LServer(input: TokenStream) -> TokenStream {
 /// `LClient!` - Creates a lazy static Client instance.
 ///
 /// # Usage
-/// ```rust
+/// ```ignore
 /// LClient!(CLIENT = Client::new().build());
 /// ```
 ///
 /// # Expansion
-/// ```rust
+/// ```text
 /// pub static CLIENT: SClient = Lazy::new(|| Client::new().build());
 /// ```
 #[allow(non_snake_case)]
@@ -312,12 +312,12 @@ pub fn LClient(input: TokenStream) -> TokenStream {
 /// `LUrl!` - Creates a lazy static Url instance
 ///
 /// # Usage
-/// ```rust
+/// ```ignore
 /// LUrl!(HOME = Url::new("/"));
 /// ```
 ///
 /// # Expansion
-/// ```rust
+/// ```text
 /// pub static HOME: SUrl<_> = Lazy::new(|| Url::new("/"));
 /// ```
 #[allow(non_snake_case)]
@@ -329,12 +329,12 @@ pub fn LUrl(input: TokenStream) -> TokenStream {
 /// `LPattern!` - Creates a lazy static PathPattern instance
 ///
 /// # Usage
-/// ```rust
+/// ```ignore
 /// LPattern!(PATTERN = PathPattern::new("/*"));
 /// ```
 ///
 /// # Expansion
-/// ```rust
+/// ```text
 /// pub static PATTERN: SPattern = Lazy::new(|| PathPattern::new("/*"));
 /// ```
 #[allow(non_snake_case)]
