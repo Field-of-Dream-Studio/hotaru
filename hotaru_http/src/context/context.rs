@@ -282,20 +282,18 @@ impl<TS: TransportSpec> HttpContext<TS> {
         if let Some(ep) = endpoint.get_params::<HttpSafety>() {
             config.update(&ep);
         }
-        let content_length = self
-            .request
-            .meta
-            .get_content_length()
-            .map_err(|error| HttpError::InvalidHeader(error.to_string()))?
-            .unwrap_or(0);
+        let content_length = self.request.meta.get_content_length()?.unwrap_or(0);
         if content_length > config.effective_body_size() as u64 {
-            return Err(HttpError::PayloadTooLarge);
+            return Err(HttpError::Body(BodyError::TooLarge));
         }
         if !config.check_method(&self.request.meta.method()) {
             return Err(HttpError::MethodNotAllowed);
         }
-        if !config.check_content_type(&self.request.meta.get_content_type().unwrap_or_default()) {
-            return Err(HttpError::UnsupportedMediaType);
+        let content_type = self.request.meta.get_content_type().unwrap_or_default();
+        if !config.check_content_type(&content_type) {
+            return Err(HttpError::Body(BodyError::UnsupportedContentType(
+                content_type.to_string(),
+            )));
         }
         return Ok(());
     }

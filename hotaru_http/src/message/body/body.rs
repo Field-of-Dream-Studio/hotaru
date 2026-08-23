@@ -51,9 +51,9 @@ impl HttpBody {
         buf_reader: &mut R,
         header: &mut HttpMeta,
         parse_config: &HttpSafety,
-    ) -> Result<Self, BodyError> {
+    ) -> Result<Self, crate::protocol::HttpError> {
         let buffer = Self::read_buffer(buf_reader, header, parse_config).await?;
-        buffer.parse_buffer(parse_config)
+        Ok(buffer.parse_buffer(parse_config)?)
     }
 
     pub async fn read_binary_info<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(

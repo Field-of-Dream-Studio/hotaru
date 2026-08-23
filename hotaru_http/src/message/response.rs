@@ -79,7 +79,7 @@ impl HttpResponse {
     pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(
         self,
         writer: &mut W,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), crate::protocol::HttpError> {
         io::send(self.meta, self.body, writer).await
     }
 

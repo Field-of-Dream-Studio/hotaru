@@ -178,7 +178,7 @@ where
         //    (no per-request HashMap lookup against RuntimeConfig).
         let request = match channel.parse_request(channel.safety()).await {
             Ok(request) => request,
-            Err(error @ HttpError::InvalidHeader(_)) => {
+            Err(error) if matches!(&error, HttpError::Meta(_) | HttpError::Body(_)) => {
                 channel.send_response(error_response_from(&error)).await?;
                 return Ok(ProtocolFlow::Close);
             }
@@ -254,7 +254,10 @@ where
         mut ctx: Self::Context,
     ) -> Result<Self::Context, <Self::Context as RequestContext>::Error> {
         let channel = ctx.channel().cloned().ok_or_else(|| {
-            HttpError::ProtocolViolation("outpoint channel is not installed".to_string())
+            HttpError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotConnected,
+                "outpoint channel is not installed",
+            ))
         })?;
 
         let safety = ctx.safety.clone();

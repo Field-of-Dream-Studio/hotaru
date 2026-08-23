@@ -79,8 +79,8 @@ impl HttpMeta {
     /// let mut meta = HttpMeta::default();
     /// let encoding = HttpEncoding::from_headers(
     ///     Some("chunked".to_string()),
-    ///     Some("gzip".to_string())
-    /// );
+    ///     Some("gzip".to_string()),
+    /// ).unwrap();
     ///
     /// meta.set_encoding(Some(encoding.clone()));
     ///
