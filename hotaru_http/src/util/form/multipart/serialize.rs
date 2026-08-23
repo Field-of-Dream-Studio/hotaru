@@ -1,6 +1,6 @@
 use crate::message::http_value::ContentDisposition;
 
-use super::form::{MultiForm, MultiFormField};
+use super::{MultiForm, MultiFormField};
 
 /// Serializes a [`MultiForm`] into a multipart string representation using the specified boundary.
 pub fn serialize_multipart(form: &MultiForm, boundary: &str) -> String {

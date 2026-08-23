@@ -57,4 +57,21 @@ impl fmt::Display for MultipartError {
     }
 }
 
-impl std::error::Error for MultipartError {}
+impl core::error::Error for MultipartError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MultiFormFieldError {
+    ContentTypeError,
+    NoFile,
+}
+
+impl core::error::Error for MultiFormFieldError {}
+
+impl fmt::Display for MultiFormFieldError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ContentTypeError => formatter.write_str("Wrong Content Type!"),
+            Self::NoFile => formatter.write_str("404 Not Found!"),
+        }
+    }
+}

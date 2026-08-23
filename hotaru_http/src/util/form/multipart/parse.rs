@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::message::http_value::ContentDisposition;
 
 use super::error::MultipartError;
-use super::form::{MultiForm, MultiFormField, MultiFormFieldFile};
+use super::{MultiForm, MultiFormField, MultiFormFieldFile};
 
 /// Finds a subsequence within a larger sequence of bytes.
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -137,7 +137,11 @@ pub fn parse_multipart(
                 content.to_vec(),
             );
             match form_map.get_mut(&field_name) {
-                Some(field) => field.insert_file(file),
+                Some(field) => field.insert_file(file).map_err(|_| {
+                    MultipartError::InvalidData(
+                        "multipart field contains mixed text and file values".to_string(),
+                    )
+                })?,
                 None => {
                     form_map.insert(field_name, MultiFormField::new_file(file));
                 }

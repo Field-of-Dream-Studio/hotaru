@@ -26,7 +26,7 @@ fn test_parse_valid_multipart() {
         Some("example.txt".to_string())
     );
     assert_eq!(
-        form.get_first_file_content("file1").unwrap(),
+        form.get_first_file_content("file1").unwrap().unwrap(),
         b"file content here"
     );
 }
@@ -146,7 +146,7 @@ fn test_round_trip_serialization() {
         Some("doc.txt".to_string())
     );
     assert_eq!(
-        parsed.get_first_file_content("file").unwrap(),
+        parsed.get_first_file_content("file").unwrap().unwrap(),
         b"hello world"
     );
 }
