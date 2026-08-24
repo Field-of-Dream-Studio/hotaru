@@ -6,6 +6,47 @@ use crate::message::http_value::StatusCode;
 use crate::util::encoding::{CompressionError, EncodingError};
 use crate::util::streamed::Streamed;
 
+/// Errors raised while decoding a chunked-transfer body at read time.
+///
+/// The apply-time counterpart of `EncodingError`'s parse-time chunked
+/// framing variants (`DuplicateChunked`, `CodingAfterChunked`).
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ChunkingError {
+    /// Chunk size line exceeded the configured per-line limit.
+    LineTooLong,
+    /// Chunk size was not valid hex (per RFC 9112 §7.1).
+    InvalidSize,
+    /// Chunk data was not terminated by CRLF.
+    InvalidTerminator,
+}
+
+impl fmt::Display for ChunkingError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LineTooLong => formatter.write_str("chunk size line exceeds maximum length"),
+            Self::InvalidSize => formatter.write_str("invalid chunk size"),
+            Self::InvalidTerminator => formatter.write_str("invalid chunk terminator"),
+        }
+    }
+}
+
+impl std::error::Error for ChunkingError {}
+
+impl ChunkingError {
+    /// Chunked framing violations force the socket to close — once the byte
+    /// stream is desynchronised we can no longer trust the next request boundary.
+    pub fn can_continue(&self) -> bool {
+        false
+    }
+}
+
+impl From<&ChunkingError> for StatusCode {
+    fn from(_: &ChunkingError) -> Self {
+        StatusCode::BAD_REQUEST
+    }
+}
+
 /// Ergonomic alias for the read+parse boundary type at body-parsing functions.
 pub type StreamedBodyError = Streamed<BodyError>;
 
@@ -21,6 +62,7 @@ pub type StreamedBodyError = Streamed<BodyError>;
 ///   `UrlEncodedError` / `MultipartError`. After PR #55 merges, these variants
 ///   should be replaced by `Form(UrlEncodedError)` / `Multipart(MultipartError)`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum BodyError {
     /// A required request body was not supplied.
     Missing,
@@ -48,6 +90,8 @@ pub enum BodyError {
     Encoding(EncodingError),
     /// Applying a content coding to the body payload failed.
     Compression(CompressionError),
+    /// Chunked transfer-encoding framing was violated at body-read time.
+    Chunking(ChunkingError),
 }
 
 impl fmt::Display for BodyError {
@@ -74,6 +118,7 @@ impl fmt::Display for BodyError {
             Self::IncompleteBody => formatter.write_str("request body is incomplete"),
             Self::Encoding(error) => fmt::Display::fmt(error, formatter),
             Self::Compression(error) => fmt::Display::fmt(error, formatter),
+            Self::Chunking(error) => fmt::Display::fmt(error, formatter),
         }
     }
 }
@@ -83,6 +128,7 @@ impl std::error::Error for BodyError {
         match self {
             Self::Encoding(error) => Some(error),
             Self::Compression(error) => Some(error),
+            Self::Chunking(error) => Some(error),
             _ => None,
         }
     }
@@ -100,6 +146,12 @@ impl From<CompressionError> for BodyError {
     }
 }
 
+impl From<ChunkingError> for BodyError {
+    fn from(error: ChunkingError) -> Self {
+        Self::Chunking(error)
+    }
+}
+
 impl BodyError {
     /// Whether the connection can continue after this error. Wrapped
     /// component variants delegate; `IncompleteBody` forces `false` because
@@ -108,7 +160,10 @@ impl BodyError {
         match self {
             Self::Encoding(error) => error.can_continue(),
             Self::Compression(error) => error.can_continue(),
-            Self::IncompleteBody => false,
+            Self::Chunking(error) => error.can_continue(),
+            // Body too large: RFC recommends closing since the client will keep
+            // sending body bytes. IncompleteBody: reader is mid-stream.
+            Self::TooLarge | Self::IncompleteBody => false,
             _ => true,
         }
     }
@@ -121,6 +176,7 @@ impl From<&BodyError> for StatusCode {
         match error {
             BodyError::Encoding(error) => StatusCode::from(error),
             BodyError::Compression(error) => StatusCode::from(error),
+            BodyError::Chunking(error) => StatusCode::from(error),
             BodyError::TooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             BodyError::MissingContentType | BodyError::UnsupportedContentType(_) => {
                 StatusCode::UNSUPPORTED_MEDIA_TYPE

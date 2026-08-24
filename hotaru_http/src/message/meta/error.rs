@@ -99,11 +99,14 @@ impl MetaError {
             Self::StartLine(error) => error.can_continue(),
             Self::Header(error) => error.can_continue(),
             Self::Encoding(error) => error.can_continue(),
-            // Header block boundary lost — cannot trust where the next request starts.
-            Self::HeaderLineTooLong | Self::HeadersTooLarge | Self::TooManyHeaders => false,
+            // Header block boundary lost or the parser desynchronised —
+            // cannot trust where the next request starts.
+            Self::HeaderLineTooLong
+            | Self::HeadersTooLarge
+            | Self::TooManyHeaders
+            | Self::InvalidHeader => false,
             // Framing ambiguity — smuggling class.
             Self::ConflictingFraming => false,
-            Self::InvalidHeader => true,
         }
     }
 }

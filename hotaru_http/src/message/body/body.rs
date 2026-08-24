@@ -1,4 +1,4 @@
-use crate::message::body::BodyError;
+use crate::message::body::{BodyError, ChunkingError};
 use crate::message::meta::MetaError;
 use crate::protocol::HttpError;
 use crate::security::safety::HttpSafety;
@@ -117,9 +117,8 @@ impl HttpBody {
                     .read_line(&mut size_line, safety_setting.effective_line_length())
                     .await?;
                 if outcome.termination == TransferTermination::CapReached {
-                    return Err(HttpError::Io(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "Chunk size line exceeds maximum length",
+                    return Err(HttpError::Body(BodyError::Chunking(
+                        ChunkingError::LineTooLong,
                     )));
                 }
                 let chunk_size_str = size_line.trim_end_matches(|c| c == '\r' || c == '\n');
@@ -128,12 +127,8 @@ impl HttpBody {
                     chunk_size_str.split(';').next().unwrap_or("").trim_end();
 
                 // Parse chunk size (validates hex format - critical for preventing crashes)
-                let chunk_size = usize::from_str_radix(chunk_size_str, 16).map_err(|_| {
-                    HttpError::Io(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "Invalid chunk size",
-                    ))
-                })?;
+                let chunk_size = usize::from_str_radix(chunk_size_str, 16)
+                    .map_err(|_| HttpError::Body(BodyError::Chunking(ChunkingError::InvalidSize)))?;
 
                 if chunk_size == 0 {
                     break; // End of chunks
@@ -154,9 +149,8 @@ impl HttpBody {
                 let mut crlf = [0; 2];
                 buf_reader.read_exact(&mut crlf).await?;
                 if crlf != [b'\r', b'\n'] {
-                    return Err(HttpError::Io(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "Invalid chunk terminator",
+                    return Err(HttpError::Body(BodyError::Chunking(
+                        ChunkingError::InvalidTerminator,
                     )));
                 }
             }

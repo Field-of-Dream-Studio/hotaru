@@ -4,4 +4,4 @@ mod parse;
 mod serialize;
 
 pub use body::HttpBody;
-pub use error::{BodyError, StreamedBodyError};
+pub use error::{BodyError, ChunkingError, StreamedBodyError};
