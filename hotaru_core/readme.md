@@ -388,7 +388,7 @@ Hotaru is built on a modular architecture:
 ## AI-assisted development
 
 Definitions and component declarations are maintained in
-[GOVERNANCE.md](https://github.com/Field-of-Dream-Studio/hotaru/blob/main/GOVERNANCE.md#3-ai-declarations).
+[POLICY.md](https://github.com/Field-of-Dream-Studio/hotaru/blob/main/POLICY.md#5-ai-declarations).
 
 ## 📄 License
 

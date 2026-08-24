@@ -16,24 +16,24 @@
 \begin{document}
 
 \begin{center}
-  {\LARGE\bfseries Project-StarFall Code Quality Assurance Record}\\[0.25em]
+  {\LARGE\bfseries FDS Code Quality Assurance Record}\\[0.25em]
   {\large Cover Sheet}
 \end{center}
 
-The questioner completes one cover sheet per pull request and attaches copies
-of \texttt{qa\_sup.pdf} to record questions and evaluations.
+Complete one cover sheet per PR requiring live QA. Attach \texttt{qa\_sup.pdf}
+sheets as needed. See the forms README for full completion rules.
 
 \begin{enumerate}[leftmargin=*,itemsep=0.15em,topsep=0.4em]
-  \item Print and complete by hand in ink.
-  \item Conduct the QA live on a real-time meeting platform. The PR author
-        must answer live without AI assistance and must not complete this record.
-  \item The questioner must be the next technical authority as defined in
-        GOVERNANCE.md.
-  \item Keep the original for four months after merge. The Project Maintainer
-        may request delivery within the first three months; the Hotaru
-        maintenance team covers the fee. Failure to produce a requested
-        original may be referred for governance review.
-  \item Write in English, Japanese, Traditional Chinese, or Simplified Chinese.
+  \item Complete by hand in ink, without AI assistance, in English, Japanese,
+        Traditional Chinese, or Simplified Chinese.
+  \item Record every applicable value. Use \texttt{N/A} with a reason only when
+        a field cannot apply; write the accurate value if no choice applies.
+  \item The assigned questioner conducts QA live and completes this record.
+        The PR author answers without AI assistance and must not complete it.
+  \item The questioner keeps the original for four months after merge. During
+        the first three months, the Project Maintainer may request delivery;
+        the project shall pay all fees incurred by delivery. Failure to produce
+        it may trigger governance review.
 \end{enumerate}
 
 \formsection{I. Pull request details}
@@ -42,8 +42,8 @@ of \texttt{qa\_sup.pdf} to record questions and evaluations.
   \textbf{Project:}       & \hrulefill & \textbf{Repository:}    & \hrulefill \\[0.9em]
   \textbf{PR number:}     & \hrulefill & \textbf{Target branch:} & \hrulefill \\[0.9em]
   \textbf{PR author:}     & \hrulefill & \textbf{Questioner:}    & \hrulefill \\[0.9em]
-  \textbf{Family:}        & \hrulefill & \textbf{Component:}     & \hrulefill \\[0.9em]
-  \textbf{Date:}          & \hrulefill & \textbf{Pages attached:}& \hrulefill
+  \textbf{Families:}      & \hrulefill & \textbf{Components:}    & \hrulefill \\[0.9em]
+  \textbf{Date:}          & \hrulefill & \textbf{Supplementary pages:} & \hrulefill
 \end{tabularx}
 
 \formsection{II. Review conditions}
@@ -51,24 +51,24 @@ of \texttt{qa\_sup.pdf} to record questions and evaluations.
 Mark every statement that applies.
 
 \begin{itemize}[label={},leftmargin=0pt,itemsep=0.25em,topsep=0.35em]
-  \item \checkbox\ The questioner is the responsible Component, Family, or
-        Project Maintainer.
-  \item \checkbox\ The questioner did not author the code being reviewed.
+  \item \checkbox\ The questioner is assigned under POLICY.md and project
+        GOVERNANCE.md.
+  \item \checkbox\ The questioner did not author the work being reviewed.
   \item \checkbox\ The change introduces or alters a public module, type,
         trait, function, or other stable API.
   \item \checkbox\ The PR author's completed Update Report has been received.
 \end{itemize}
 
-\textbf{PR's declared AI tier:}\quad
+\textbf{Applicable AI tier(s):}\quad
 \checkbox\ Forbidden \quad
 \checkbox\ Author-Owned \quad
 \checkbox\ Human-Led \quad
 \checkbox\ Co-Authored
 
-\formsection{III. Declarations}
+\formsection{III. Declaration}
 
 \textbf{Questioner declaration.} I conducted this QA live with the PR author
-on a real-time meeting platform. I reviewed and understand the code covered by
+on a real-time meeting platform. I reviewed and understand the work covered by
 this record. The PR author answered every question live without AI assistance
 and did not complete this document. I completed this record by hand in ink
 without AI assistance.
