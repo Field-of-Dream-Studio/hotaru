@@ -1,6 +1,5 @@
 use std::fmt::Write;
 
-use hotaru_core::connection::error::ConnectionError;
 use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
 
 use crate::message::body::HttpBody;
@@ -13,7 +12,7 @@ pub async fn parse_lazy<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>
     config: &HttpSafety,
     is_request: bool,
     print_raw: bool,
-) -> Result<(HttpMeta, HttpBody), ConnectionError> {
+) -> Result<(HttpMeta, HttpBody), HttpError> {
     // Create one BufReader up-front, pass this throughout.
     let mut meta = HttpMeta::from_stream(stream, config, print_raw, is_request).await?;
 

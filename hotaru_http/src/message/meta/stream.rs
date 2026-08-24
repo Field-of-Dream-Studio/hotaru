@@ -1,8 +1,9 @@
 use super::HttpMeta;
-use crate::connection::error::ConnectionError;
+use super::error::{MetaError, StreamedMetaError};
 use crate::message::header::{HeaderMap, HeaderValue};
 use crate::message::start_line::HttpStartLine;
 use crate::security::safety::HttpSafety;
+use crate::util::streamed::Streamed;
 use hotaru_core::connection::{HotaruBufRead, TransferTermination};
 use std::collections::HashMap;
 
@@ -12,15 +13,13 @@ impl HttpMeta {
         config: &HttpSafety,
         print_raw: bool,
         is_request: bool,
-    ) -> Result<HttpMeta, ConnectionError> {
-        let mut headers = Self::header_lines_raw_from_stream(buf_reader, config, print_raw)
-            .await
-            .map_err(|_| ConnectionError::BadRequest(format!("Failed to read headers")))?;
+    ) -> Result<HttpMeta, StreamedMetaError> {
+        let mut headers =
+            Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
 
         if headers.is_empty() {
-            return Err(ConnectionError::BadRequest(format!(
-                "Empty {}",
-                if is_request { "request" } else { "response" }
+            return Err(Streamed::Err(MetaError::from(
+                crate::message::start_line::StartLineError::Empty,
             )));
         }
 
@@ -40,13 +39,10 @@ impl HttpMeta {
         if meta.header.contains_key("content-length")
             && meta.header.contains_key("transfer-encoding")
         {
-            return Err(ConnectionError::BadRequest(
-                "Content-Length cannot be combined with Transfer-Encoding".to_string(),
-            ));
+            return Err(Streamed::Err(MetaError::ConflictingFraming));
         }
 
-        meta.parse_content_length()
-            .map_err(|error| ConnectionError::BadRequest(error.to_string()))?;
+        meta.parse_content_length().map_err(Streamed::Err)?;
 
         Ok(meta)
     }
@@ -55,18 +51,14 @@ impl HttpMeta {
         buf_reader: &mut R,
         config: &HttpSafety,
         print_raw: bool,
-    ) -> Result<Vec<String>, ConnectionError> {
+    ) -> Result<Vec<String>, StreamedMetaError> {
         let mut headers = Vec::new();
         let mut total_header_size = 0;
 
         // Try to fill the buffer with a single read first
-        let buffer = buf_reader
-            .fill_buf()
-            .await
-            .map_err(|_| ConnectionError::InternalServerError(format!("Failed to fill buffer")))?;
+        let buffer = buf_reader.fill_buf().await?;
 
         // Fast path: Check if we got all headers in one go
-        // Extract result first, then drop buffer borrow before calling consume
         let fast_path_result = Self::extract_headers_from_buffer(buffer, config);
 
         if let Some((header_lines, headers_end)) = fast_path_result {
@@ -78,17 +70,17 @@ impl HttpMeta {
             // Process headers from buffer
             for line in header_lines {
                 if !config.check_line_length(line.len()) {
-                    return Err(ConnectionError::BadRequest(format!("Header line too long")));
+                    return Err(Streamed::Err(MetaError::HeaderLineTooLong));
                 }
 
-                total_header_size += line.len() + 2; // +2 for CRLF 
+                total_header_size += line.len() + 2; // +2 for CRLF
 
                 if !config.check_header_size(total_header_size) {
-                    return Err(ConnectionError::BadRequest(format!("Headers too large")));
+                    return Err(Streamed::Err(MetaError::HeadersTooLarge));
                 }
 
                 if !config.check_headers_count(headers.len()) {
-                    return Err(ConnectionError::BadRequest(format!("Too many headers")));
+                    return Err(Streamed::Err(MetaError::TooManyHeaders));
                 }
 
                 // Strip CRLF injection and store
@@ -99,7 +91,7 @@ impl HttpMeta {
             // Consume the processed data from the buffer
             buf_reader.consume(headers_end);
         } else {
-            // Slow path: read headers line by line as before
+            // Slow path: read headers line by line
             if print_raw {
                 println!("Slow path: reading headers line by line");
             }
@@ -110,7 +102,7 @@ impl HttpMeta {
                     .read_line(&mut line, config.effective_line_length())
                     .await?;
                 if outcome.termination == TransferTermination::CapReached {
-                    return Err(ConnectionError::PayloadTooLarge);
+                    return Err(Streamed::Err(MetaError::HeaderLineTooLong));
                 }
                 let bytes_read = outcome.transferred;
                 if print_raw {
@@ -118,7 +110,6 @@ impl HttpMeta {
                 }
 
                 if bytes_read == 0 || line.trim_end().is_empty() {
-                    // println!("[End of headers] No more lines to read, 0 bytes read {}, empty line: {}", bytes_read, line.trim_end().is_empty());
                     break; // End of headers
                 }
 
@@ -126,14 +117,12 @@ impl HttpMeta {
 
                 // Enforce max header size limit
                 if !config.check_header_size(total_header_size) {
-                    // println!("[Headers too large] Total header size: {}, allowed: {}", total_header_size, config.effective_header_size());
-                    return Err(ConnectionError::PayloadTooLarge);
+                    return Err(Streamed::Err(MetaError::HeadersTooLarge));
                 }
 
                 // Enforce max number of headers
                 if !config.check_headers_count(headers.len()) {
-                    // println!("[Too many headers] Current header count: {}", headers.len());
-                    return Err(ConnectionError::PayloadTooLarge);
+                    return Err(Streamed::Err(MetaError::TooManyHeaders));
                 }
 
                 // Strip CRLF injection and store the header
@@ -158,13 +147,6 @@ impl HttpMeta {
     fn parse_headers(header_lines: Vec<String>, _is_response: bool) -> HeaderMap {
         let mut headers: HashMap<String, HeaderValue> = HashMap::new();
 
-        // // List of headers that should not be combined (kept as separate values)
-        // // This is especially important for responses with multiple Set-Cookie headers
-        // let non_combinable_headers: HashSet<&str> = [
-        //     "set-cookie",
-        //     // Add other headers that should not be combined if needed
-        // ].iter().cloned().collect();
-
         for line in header_lines {
             if let Some(colon_pos) = line.find(':') {
                 let (key, value) = line.split_at(colon_pos);
@@ -175,19 +157,9 @@ impl HttpMeta {
                 // Remove the colon and trim whitespace from the value
                 let header_value = value[1..].trim().to_string();
 
-                // Check if this is a special header that should not be combined
-                // let is_non_combinable = is_response && non_combinable_headers.contains(header_name.as_str());
-
                 match headers.get_mut(&header_name) {
                     Some(existing_value) => {
                         existing_value.add_without_combining(header_value);
-                        // For special headers like Set-Cookie, add without combining
-                        // if is_non_combinable {
-                        //     existing_value.add_without_combining(header_value);
-                        // } else {
-                        //     // For regular headers, append (typically combined with commas)
-                        //     existing_value.append(header_value);
-                        // }
                     }
                     None => {
                         // First occurrence of this header
@@ -205,45 +177,44 @@ impl HttpMeta {
         buf_reader: &mut R,
         config: &HttpSafety,
         print_raw: bool,
-    ) -> Result<HttpMeta, ConnectionError> {
+    ) -> Result<HttpMeta, StreamedMetaError> {
         Self::from_stream(buf_reader, config, print_raw, true).await
-    }
-
-    pub async fn append_from_request_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
-        &mut self,
-        buf_reader: &mut R,
-        config: &HttpSafety,
-        print_raw: bool,
-    ) -> Result<(), ConnectionError> {
-        let mut headers = Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
-
-        if headers.is_empty() {
-            return Ok(());
-        }
-
-        // Parse the start line
-        let start_line = Self::parse_start_line(&headers.remove(0), true);
-
-        // Parse headers
-        let header = Self::parse_headers(headers, true);
-
-        if print_raw {
-            println!("Parsed request headers: {:?}", header);
-            println!("Parsed request start line: {:?}", start_line);
-        }
-
-        self.start_line = start_line;
-        self.header.extend(header);
-
-        Ok(())
     }
 
     pub async fn from_response_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         buf_reader: &mut R,
         config: &HttpSafety,
         print_raw: bool,
-    ) -> Result<HttpMeta, ConnectionError> {
+    ) -> Result<HttpMeta, StreamedMetaError> {
         Self::from_stream(buf_reader, config, print_raw, false).await
+    }
+
+    /// Reads a bare header block and merges it into `self.header`.
+    /// No start line is parsed — every line is treated as a header.
+    /// Used for chunked trailers and any other header-only append.
+    pub async fn append_headers_from_stream<
+        R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
+    >(
+        &mut self,
+        buf_reader: &mut R,
+        config: &HttpSafety,
+        print_raw: bool,
+    ) -> Result<(), StreamedMetaError> {
+        let headers =
+            Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
+
+        if headers.is_empty() {
+            return Ok(());
+        }
+
+        let header = Self::parse_headers(headers, true);
+
+        if print_raw {
+            println!("Parsed trailers: {:?}", header);
+        }
+
+        self.header.extend(header);
+        Ok(())
     }
 
     /// Helper function to extract complete headers from a buffer if possible

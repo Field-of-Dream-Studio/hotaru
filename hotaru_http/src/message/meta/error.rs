@@ -31,6 +31,9 @@ pub enum MetaError {
     /// A header line was structurally invalid (no `:`, illegal name, etc.).
     InvalidHeader,
 
+    /// Content-Length and Transfer-Encoding both present — smuggling risk.
+    ConflictingFraming,
+
     /// A start-line parse failure.
     StartLine(StartLineError),
 
@@ -48,6 +51,9 @@ impl fmt::Display for MetaError {
             Self::HeadersTooLarge => formatter.write_str("header block too large"),
             Self::TooManyHeaders => formatter.write_str("too many headers"),
             Self::InvalidHeader => formatter.write_str("invalid header line"),
+            Self::ConflictingFraming => {
+                formatter.write_str("Content-Length cannot be combined with Transfer-Encoding")
+            }
             Self::StartLine(error) => fmt::Display::fmt(error, formatter),
             Self::Header(error) => fmt::Display::fmt(error, formatter),
             Self::Encoding(error) => fmt::Display::fmt(error, formatter),
@@ -95,6 +101,8 @@ impl MetaError {
             Self::Encoding(error) => error.can_continue(),
             // Header block boundary lost — cannot trust where the next request starts.
             Self::HeaderLineTooLong | Self::HeadersTooLarge | Self::TooManyHeaders => false,
+            // Framing ambiguity — smuggling class.
+            Self::ConflictingFraming => false,
             Self::InvalidHeader => true,
         }
     }
@@ -112,7 +120,7 @@ impl From<&MetaError> for StatusCode {
             MetaError::HeaderLineTooLong
             | MetaError::HeadersTooLarge
             | MetaError::TooManyHeaders => StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
-            MetaError::InvalidHeader => StatusCode::BAD_REQUEST,
+            MetaError::InvalidHeader | MetaError::ConflictingFraming => StatusCode::BAD_REQUEST,
         }
     }
 }

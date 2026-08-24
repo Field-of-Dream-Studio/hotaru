@@ -1,7 +1,9 @@
 #[cfg(feature = "compression")]
 use hotaru_lib::compression;
 
-use super::{CompressionError, CompressionFailure};
+use super::CompressionError;
+#[cfg(feature = "compression")]
+use super::CompressionFailure;
 
 /// Represents HTTP content coding types as defined in HTTP standards.
 ///

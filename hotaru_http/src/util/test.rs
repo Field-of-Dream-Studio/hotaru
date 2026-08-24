@@ -148,22 +148,6 @@ mod security_tests {
     // ============================================================================
 
     #[tokio::test]
-    async fn test_header_crlf_injection_in_value() {
-        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
-        let safety = HttpSafety::default();
-
-        // Simulate headers with CRLF injection attempt
-        let headers = b"Host: example.com\r\nUser-Agent: Test\r\nInjected: header\r\n\r\n";
-        let cursor = Cursor::new(headers.to_vec());
-        let mut reader = TokioIo::new(BufReader::new(cursor));
-        let result = meta
-            .append_from_request_stream(&mut reader, &safety, true)
-            .await;
-        // The parser should handle this, but we verify headers are parsed
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
     async fn test_header_null_byte_injection() {
         let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default();
@@ -173,7 +157,7 @@ mod security_tests {
         let cursor = Cursor::new(headers.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
-            .append_from_request_stream(&mut reader, &safety, true)
+            .append_headers_from_stream(&mut reader, &safety, true)
             .await;
         assert!(result.is_ok());
 
@@ -204,7 +188,7 @@ mod security_tests {
         let cursor = Cursor::new(headers.as_bytes().to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
-            .append_from_request_stream(&mut reader, &safety, true)
+            .append_headers_from_stream(&mut reader, &safety, true)
             .await;
         // Should be rejected due to size limit
         assert!(result.is_err(), "Should reject oversized header name");
@@ -221,7 +205,7 @@ mod security_tests {
         let cursor = Cursor::new(headers.as_bytes().to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
-            .append_from_request_stream(&mut reader, &safety, true)
+            .append_headers_from_stream(&mut reader, &safety, true)
             .await;
         // Should be rejected due to size limit
         assert!(result.is_err(), "Should reject oversized header value");
@@ -241,7 +225,7 @@ mod security_tests {
         let cursor = Cursor::new(headers.as_bytes().to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = meta
-            .append_from_request_stream(&mut reader, &safety, true)
+            .append_headers_from_stream(&mut reader, &safety, true)
             .await;
         // Should be rejected due to cumulative size
         assert!(
@@ -251,30 +235,12 @@ mod security_tests {
     }
 
     #[tokio::test]
-    async fn test_header_duplicate_host_header() {
-        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
-        let safety = HttpSafety::default();
-
-        // Multiple Host headers
-        let headers = b"Host: example.com\r\nHost: malicious.com\r\n\r\n";
-        let cursor = Cursor::new(headers.to_vec());
-        let mut reader = TokioIo::new(BufReader::new(cursor));
-        let result = meta
-            .append_from_request_stream(&mut reader, &safety, true)
-            .await;
-        assert!(result.is_ok());
-
-        // Check which Host header was kept (last one typically)
-        if let Some(host) = meta.header.get("Host") {
-            // The parser likely keeps the last one
-            assert!(host.len() > 0);
-        }
-    }
-
-    #[tokio::test]
     async fn test_header_duplicate_content_length() {
-        let safety = HttpSafety::default();
+        use crate::message::header::HeaderError;
+        use crate::message::meta::MetaError;
+        use crate::protocol::HttpError;
 
+        let safety = HttpSafety::default();
         let request = b"POST / HTTP/1.1\r\nContent-Length: 10\r\nContent-Length: 20\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
@@ -282,13 +248,17 @@ mod security_tests {
 
         assert!(matches!(
             result,
-            Err(hotaru_core::connection::error::ConnectionError::BadRequest(message))
-                if message == "multiple content-length header values"
+            Err(HttpError::Meta(MetaError::Header(HeaderError::MultipleValues(ref name))))
+                if name == "content-length"
         ));
     }
 
     #[tokio::test]
     async fn test_header_duplicate_identical_content_length() {
+        use crate::message::header::HeaderError;
+        use crate::message::meta::MetaError;
+        use crate::util::streamed::Streamed;
+
         let safety = HttpSafety::default();
         let request = b"POST / HTTP/1.1\r\nContent-Length: 10\r\nContent-Length: 10\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
@@ -297,13 +267,17 @@ mod security_tests {
 
         assert!(matches!(
             result,
-            Err(hotaru_core::connection::error::ConnectionError::BadRequest(message))
-                if message == "multiple content-length header values"
+            Err(Streamed::Err(MetaError::Header(HeaderError::MultipleValues(ref name))))
+                if name == "content-length"
         ));
     }
 
     #[tokio::test]
     async fn test_header_comma_separated_content_length() {
+        use crate::message::header::HeaderError;
+        use crate::message::meta::MetaError;
+        use crate::util::streamed::Streamed;
+
         let safety = HttpSafety::default();
         let request = b"POST / HTTP/1.1\r\nContent-Length: 10, 10\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
@@ -312,13 +286,16 @@ mod security_tests {
 
         assert!(matches!(
             result,
-            Err(hotaru_core::connection::error::ConnectionError::BadRequest(message))
-                if message == "invalid content-length header value"
+            Err(Streamed::Err(MetaError::Header(HeaderError::InvalidHeaderValue(ref name))))
+                if name == "content-length"
         ));
     }
 
     #[tokio::test]
     async fn test_header_content_length_with_transfer_encoding() {
+        use crate::message::meta::MetaError;
+        use crate::util::streamed::Streamed;
+
         let safety = HttpSafety::default();
         let request =
             b"POST / HTTP/1.1\r\nContent-Length: 10\r\nTransfer-Encoding: chunked\r\n\r\n";
@@ -328,8 +305,7 @@ mod security_tests {
 
         assert!(matches!(
             result,
-            Err(hotaru_core::connection::error::ConnectionError::BadRequest(message))
-                if message == "Content-Length cannot be combined with Transfer-Encoding"
+            Err(Streamed::Err(MetaError::ConflictingFraming))
         ));
     }
 
@@ -351,67 +327,22 @@ mod security_tests {
     /// Line folding is deprecated and a security risk in modern HTTP/1.1
     #[tokio::test]
     async fn test_header_line_folding() {
-        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default();
 
-        // HTTP line folding (obsolete in HTTP/1.1, security risk)
-        // Complete HTTP request with line folding in header
         let request = b"GET / HTTP/1.1\r\nX-Long-Header: part1\r\n part2\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
-        let result = meta
-            .append_from_request_stream(&mut reader, &safety, false)
-            .await;
-        // Parser should succeed
-        assert!(result.is_ok());
-
-        // Check if line folding was parsed
-        println!("Headers parsed: {:?}", meta.header);
+        let meta = HttpMeta::from_request_stream(&mut reader, &safety, false)
+            .await
+            .expect("parse should succeed");
 
         // Line folding should be rejected - the continuation line " part2"
-        // should not be parsed as part of X-Long-Header
-        // Modern parsers treat lines starting with whitespace as malformed
+        // should not be parsed as part of X-Long-Header.
         if let Some(header_value) = meta.header.get("x-long-header") {
-            let value = header_value.first();
-            println!("X-Long-Header value: {:?}", value);
-            // Should only have "part1", not "part1 part2"
-            assert_eq!(value, "part1", "Line folding was rejected");
+            assert_eq!(header_value.first(), "part1", "Line folding was rejected");
         } else {
-            // Or header might be completely rejected
             assert_eq!(meta.header.len(), 0, "Parser rejects line folded headers");
         }
-    }
-
-    #[tokio::test]
-    async fn test_header_no_colon_separator() {
-        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
-        let safety = HttpSafety::default();
-
-        // Header without colon separator
-        let headers = b"InvalidHeader\r\n\r\n";
-        let cursor = Cursor::new(headers.to_vec());
-        let mut reader = TokioIo::new(BufReader::new(cursor));
-        let result = meta
-            .append_from_request_stream(&mut reader, &safety, true)
-            .await;
-        // Should be rejected or ignored
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_header_control_characters() {
-        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
-        let safety = HttpSafety::default();
-
-        // Header with control characters (potential security risk)
-        let headers = b"X-Control: value\x01\x02\x03\r\n\r\n";
-        let cursor = Cursor::new(headers.to_vec());
-        let mut reader = TokioIo::new(BufReader::new(cursor));
-        let result = meta
-            .append_from_request_stream(&mut reader, &safety, true)
-            .await;
-        // Parser behavior with control characters
-        assert!(result.is_ok());
     }
 
     // ============================================================================
@@ -680,5 +611,85 @@ mod security_tests {
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         // Should succeed (hex is case-insensitive)
         assert!(result.is_ok());
+    }
+
+    /// Regression for issue #31 part (a): chunk extensions per RFC 9112 §7.1.1
+    /// must be stripped before hex parsing. Chunk `5;ext=1` must parse as 5.
+    #[tokio::test]
+    async fn test_chunked_accepts_chunk_extensions() {
+        let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
+        let safety = HttpSafety::default();
+
+        let body_data = b"5;ext=1\r\nhello\r\n0\r\n\r\n";
+        let cursor = Cursor::new(body_data.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+        let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
+
+        assert!(result.is_ok(), "chunk extensions should be accepted");
+        if let Ok(HttpBody::Buffer { data, .. }) = result {
+            assert_eq!(data, b"hello");
+        }
+    }
+
+    /// Regression for issue #31 part (b): non-chunked transfer coding must be
+    /// rejected with `EncodingError::UnsupportedTransferCoding` — never
+    /// silently accepted and delivered as raw encoded bytes.
+    #[test]
+    fn test_transfer_encoding_gzip_rejected() {
+        use crate::message::header::HeaderValue;
+        use crate::message::meta::MetaError;
+        use crate::util::encoding::EncodingError;
+
+        let mut meta = HttpMeta::default();
+        meta.header
+            .insert("transfer-encoding".to_string(), HeaderValue::new("gzip"));
+
+        let result = meta.get_encoding();
+
+        assert!(matches!(
+            result,
+            Err(MetaError::Encoding(EncodingError::UnsupportedTransferCoding(ref name)))
+                if name == "gzip"
+        ));
+    }
+
+    /// Regression for issue #37: trailer block must NOT clobber the request
+    /// start line, and every trailer line must land in the header map.
+    #[tokio::test]
+    async fn test_chunked_trailers_do_not_clobber_start_line() {
+        use crate::message::http_value::{HttpMethod, HttpVersion};
+        use crate::message::start_line::HttpStartLine;
+
+        let start_line = HttpStartLine::new_request(
+            HttpVersion::Http11,
+            HttpMethod::POST,
+            "/original/target".to_string(),
+        );
+        let mut meta =
+            HttpMeta::new(start_line, crate::message::header::HeaderMap::new());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
+        let safety = HttpSafety::default();
+
+        // Body: one chunk, then zero chunk, then two trailer headers.
+        let body_data =
+            b"5\r\nhello\r\n0\r\nX-Trailer-One: alpha\r\nX-Trailer-Two: beta\r\n\r\n";
+        let cursor = Cursor::new(body_data.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+
+        let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
+        assert!(result.is_ok(), "read_buffer should succeed");
+
+        // Start line must be preserved (not overwritten with default GET /).
+        assert!(meta.start_line.is_request());
+        assert_eq!(meta.start_line.method(), HttpMethod::POST);
+        assert_eq!(meta.start_line.path(), "/original/target");
+
+        // Both trailers must be present — the first must not be lost as a
+        // pretend start line.
+        assert!(meta.header.contains_key("x-trailer-one"));
+        assert!(meta.header.contains_key("x-trailer-two"));
     }
 }

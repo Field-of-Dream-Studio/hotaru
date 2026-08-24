@@ -121,21 +121,24 @@ impl TransferCodings {
     ///
     /// let mut codings = TransferCodings::new();
     ///
-    /// // Add a non-chunked coding
-    /// codings.push(TransferCoding::Other("gzip".into())).unwrap();
-    ///
-    /// // Add chunked coding (must be last)
+    /// // Chunked is the only supported transfer coding.
     /// codings.push(TransferCoding::Chunked).unwrap();
     ///
-    /// // Cannot add another coding after chunked
-    /// assert!(codings.push(TransferCoding::Other("compress".into())).is_err());
+    /// // Unknown transfer codings are rejected (RFC 9112 §6.1).
+    /// let mut codings = TransferCodings::new();
+    /// assert!(codings.push(TransferCoding::Other("gzip".into())).is_err());
     ///
-    /// // Cannot add chunked twice
+    /// // Chunked cannot appear twice.
     /// let mut codings = TransferCodings::new();
     /// codings.push(TransferCoding::Chunked).unwrap();
     /// assert!(codings.push(TransferCoding::Chunked).is_err());
     /// ```
     pub fn push(&mut self, coding: TransferCoding) -> Result<(), EncodingError> {
+        // Reject unknown transfer codings — RFC 9112 §6.1: server MUST return
+        // 501 Not Implemented for a Transfer-Encoding it cannot honor.
+        if let TransferCoding::Other(name) = &coding {
+            return Err(EncodingError::UnsupportedTransferCoding(name.to_string()));
+        }
         if matches!(coding, TransferCoding::Chunked) {
             if self
                 .codings
@@ -212,10 +215,9 @@ impl TransferCodings {
     /// # use hotaru_http::encoding::{TransferCodings, TransferCoding};
     ///
     /// let mut codings = TransferCodings::new();
-    /// codings.push(TransferCoding::Other("gzip".into())).unwrap();
     /// codings.push(TransferCoding::Chunked).unwrap();
     ///
-    /// assert_eq!(codings.to_header(), "gzip, chunked");
+    /// assert_eq!(codings.to_header(), "chunked");
     /// ```
     pub fn to_header(&self) -> String {
         self.codings
