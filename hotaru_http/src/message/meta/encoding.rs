@@ -10,7 +10,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::header::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -35,7 +36,8 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::header::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -98,11 +100,12 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::header::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("chunked")]);
+    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("chunked"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// // Parse the value into cache
@@ -112,7 +115,7 @@ impl HttpMeta {
     /// meta.clear_encoding();
     ///
     /// // Header is still intact and will be re-parsed
-    /// assert!(meta.get_encoding().is_some());
+    /// assert!(meta.get_encoding().is_ok());
     /// ```
     pub fn clear_encoding(&mut self) {
         self.encoding = None;
@@ -125,12 +128,13 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::header::HeaderValue;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("transfer-encoding".to_string(), vec![HeaderValue::new("gzip")]);
-    /// headers.insert("content-encoding".to_string(), vec![HeaderValue::new("br")]);
+    /// headers.insert("transfer-encoding".to_string(), HeaderValue::new("gzip"));
+    /// headers.insert("content-encoding".to_string(), HeaderValue::new("br"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// // Delete both cache and headers

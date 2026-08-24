@@ -16,8 +16,8 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::header::HeaderValue;
-    /// # use hotaru_http::http_value::{HttpStartLine, HttpVersion, HttpMethod};
+    /// # use hotaru_http::start_line::HttpStartLine;
+    /// # use hotaru_http::http_value::{HttpVersion, HttpMethod};
     /// use std::collections::HashMap;
     ///
     /// // Create a request meta
@@ -29,7 +29,7 @@ impl HttpMeta {
     ///     ),
     ///     HashMap::new()
     /// );
-    /// meta.set_header("host", "example.com");
+    /// meta.set_attribute("host", "example.com");
     ///
     /// let http_string = meta.represent();
     /// assert!(http_string.starts_with("GET /index.html HTTP/1.1\r\n"));

@@ -1,0 +1,139 @@
+name: hotaru-io-rt
+
+on:
+  push:
+    branches:
+      - master
+      - 'theme/**'
+  pull_request:
+    branches:
+      - master
+      - 'theme/**'
+
+concurrency:
+  group: hotaru-io-rt-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Host `cargo check` + `cargo test` with each crate's default feature set.
+  # Every io / rt crate compiles on the host under its defaults:
+  #   * hotaru_io_tokio / hotaru_io_futures / hotaru_rt_tokio → `std`
+  #   * hotaru_io_embedded / hotaru_rt_embassy → `embedded + spawn_local`
+  #     (embedded here is `no_std` in the crate, but its integration tests
+  #     live in `tests/` and link against std, so `cargo test` still works.)
+  host:
+    name: ${{ matrix.crate }} default
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - hotaru_io_tokio
+          - hotaru_io_futures
+          - hotaru_io_embedded
+          - hotaru_rt_tokio
+          - hotaru_rt_embassy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check ${{ matrix.crate }}
+        run: cargo check -p ${{ matrix.crate }}
+      - name: Test ${{ matrix.crate }}
+        run: cargo test -p ${{ matrix.crate }}
+
+  # Non-default feature combinations that must still typecheck. The `std` /
+  # `embedded` axis is mutually exclusive on the embedded crates, so each
+  # combo picks exactly one side plus one spawn mode.
+  feature-matrix:
+    name: ${{ matrix.crate }} / ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Tokio IO — the `std` feature is the only knob; verify no-default-features
+          # with `std` still builds (guards against accidental default-only paths).
+          - crate: hotaru_io_tokio
+            features: std
+          # Futures IO — same story.
+          - crate: hotaru_io_futures
+            features: std
+          # Tokio runtime — same story.
+          - crate: hotaru_rt_tokio
+            features: std
+          # Embedded IO — exercise the spawn_send flavour and the two spawn_local
+          # lock backends on the host (bare-metal linkage is covered below).
+          - crate: hotaru_io_embedded
+            features: embedded,spawn_send
+          - crate: hotaru_io_embedded
+            features: embedded,spawn_local_atomic
+          - crate: hotaru_io_embedded
+            features: embedded,spawn_local_no_atomic
+          - crate: hotaru_io_embedded
+            features: std,spawn_send
+          # Embassy runtime — `std` mode is what the tutorial examples use, and
+          # `embedded` + spawn_send is the multi-threaded embedded path.
+          - crate: hotaru_rt_embassy
+            features: std,spawn_send
+          - crate: hotaru_rt_embassy
+            features: embedded,spawn_send
+          - crate: hotaru_rt_embassy
+            features: embedded,spawn_local_atomic
+          - crate: hotaru_rt_embassy
+            features: embedded,spawn_local_no_atomic
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check ${{ matrix.crate }} feature set
+        run: cargo check -p ${{ matrix.crate }} --no-default-features --features "${{ matrix.features }}"
+
+  # Bare-metal builds for the crates whose reason-to-exist is no_std. Uses
+  # `cargo build` (not `check`) so the linker step actually runs — that is what
+  # catches accidental std dependencies pulled in through a transitive crate.
+  no-std-targets:
+    name: bare-metal ${{ matrix.crate }} / ${{ matrix.target }} / ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # hotaru_io_embedded on ARM Cortex-M4/M7 with FPU — the default
+          # embedded target for STM32F4/F7/H7 and nRF52840-class boards.
+          - crate: hotaru_io_embedded
+            target: thumbv7em-none-eabihf
+            features: embedded,spawn_local
+          - crate: hotaru_io_embedded
+            target: thumbv7em-none-eabihf
+            features: embedded,spawn_local_atomic
+          # RISC-V without atomics — covers the Rc/RefCell lock backend.
+          - crate: hotaru_io_embedded
+            target: riscv32imc-unknown-none-elf
+            features: embedded,spawn_local_no_atomic
+          # hotaru_rt_embassy on the same targets.
+          - crate: hotaru_rt_embassy
+            target: thumbv7em-none-eabihf
+            features: embedded,spawn_local
+          - crate: hotaru_rt_embassy
+            target: thumbv7em-none-eabihf
+            features: embedded,spawn_local_atomic
+          - crate: hotaru_rt_embassy
+            target: riscv32imc-unknown-none-elf
+            features: embedded,spawn_local_no_atomic
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable + bare-metal target
+        run: |
+          rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+          rustup default stable
+      - name: Build ${{ matrix.crate }} for ${{ matrix.target }}
+        run: |
+          cargo build -p ${{ matrix.crate }} \
+            --target ${{ matrix.target }} \
+            --no-default-features \
+            --features "${{ matrix.features }}"

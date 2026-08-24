@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use hotaru_core::connection::{
-    ConnMeta, ConnStream, HotaruRead, HotaruWrite, error::ConnectionError,
+    ConnMeta, ConnStream, HotaruRead, HotaruWrite,
 };
 use hotaru_core::protocol::Channel;
 use tokio::sync::Mutex;
@@ -71,13 +71,9 @@ where
         let mut reader = self.reader.lock().await;
         let request = match HttpRequest::parse_lazy(&mut *reader, safety, false).await {
             Ok(request) => request,
-            Err(ConnectionError::BadRequest(_)) => {
-                self.open.store(false, Ordering::Release);
-                return Err(HttpError::Meta(crate::message::meta::MetaError::InvalidHeader));
-            }
             Err(error) => {
                 self.open.store(false, Ordering::Release);
-                return Err(HttpError::Io(std::io::Error::other(error.to_string())));
+                return Err(error);
             }
         };
 
@@ -116,13 +112,9 @@ where
         let mut reader = self.reader.lock().await;
         let response = match HttpResponse::parse_lazy(&mut *reader, safety, false).await {
             Ok(response) => response,
-            Err(ConnectionError::BadRequest(_)) => {
-                self.open.store(false, Ordering::Release);
-                return Err(HttpError::Meta(crate::message::meta::MetaError::InvalidHeader));
-            }
             Err(error) => {
                 self.open.store(false, Ordering::Release);
-                return Err(HttpError::Io(std::io::Error::other(error.to_string())));
+                return Err(error);
             }
         };
 

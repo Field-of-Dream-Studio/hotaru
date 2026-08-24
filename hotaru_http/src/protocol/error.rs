@@ -113,6 +113,12 @@ impl From<CompressionError> for HttpError {
     }
 }
 
+impl From<crate::message::body::ChunkingError> for HttpError {
+    fn from(error: crate::message::body::ChunkingError) -> Self {
+        Self::Body(BodyError::from(error))
+    }
+}
+
 // ── From: Streamed<E> → HttpError ─────────────────────────────────────
 //
 // The load-bearing edge: any `Streamed<E>` where `E: Into<HttpError>`

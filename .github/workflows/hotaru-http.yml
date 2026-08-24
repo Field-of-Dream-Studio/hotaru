@@ -1,0 +1,73 @@
+name: hotaru-http
+
+on:
+  push:
+    branches:
+      - master
+      - 'theme/**'
+  pull_request:
+    branches:
+      - master
+      - 'theme/**'
+
+concurrency:
+  group: hotaru-http-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  default:
+    name: default features
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check hotaru_http default features
+        run: cargo check -p hotaru_http
+
+  # Non-default feature combinations. `hotaru_http` is Tokio/std-only today, so
+  # the meaningful axes are `tokio` (turns on std + spawn_send + io_tokio/std),
+  # `tls`, and `compression`. `std`, `io_tokio`, and `spawn_send` are covered
+  # implicitly by the `tokio` combo, but we also probe them individually so a
+  # broken cfg gate on any single feature surfaces here rather than in the wild.
+  feature-matrix:
+    name: ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - std
+          - spawn_send
+          - io_tokio
+          - tokio
+          - tokio,tls
+          - tokio,compression
+          - tokio,tls,compression
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check hotaru_http feature set
+        run: cargo check -p hotaru_http --no-default-features --features "${{ matrix.features }}"
+
+  # Unit + integration tests. Run with the fullest std/Tokio feature set so
+  # every gated test module (TLS handshake helpers, compression codecs, etc.)
+  # is actually exercised.
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Run hotaru_http tests (default features)
+        run: cargo test -p hotaru_http
+      - name: Run hotaru_http tests (tokio,tls,compression)
+        run: cargo test -p hotaru_http --features "tokio,tls,compression"

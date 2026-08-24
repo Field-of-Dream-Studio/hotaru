@@ -117,29 +117,26 @@ impl HttpMeta {
     /// # Examples
     ///
     /// ```rust
-    /// // For a request with a Cookie header
-    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
-    /// # use hotaru_http::http_value::HttpStartLine;
+    /// # use hotaru_http::meta::HttpMeta;
+    /// # use hotaru_http::header::HeaderValue;
+    /// # use hotaru_http::start_line::HttpStartLine;
     /// use std::collections::HashMap;
     ///
+    /// // For a request with a Cookie header
     /// let mut headers = HashMap::new();
     /// headers.insert("cookie".to_string(), HeaderValue::new("sessionId=abc123; theme=dark"));
     /// let mut meta = HttpMeta::new(HttpStartLine::parse_request_or_default("GET / HTTP/1.1"), headers);
     ///
     /// let cookies = meta.parse_cookies();
-    /// assert_eq!(cookies.get("sessionId").unwrap().value, "abc123");
+    /// assert_eq!(cookies.get("sessionId").unwrap().get_value(), "abc123");
     ///
     /// // For a response with Set-Cookie headers
-    /// # use hotaru_http::meta::{HttpMeta, HeaderValue};
-    /// # use hotaru_http::http_value::HttpStartLine;
-    /// use std::collections::HashMap;
-    ///
     /// let mut headers = HashMap::new();
     /// headers.insert("set-cookie".to_string(), HeaderValue::new("sessionId=abc123; Path=/; Secure"));
     /// let mut meta = HttpMeta::new(HttpStartLine::parse_response_or_default("HTTP/1.1 200 OK"), headers);
     ///
     /// let cookies = meta.parse_cookies();
-    /// assert_eq!(cookies.get("sessionId").unwrap().value, "abc123");
+    /// assert_eq!(cookies.get("sessionId").unwrap().get_value(), "abc123");
     /// assert_eq!(cookies.get("sessionId").unwrap().get_path(), Some("/".to_string()));
     /// assert_eq!(cookies.get("sessionId").unwrap().get_secure(), Some(true));
     /// ```
@@ -251,13 +248,13 @@ impl HttpMeta {
     ///
     /// // Parse the value into the cache
     /// let cookies = meta.get_cookies();
-    /// assert_eq!(cookies.get("sessionId").unwrap().value(), "abc123");
+    /// assert_eq!(cookies.get("sessionId").unwrap().get_value(), "abc123");
     ///
     /// // Clear the cache only
     /// meta.clear_cookies();
     ///
     /// // The header is still intact and will be re-parsed
-    /// assert_eq!(meta.get_cookies().get("sessionId").unwrap().value(), "abc123");
+    /// assert_eq!(meta.get_cookies().get("sessionId").unwrap().get_value(), "abc123");
     /// ```
     pub fn clear_cookies(&mut self) {
         self.cookies = None;

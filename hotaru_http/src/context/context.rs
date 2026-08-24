@@ -1,7 +1,6 @@
 use akari::Value;
 use hotaru_core::app::common::{RunMode, RuntimeConfig};
 use hotaru_core::connection::TransportSpec;
-use hotaru_core::connection::error::ConnectionError;
 use hotaru_core::debug_log;
 use hotaru_core::extensions::{Locals, Params};
 use hotaru_core::protocol::{
@@ -222,7 +221,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     pub async fn read_request<R>(
         runtime: Arc<RuntimeConfig>,
         reader: &mut R,
-    ) -> Result<HttpRequest, ConnectionError>
+    ) -> Result<HttpRequest, HttpError>
     where
         R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
     {
