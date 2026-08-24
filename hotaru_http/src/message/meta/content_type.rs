@@ -20,10 +20,10 @@ impl HttpMeta {
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("content-type".to_string(), HeaderValue::new("text/html"));
+    /// headers.insert("content-type".to_string(), HeaderValue::new("text/html; charset=UTF-8"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
-    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::TextHtml));
+    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::TextHtml()));
     /// ```
     pub fn get_content_type(&mut self) -> Option<HttpContentType> {
         if let Some(ref content_type) = self.content_type {
@@ -47,11 +47,11 @@ impl HttpMeta {
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("content-type".to_string(), HeaderValue::new("text/html"));
+    /// headers.insert("content-type".to_string(), HeaderValue::new("text/html; charset=UTF-8"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// let content_type = meta.parse_content_type();
-    /// assert_eq!(content_type, Some(HttpContentType::TextHtml));
+    /// assert_eq!(content_type, Some(HttpContentType::TextHtml()));
     /// ```
     pub fn parse_content_type(&mut self) -> Option<HttpContentType> {
         // Try lowercase first, then uppercase for backward compatibility
@@ -75,9 +75,9 @@ impl HttpMeta {
     /// # use hotaru_http::http_value::HttpContentType;
     ///
     /// let mut meta = HttpMeta::default();
-    /// meta.set_content_type(HttpContentType::ApplicationJson);
+    /// meta.set_content_type(HttpContentType::ApplicationJson());
     ///
-    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::ApplicationJson));
+    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::ApplicationJson()));
     /// ```
     pub fn set_content_type(&mut self, content_type: HttpContentType) {
         self.content_type = Some(content_type);
@@ -101,18 +101,18 @@ impl HttpMeta {
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("content-type".to_string(), HeaderValue::new("text/html"));
+    /// headers.insert("content-type".to_string(), HeaderValue::new("text/html; charset=UTF-8"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// // Parse the value into the cache
     /// let content_type = meta.get_content_type();
-    /// assert_eq!(content_type, Some(HttpContentType::TextHtml));
+    /// assert_eq!(content_type, Some(HttpContentType::TextHtml()));
     ///
     /// // Clear the cache only
     /// meta.clear_content_type();
     ///
     /// // The header is still intact and will be re-parsed
-    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::TextHtml));
+    /// assert_eq!(meta.get_content_type(), Some(HttpContentType::TextHtml()));
     /// ```
     pub fn clear_content_type(&mut self) {
         self.content_type = None;
@@ -134,7 +134,7 @@ impl HttpMeta {
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
-    /// headers.insert("content-type".to_string(), HeaderValue::new("text/html"));
+    /// headers.insert("content-type".to_string(), HeaderValue::new("text/html; charset=UTF-8"));
     /// let mut meta = HttpMeta::new(Default::default(), headers);
     ///
     /// // Delete both the cache and header
@@ -143,8 +143,8 @@ impl HttpMeta {
     /// // The header is gone
     /// assert!(meta.get_header("content-type").is_none());
     ///
-    /// // And get_content_type will now return a default value
-    /// assert_eq!(meta.get_content_type().unwrap(), HttpContentType::from_str(""));
+    /// // And get_content_type will now return None until a new one is set
+    /// assert_eq!(meta.get_content_type(), None);
     /// ```
     pub fn delete_content_type(&mut self) {
         self.content_type = None;

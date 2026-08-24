@@ -123,7 +123,7 @@ impl HttpMeta {
     /// # use hotaru_http::meta::HttpMeta;
     ///
     /// let mut meta = HttpMeta::default();
-    /// meta.set_header("content-length", "123");
+    /// meta.set_attribute("content-length", "123");
     /// meta.delete_content_length();
     ///
     /// assert!(meta.get_header("content-length").is_none());
