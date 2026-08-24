@@ -2,7 +2,7 @@ use akari::Value;
 
 use crate::message::http_value::HttpContentType;
 use crate::security::safety::HttpSafety;
-use crate::util::form::{MultiForm, UrlEncodedForm};
+use crate::util::form::{MultiForm, MultipartError, UrlEncodedError, UrlEncodedForm};
 
 use super::{BodyError, HttpBody};
 
@@ -26,12 +26,22 @@ impl HttpBody {
             HttpBody::Binary(body)
         }
 
-        fn parse_into_form(body: Vec<u8>) -> HttpBody {
-            HttpBody::Form(UrlEncodedForm::parse(body))
+        fn parse_into_form(body: Vec<u8>) -> Result<HttpBody, BodyError> {
+            UrlEncodedForm::parse(body)
+                .map(HttpBody::Form)
+                .map_err(|err| match err {
+                    UrlEncodedError::InvalidUtf8 => BodyError::InvalidUtf8,
+                    other => BodyError::InvalidForm(other.to_string()),
+                })
         }
 
-        fn parse_into_files(body: Vec<u8>, boundary: String) -> HttpBody {
-            HttpBody::Files(MultiForm::parse(body, boundary))
+        fn parse_into_files(body: Vec<u8>, boundary: String) -> Result<HttpBody, BodyError> {
+            MultiForm::parse(body, boundary)
+                .map(HttpBody::Files)
+                .map_err(|err| match err {
+                    MultipartError::InvalidUtf8 => BodyError::InvalidUtf8,
+                    other => BodyError::InvalidMultipart(other.to_string()),
+                })
         }
 
         match self {
@@ -62,7 +72,7 @@ impl HttpBody {
                     HttpContentType::Application { subtype, .. }
                         if subtype == "x-www-form-urlencoded" =>
                     {
-                        Ok(parse_into_form(data))
+                        parse_into_form(data)
                     }
                     HttpContentType::Multipart { subtype, boundary } if subtype == "form-data" => {
                         let boundary = boundary.ok_or_else(|| {
@@ -70,7 +80,7 @@ impl HttpBody {
                                 "multipart/form-data boundary is missing".to_string(),
                             )
                         })?;
-                        Ok(parse_into_files(data, boundary))
+                        parse_into_files(data, boundary)
                     }
                     _ => Ok(parse_into_binary(data)),
                 }
@@ -92,6 +102,25 @@ mod tests {
         HttpBody::Buffer {
             data,
             content_type: HttpContentType::ApplicationJson(),
+            content_coding: ContentCodings::new(),
+        }
+    }
+
+    fn buffered_form(data: Vec<u8>) -> HttpBody {
+        HttpBody::Buffer {
+            data,
+            content_type: HttpContentType::ApplicationUrlEncodedForm(),
+            content_coding: ContentCodings::new(),
+        }
+    }
+
+    fn buffered_multi.part(data: Vec<u8>, boundary: Option<String>) -> HttpBody {
+        HttpBody::Buffer {
+            data,
+            content_type: HttpContentType::Multipart {
+                subtype: "form-data".to_string(),
+                boundary,
+            },
             content_coding: ContentCodings::new(),
         }
     }
@@ -120,6 +149,67 @@ mod tests {
 
         assert!(matches!(&error, BodyError::InvalidJson(_)));
         assert!(!error.to_string().contains("secret-token"));
+    }
+
+    #[test]
+    fn parses_valid_form() {
+        let body = buffered_form(b"name=Hotaru&version=1".to_vec())
+            .parse_buffer(&HttpSafety::new())
+            .unwrap();
+
+        assert!(matches!(body, HttpBody::Form(_)));
+    }
+
+    #[test]
+    fn rejects_malformed_form() {
+        let result = buffered_form(b"malformed_without_equals".to_vec())
+            .parse_buffer(&HttpSafety::new());
+
+        assert!(matches!(result, Err(BodyError::InvalidForm(_))));
+    }
+
+    #[test]
+    fn rejects_invalid_utf8_form() {
+        let result = buffered_form(vec![0xff, 0xfe]).parse_buffer(&HttpSafety::new());
+
+        assert!(matches!(result, Err(BodyError::InvalidUtf8)));
+    }
+
+    #[test]
+    fn parses_valid_multipart() {
+        let payload = concat!(
+            "--boundary\r\n",
+            "Content-Disposition: form-data; name=\"field\"\r\n\r\n",
+            "value\r\n",
+            "--boundary--\r\n"
+        )
+        .as_bytes()
+        .to_vec();
+
+        let body = buffered_multipart(payload, Some("boundary".to_string()))
+            .parse_buffer(&HttpSafety::new())
+            .unwrap();
+
+        assert!(matches!(body, HttpBody::Files(_)));
+    }
+
+    #[test]
+    fn rejects_multipart_missing_boundary_param() {
+        let result = buffered_multipart(b"data".to_vec(), None)
+            .parse_buffer(&HttpSafety::new());
+
+        assert!(matches!(result, Err(BodyError::InvalidMultipart(_))));
+    }
+
+    #[test]
+    fn rejects_malformed_multipart_body() {
+        let result = buffered_multipart(
+            b"no boundaries here".to_vec(),
+            Some("boundary".to_string()),
+        )
+        .parse_buffer(&HttpSafety::new());
+
+        assert!(matches!(result, Err(BodyError::InvalidMultipart(_))));
     }
 
     #[test]

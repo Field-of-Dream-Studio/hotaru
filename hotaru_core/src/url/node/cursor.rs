@@ -86,10 +86,15 @@ where
 
     /// Walk from a sub-tree node.
     pub fn from_node(node: Arc<UrlNode<C, TS>>) -> Self {
+        Self::from_node_with_state(node, PartialState::NotStart)
+    }
+
+    /// Walk from a sub-tree node, resuming child matching at `state`.
+    pub fn from_node_with_state(node: Arc<UrlNode<C, TS>>, state: PartialState) -> Self {
         Self {
             frames: vec![WalkFrame {
                 node: FrameNode::Node(node),
-                state: PartialState::NotStart,
+                state,
             }],
         }
     }
