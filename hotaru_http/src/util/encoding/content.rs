@@ -1,6 +1,8 @@
 #[cfg(feature = "compression")]
 use hotaru_lib::compression;
 
+use super::{CompressionError, CompressionFailure};
+
 /// Represents HTTP content coding types as defined in HTTP standards.
 ///
 /// Content codings are compression algorithms applied to the message body.
@@ -92,58 +94,72 @@ impl ContentCoding {
         encoding: &ContentCoding,
         data: &[u8],
         max_size: usize,
-    ) -> std::io::Result<Vec<u8>> {
+    ) -> Result<Vec<u8>, CompressionError> {
         match encoding {
             #[cfg(feature = "compression")]
-            ContentCoding::Gzip => compression::decompress_gzip(data, max_size),
+            ContentCoding::Gzip => compression::decompress_gzip(data, max_size)
+                .map_err(|_| CompressionError::DecodeFailed(CompressionFailure::InvalidStream)),
             #[cfg(feature = "compression")]
-            ContentCoding::Deflate => compression::decompress_deflate(data, max_size),
+            ContentCoding::Deflate => compression::decompress_deflate(data, max_size)
+                .map_err(|_| CompressionError::DecodeFailed(CompressionFailure::InvalidStream)),
             #[cfg(feature = "compression")]
-            ContentCoding::Brotli => compression::decompress_brotli(data, max_size),
+            ContentCoding::Brotli => compression::decompress_brotli(data, max_size)
+                .map_err(|_| CompressionError::DecodeFailed(CompressionFailure::InvalidStream)),
             #[cfg(feature = "compression")]
-            ContentCoding::Zstd => compression::decompress_zstd(data, max_size),
+            ContentCoding::Zstd => compression::decompress_zstd(data, max_size)
+                .map_err(|_| CompressionError::DecodeFailed(CompressionFailure::InvalidStream)),
             #[cfg(not(feature = "compression"))]
-            ContentCoding::Gzip
-            | ContentCoding::Deflate
-            | ContentCoding::Brotli
-            | ContentCoding::Zstd => {
+            ContentCoding::Gzip => {
                 let _ = max_size;
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Unsupported,
-                    "compression feature not enabled",
-                ))
+                Err(CompressionError::Unavailable("gzip"))
             }
-            ContentCoding::Compress => Err(std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
-                "compress encoding not supported",
-            )),
-            _ => Ok(data.to_vec()), // Identity or unsupported
+            #[cfg(not(feature = "compression"))]
+            ContentCoding::Deflate => {
+                let _ = max_size;
+                Err(CompressionError::Unavailable("deflate"))
+            }
+            #[cfg(not(feature = "compression"))]
+            ContentCoding::Brotli => {
+                let _ = max_size;
+                Err(CompressionError::Unavailable("br"))
+            }
+            #[cfg(not(feature = "compression"))]
+            ContentCoding::Zstd => {
+                let _ = max_size;
+                Err(CompressionError::Unavailable("zstd"))
+            }
+            ContentCoding::Compress => Err(CompressionError::Unavailable("compress")),
+            _ => Ok(data.to_vec()), // Identity or unknown coding — pass through.
         }
     }
 
-    pub fn encode_compressed(encoding: &ContentCoding, data: &[u8]) -> std::io::Result<Vec<u8>> {
+    pub fn encode_compressed(
+        encoding: &ContentCoding,
+        data: &[u8],
+    ) -> Result<Vec<u8>, CompressionError> {
         match encoding {
             #[cfg(feature = "compression")]
-            ContentCoding::Gzip => compression::compress_gzip(data),
+            ContentCoding::Gzip => compression::compress_gzip(data)
+                .map_err(|_| CompressionError::EncodeFailed(CompressionFailure::InvalidStream)),
             #[cfg(feature = "compression")]
-            ContentCoding::Deflate => compression::compress_deflate(data),
+            ContentCoding::Deflate => compression::compress_deflate(data)
+                .map_err(|_| CompressionError::EncodeFailed(CompressionFailure::InvalidStream)),
             #[cfg(feature = "compression")]
-            ContentCoding::Brotli => compression::compress_brotli(data),
+            ContentCoding::Brotli => compression::compress_brotli(data)
+                .map_err(|_| CompressionError::EncodeFailed(CompressionFailure::InvalidStream)),
             #[cfg(feature = "compression")]
-            ContentCoding::Zstd => compression::compress_zstd(data, 1),
+            ContentCoding::Zstd => compression::compress_zstd(data, 1)
+                .map_err(|_| CompressionError::EncodeFailed(CompressionFailure::InvalidStream)),
             #[cfg(not(feature = "compression"))]
-            ContentCoding::Gzip
-            | ContentCoding::Deflate
-            | ContentCoding::Brotli
-            | ContentCoding::Zstd => Err(std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
-                "compression feature not enabled",
-            )),
-            ContentCoding::Compress => Err(std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
-                "compress encoding not supported",
-            )),
-            _ => Ok(data.to_vec()), // Identity or unsupported
+            ContentCoding::Gzip => Err(CompressionError::Unavailable("gzip")),
+            #[cfg(not(feature = "compression"))]
+            ContentCoding::Deflate => Err(CompressionError::Unavailable("deflate")),
+            #[cfg(not(feature = "compression"))]
+            ContentCoding::Brotli => Err(CompressionError::Unavailable("br")),
+            #[cfg(not(feature = "compression"))]
+            ContentCoding::Zstd => Err(CompressionError::Unavailable("zstd")),
+            ContentCoding::Compress => Err(CompressionError::Unavailable("compress")),
+            _ => Ok(data.to_vec()), // Identity or unknown coding — pass through.
         }
     }
 }
@@ -250,7 +266,11 @@ impl ContentCodings {
     ///
     /// A `Result` containing the decompressed data as a `Vec<u8>`, or an error
     /// if decoding fails or the output exceeds `max_size`.
-    pub fn decode_compressed(&self, data: Vec<u8>, max_size: usize) -> std::io::Result<Vec<u8>> {
+    pub fn decode_compressed(
+        &self,
+        data: Vec<u8>,
+        max_size: usize,
+    ) -> Result<Vec<u8>, CompressionError> {
         if self.is_identity() {
             return Ok(data);
         }
@@ -281,7 +301,7 @@ impl ContentCodings {
     /// let result = codings.encode_compressed(data.clone()).unwrap();
     /// assert_eq!(result, data);
     /// ```
-    pub fn encode_compressed(&self, data: Vec<u8>) -> std::io::Result<Vec<u8>> {
+    pub fn encode_compressed(&self, data: Vec<u8>) -> Result<Vec<u8>, CompressionError> {
         if self.is_identity() {
             return Ok(data);
         }

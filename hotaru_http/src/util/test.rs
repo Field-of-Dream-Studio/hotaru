@@ -283,7 +283,7 @@ mod security_tests {
         assert!(matches!(
             result,
             Err(hotaru_core::connection::error::ConnectionError::BadRequest(message))
-                if message == "multiple Content-Length values"
+                if message == "multiple content-length header values"
         ));
     }
 
@@ -298,7 +298,7 @@ mod security_tests {
         assert!(matches!(
             result,
             Err(hotaru_core::connection::error::ConnectionError::BadRequest(message))
-                if message == "multiple Content-Length values"
+                if message == "multiple content-length header values"
         ));
     }
 
@@ -313,7 +313,7 @@ mod security_tests {
         assert!(matches!(
             result,
             Err(hotaru_core::connection::error::ConnectionError::BadRequest(message))
-                if message == "invalid Content-Length"
+                if message == "invalid content-length header value"
         ));
     }
 

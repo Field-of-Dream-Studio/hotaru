@@ -45,7 +45,8 @@ impl HttpMeta {
             ));
         }
 
-        meta.parse_content_length()?;
+        meta.parse_content_length()
+            .map_err(|error| ConnectionError::BadRequest(error.to_string()))?;
 
         Ok(meta)
     }

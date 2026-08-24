@@ -40,7 +40,9 @@ impl HttpBody {
             content_coding: header
                 .get_encoding()
                 .map(|e| e.content().clone())
-                .unwrap_or_default(),
+                .map_err(|error| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, error)
+                })?,
         })
     }
 
@@ -49,9 +51,9 @@ impl HttpBody {
         buf_reader: &mut R,
         header: &mut HttpMeta,
         parse_config: &HttpSafety,
-    ) -> Result<Self, BodyError> {
+    ) -> Result<Self, crate::protocol::HttpError> {
         let buffer = Self::read_buffer(buf_reader, header, parse_config).await?;
-        buffer.parse_buffer(parse_config)
+        Ok(buffer.parse_buffer(parse_config)?)
     }
 
     pub async fn read_binary_info<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
@@ -206,7 +208,9 @@ impl HttpBody {
         }
 
         // Read raw body data
-        let encoding = header.get_encoding().unwrap_or_default();
+        let encoding = header
+            .get_encoding()
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
         let raw_data = if encoding.transfer().is_chunked() {
             read_chunked_body(buf_reader, header, parse_config).await?
         } else {

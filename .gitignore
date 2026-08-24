@@ -26,6 +26,7 @@ hotaru_core/trans_update.md
 htji3e/
 proposal/*
 ERROR_TYPES.md 
+ISSUE_HTTP_META_SLIM_AND_MIDDLEWARE_EXTRACTORS.md 
 
 # Backup files
 *.swp

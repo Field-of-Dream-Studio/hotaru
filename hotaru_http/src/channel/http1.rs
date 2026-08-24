@@ -71,13 +71,13 @@ where
         let mut reader = self.reader.lock().await;
         let request = match HttpRequest::parse_lazy(&mut *reader, safety, false).await {
             Ok(request) => request,
-            Err(ConnectionError::BadRequest(message)) => {
+            Err(ConnectionError::BadRequest(_)) => {
                 self.open.store(false, Ordering::Release);
-                return Err(HttpError::InvalidHeader(message));
+                return Err(HttpError::Meta(crate::message::meta::MetaError::InvalidHeader));
             }
             Err(error) => {
                 self.open.store(false, Ordering::Release);
-                return Err(HttpError::Connection(error));
+                return Err(HttpError::Io(std::io::Error::other(error.to_string())));
             }
         };
 
@@ -94,7 +94,7 @@ where
 
     async fn send_response(&self, response: HttpResponse) -> Result<(), HttpError> {
         let mut writer = self.writer.lock().await;
-        response.send(&mut *writer).await.map_err(HttpError::Io)?;
+        response.send(&mut *writer).await?;
         writer.flush().await.map_err(HttpError::Io)?;
         Ok(())
     }
@@ -103,7 +103,7 @@ where
         let mut writer = self.writer.lock().await;
         if let Err(err) = request.send(&mut *writer).await {
             self.open.store(false, Ordering::Release);
-            return Err(HttpError::Io(err));
+            return Err(err);
         }
         if let Err(err) = writer.flush().await {
             self.open.store(false, Ordering::Release);
@@ -116,13 +116,13 @@ where
         let mut reader = self.reader.lock().await;
         let response = match HttpResponse::parse_lazy(&mut *reader, safety, false).await {
             Ok(response) => response,
-            Err(ConnectionError::BadRequest(message)) => {
+            Err(ConnectionError::BadRequest(_)) => {
                 self.open.store(false, Ordering::Release);
-                return Err(HttpError::InvalidHeader(message));
+                return Err(HttpError::Meta(crate::message::meta::MetaError::InvalidHeader));
             }
             Err(error) => {
                 self.open.store(false, Ordering::Release);
-                return Err(HttpError::Connection(error));
+                return Err(HttpError::Io(std::io::Error::other(error.to_string())));
             }
         };
 

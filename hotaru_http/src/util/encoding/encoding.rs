@@ -1,4 +1,4 @@
-use super::{ContentCoding, ContentCodings, TransferCoding, TransferCodings};
+use super::{ContentCoding, ContentCodings, EncodingError, TransferCoding, TransferCodings};
 
 /// Combines HTTP transfer and content encodings into a single structure.
 ///
@@ -12,14 +12,10 @@ pub struct HttpEncoding {
 impl HttpEncoding {
     /// Creates a new `HttpEncoding` from HTTP header values.
     ///
-    /// # Arguments
-    ///
-    /// * `transfer_header` - Optional Transfer-Encoding header value
-    /// * `content_header` - Optional Content-Encoding header value
-    ///
-    /// # Returns
-    ///
-    /// A new `HttpEncoding` instance parsed from the provided headers
+    /// Fails with [`EncodingError`] if the Transfer-Encoding header violates
+    /// framing rules (duplicate `chunked` or a coding listed after `chunked`).
+    /// Content-Encoding tokens are accepted lenient — unknown tokens land as
+    /// [`ContentCoding::Other`] and are validated at apply-time.
     ///
     /// # Examples
     ///
@@ -27,24 +23,24 @@ impl HttpEncoding {
     /// # use hotaru_http::encoding::HttpEncoding;
     ///
     /// let encoding = HttpEncoding::from_headers(
-    ///     Some("chunked, gzip".to_string()),
-    ///     Some("br".to_string())
-    /// );
+    ///     Some("chunked".to_string()),
+    ///     Some("br".to_string()),
+    /// ).unwrap();
     ///
     /// assert!(encoding.transfer().is_chunked());
     /// assert!(!encoding.content().is_identity());
     /// ```
-    pub fn from_headers(transfer_header: Option<String>, content_header: Option<String>) -> Self {
+    pub fn from_headers(
+        transfer_header: Option<String>,
+        content_header: Option<String>,
+    ) -> Result<Self, EncodingError> {
         let mut transfer = TransferCodings::new();
         let mut content = ContentCodings::new();
 
         if let Some(header) = transfer_header {
             for part in header.split(',') {
                 if !part.trim().is_empty() {
-                    let coding = TransferCoding::from_string(part);
-                    if let Err(e) = transfer.push(coding) {
-                        eprintln!("[WARN] Invalid Transfer-Encoding: {}", e);
-                    }
+                    transfer.push(TransferCoding::from_string(part))?;
                 }
             }
         }
@@ -57,7 +53,7 @@ impl HttpEncoding {
             }
         }
 
-        Self { transfer, content }
+        Ok(Self { transfer, content })
     }
 
     /// Converts the HTTP encodings to header values.
@@ -75,8 +71,8 @@ impl HttpEncoding {
     ///
     /// let mut encoding = HttpEncoding::from_headers(
     ///     Some("chunked".to_string()),
-    ///     Some("gzip".to_string())
-    /// );
+    ///     Some("gzip".to_string()),
+    /// ).unwrap();
     ///
     /// let (transfer, content) = encoding.to_headers();
     /// assert_eq!(transfer, Some("chunked".to_string()));
@@ -111,8 +107,8 @@ impl HttpEncoding {
     ///
     /// let encoding = HttpEncoding::from_headers(
     ///     Some("chunked".to_string()),
-    ///     None
-    /// );
+    ///     None,
+    /// ).unwrap();
     ///
     /// assert!(encoding.transfer().is_chunked());
     /// ```
@@ -133,8 +129,8 @@ impl HttpEncoding {
     ///
     /// let encoding = HttpEncoding::from_headers(
     ///     None,
-    ///     Some("gzip, br".to_string())
-    /// );
+    ///     Some("gzip, br".to_string()),
+    /// ).unwrap();
     ///
     /// assert!(!encoding.content().is_identity());
     /// ```

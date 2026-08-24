@@ -1,3 +1,5 @@
+use super::error::EncodingError;
+
 /// Represents HTTP transfer coding types as defined in HTTP standards.
 ///
 /// Transfer codings are primarily used to define the message transfer format
@@ -133,21 +135,21 @@ impl TransferCodings {
     /// codings.push(TransferCoding::Chunked).unwrap();
     /// assert!(codings.push(TransferCoding::Chunked).is_err());
     /// ```
-    pub fn push(&mut self, coding: TransferCoding) -> Result<(), &'static str> {
+    pub fn push(&mut self, coding: TransferCoding) -> Result<(), EncodingError> {
         if matches!(coding, TransferCoding::Chunked) {
             if self
                 .codings
                 .iter()
                 .any(|c| matches!(c, TransferCoding::Chunked))
             {
-                return Err("chunked can only appear once");
+                return Err(EncodingError::DuplicateChunked);
             }
         } else if self
             .codings
             .last()
             .is_some_and(|c| matches!(c, TransferCoding::Chunked))
         {
-            return Err("no coding can follow chunked");
+            return Err(EncodingError::CodingAfterChunked);
         }
 
         self.codings.push(coding);

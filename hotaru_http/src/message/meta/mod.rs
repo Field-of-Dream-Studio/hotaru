@@ -11,5 +11,5 @@ mod meta;
 mod serialize;
 mod stream;
 
-pub use error::MetaError;
+pub use error::{MetaError, StreamedMetaError};
 pub use meta::HttpMeta;
