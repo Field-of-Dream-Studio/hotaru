@@ -32,10 +32,8 @@ instructions so that printed forms remain usable offline.
 - `Repository` identifies the repository containing the PR. `PR number` is the
   number assigned by that repository, and `Target branch` is the PR's base
   branch.
-- `Supplementary pages` records the number of attached supplementary pages and
-  excludes the cover sheet. In each page footer, the total includes the
-  cover sheet; number the complete set consecutively beginning with the cover
-  as page 1.
+- In each page footer, the total includes all fixed and attached pages. Number
+  the complete set consecutively beginning with the cover as page 1.
 - The person who signs a record is responsible for the accuracy and technical
   judgment recorded in it.
 
@@ -64,8 +62,6 @@ procedure.
 - **Families and Components:** every affected short name from
   [GOVERNANCE.md](../../GOVERNANCE.md). Do not collapse a cross-family or
   multi-component PR into one value.
-- **Date:** the date on which the PR author completes and signs the report.
-- **Supplementary pages:** the number of attached Update Report detail sheets.
 - **Role:** select the PR author's highest role applicable to any affected scope
   of this PR: Contributor, Reviewer or Steward, Component Maintainer, Family
   Maintainer, or Project Maintainer.
@@ -174,11 +170,6 @@ question sheet are complete.
   [POLICY.md Chapter 2](../../POLICY.md#2-roles-and-ownership).
 - **Families and Components:** every affected short name from
   [GOVERNANCE.md](../../GOVERNANCE.md).
-- **Record date:** the date on which the reviewer completes the record.
-- **Supplementary pages:** the number of attached `qa_sup.pdf` question sheets.
-  The fixed review sheet on page 2 is not included in this field. The total in
-  every page footer includes both fixed pages and all attached question sheets.
-  Write `0` for Trivial Update direct approval.
 - **Reviewer role:** select the Maintainer role under which the reviewer is
   assigned for this PR: Component Maintainer, Family Maintainer, or Project
   Maintainer. Only a Maintainer may be the assigned reviewer.
@@ -194,11 +185,11 @@ question sheet are complete.
   selected row and leave the other row blank; the general `N/A` rule does not
   apply to the unselected row.
 - **Live QA fields:** confirm that Live QA was conducted, record the session
-  date and time with its time zone, record the overall understanding
-  demonstrated by the PR author, select one final decision, state its reason,
-  and select whether follow-up is required. If **Yes** is selected, record the
-  required follow-up separately in the space provided. The overall choices are
-  **Sufficient**, **Partial**, and **Insufficient**.
+  date, record the session time and its time zone, record the overall
+  understanding demonstrated by the PR author, select one final decision,
+  state its reason, and select whether follow-up is required. If **Yes** is
+  selected, record the required follow-up separately in the space provided.
+  The overall choices are **Sufficient**, **Partial**, and **Insufficient**.
 - **Trivial Update fields:** confirm that the entire PR consists only of one or
   more of the enumerated eligible cases, then use **Basis for classification**
   to state why it meets the applicable requirements in `POLICY.md`. The case
