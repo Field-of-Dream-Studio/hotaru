@@ -114,7 +114,7 @@ mod tests {
         }
     }
 
-    fn buffered_multi.part(data: Vec<u8>, boundary: Option<String>) -> HttpBody {
+    fn buffered_multipart(data: Vec<u8>, boundary: Option<String>) -> HttpBody {
         HttpBody::Buffer {
             data,
             content_type: HttpContentType::Multipart {
