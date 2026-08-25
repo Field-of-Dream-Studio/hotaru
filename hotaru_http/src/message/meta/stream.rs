@@ -43,6 +43,9 @@ impl HttpMeta {
         }
 
         meta.parse_content_length().map_err(Streamed::Err)?;
+        meta.parse_connection()
+            .map_err(MetaError::from)
+            .map_err(Streamed::Err)?;
 
         Ok(meta)
     }
@@ -213,6 +216,9 @@ impl HttpMeta {
             println!("Parsed trailers: {:?}", header);
         }
 
+        if header.contains_key("connection") {
+            self.connection = None;
+        }
         self.header.extend(header);
         Ok(())
     }

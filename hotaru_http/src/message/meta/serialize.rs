@@ -105,6 +105,14 @@ impl HttpMeta {
             }
         }
 
+        // Add Connection if a typed value is present.
+        if let Some(ref connection) = self.connection {
+            if let Some(value) = connection.to_header() {
+                result.push_str(&format!("connection: {}\r\n", value));
+                handled_headers.insert("connection".to_string());
+            }
+        }
+
         // Add cookies based on whether this is a request or response
         if let Some(ref cookies) = self.cookies {
             if self.start_line.is_request() {

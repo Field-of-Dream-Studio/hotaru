@@ -2,30 +2,9 @@
 
 use hotaru_core::protocol::ProtocolError;
 
-use crate::message::http_value::StatusCode;
-use crate::message::request::HttpRequest;
+use crate::message::http_value::StatusCode; 
 use crate::message::response::{HttpResponse, response_templates};
-use crate::protocol::error::HttpError;
-
-/// Check whether the HTTP request indicates keep-alive should be used.
-pub fn is_keep_alive(request: &HttpRequest) -> bool {
-    if let Some(connection) = request.meta.header.get("connection") {
-        connection.as_str().to_lowercase() != "close"
-    } else {
-        // HTTP/1.1 defaults to keep-alive
-        true
-    }
-}
-
-/// Check whether an HTTP response allows the channel to remain open.
-pub fn is_response_keep_alive(response: &HttpResponse) -> bool {
-    if let Some(connection) = response.meta.header.get("connection") {
-        connection.as_str().to_lowercase() != "close"
-    } else {
-        // HTTP/1.1 defaults to keep-alive
-        true
-    }
-}
+use crate::protocol::error::HttpError; 
 
 /// Build a minimal HTML error page body for the given status code.
 ///

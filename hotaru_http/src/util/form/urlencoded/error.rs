@@ -2,6 +2,8 @@
 
 use core::fmt;
 
+use crate::message::http_value::StatusCode;
+
 /// An error produced while parsing a URL-encoded form body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UrlEncodedError {
@@ -23,3 +25,16 @@ impl fmt::Display for UrlEncodedError {
 }
 
 impl std::error::Error for UrlEncodedError {}
+
+impl UrlEncodedError {
+    /// Body-content parse failures don't lose reader sync — keep the socket.
+    pub fn can_continue(&self) -> bool {
+        true
+    }
+}
+
+impl From<&UrlEncodedError> for StatusCode {
+    fn from(_: &UrlEncodedError) -> Self {
+        StatusCode::BAD_REQUEST
+    }
+}

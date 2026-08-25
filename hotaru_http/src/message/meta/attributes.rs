@@ -5,6 +5,7 @@ use crate::message::http_value::HttpMethod;
 impl HttpMeta {
     pub fn set_header_hashmap(&mut self, header: impl Into<HeaderMap>) {
         self.header = header.into();
+        self.connection = None;
     }
 
     /// Returns the hashed, unparsed header.
@@ -22,8 +23,11 @@ impl HttpMeta {
 
     ///
     pub fn set_attribute<T: Into<String>, S: Into<HeaderValue>>(&mut self, key: T, value: S) {
-        self.header
-            .insert(key.into().trim().to_lowercase(), value.into());
+        let key = key.into().trim().to_lowercase();
+        if key == "connection" {
+            self.connection = None;
+        }
+        self.header.insert(key, value.into());
     }
 
     pub fn get_path(&mut self, part: usize) -> String {
