@@ -2,6 +2,8 @@
 
 use core::fmt;
 
+use crate::message::http_value::StatusCode;
+
 /// An error produced while parsing a multipart form body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MultipartError {
@@ -58,6 +60,19 @@ impl fmt::Display for MultipartError {
 }
 
 impl core::error::Error for MultipartError {}
+
+impl MultipartError {
+    /// Body-content parse failures don't lose reader sync — keep the socket.
+    pub fn can_continue(&self) -> bool {
+        true
+    }
+}
+
+impl From<&MultipartError> for StatusCode {
+    fn from(_: &MultipartError) -> Self {
+        StatusCode::BAD_REQUEST
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MultiFormFieldError {

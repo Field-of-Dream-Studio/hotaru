@@ -30,8 +30,9 @@ impl HttpBody {
             UrlEncodedForm::parse(body)
                 .map(HttpBody::Form)
                 .map_err(|err| match err {
+                    // Fold UTF-8 into the shared BodyError::InvalidUtf8, same as JSON.
                     UrlEncodedError::InvalidUtf8 => BodyError::InvalidUtf8,
-                    other => BodyError::InvalidForm(other.to_string()),
+                    other => BodyError::Form(other),
                 })
         }
 
@@ -40,7 +41,7 @@ impl HttpBody {
                 .map(HttpBody::Files)
                 .map_err(|err| match err {
                     MultipartError::InvalidUtf8 => BodyError::InvalidUtf8,
-                    other => BodyError::InvalidMultipart(other.to_string()),
+                    other => BodyError::Multipart(other),
                 })
         }
 
@@ -75,11 +76,8 @@ impl HttpBody {
                         parse_into_form(data)
                     }
                     HttpContentType::Multipart { subtype, boundary } if subtype == "form-data" => {
-                        let boundary = boundary.ok_or_else(|| {
-                            BodyError::InvalidMultipart(
-                                "multipart/form-data boundary is missing".to_string(),
-                            )
-                        })?;
+                        let boundary = boundary
+                            .ok_or_else(|| BodyError::Multipart(MultipartError::EmptyBoundary))?;
                         parse_into_files(data, boundary)
                     }
                     _ => Ok(parse_into_binary(data)),
@@ -165,7 +163,7 @@ mod tests {
         let result = buffered_form(b"malformed_without_equals".to_vec())
             .parse_buffer(&HttpSafety::new());
 
-        assert!(matches!(result, Err(BodyError::InvalidForm(_))));
+        assert!(matches!(result, Err(BodyError::Form(_))));
     }
 
     #[test]
@@ -198,7 +196,7 @@ mod tests {
         let result = buffered_multipart(b"data".to_vec(), None)
             .parse_buffer(&HttpSafety::new());
 
-        assert!(matches!(result, Err(BodyError::InvalidMultipart(_))));
+        assert!(matches!(result, Err(BodyError::Multipart(_))));
     }
 
     #[test]
@@ -209,7 +207,7 @@ mod tests {
         )
         .parse_buffer(&HttpSafety::new());
 
-        assert!(matches!(result, Err(BodyError::InvalidMultipart(_))));
+        assert!(matches!(result, Err(BodyError::Multipart(_))));
     }
 
     #[test]

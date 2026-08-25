@@ -4,6 +4,7 @@ use core::fmt;
 
 use crate::message::http_value::StatusCode;
 use crate::util::encoding::{CompressionError, EncodingError};
+use crate::util::form::{MultipartError, UrlEncodedError};
 use crate::util::streamed::Streamed;
 
 /// Errors raised while decoding a chunked-transfer body at read time.
@@ -55,12 +56,8 @@ pub type StreamedBodyError = Streamed<BodyError>;
 /// Pure semantic type: no `Io` variant. Transport failures at read+parse
 /// boundaries live in [`Streamed<BodyError>`](crate::util::streamed::Streamed).
 ///
-/// Variants that carry a `String` payload are placeholders for typed component
-/// errors that do not exist in this branch yet:
-/// - `InvalidJson` awaits a dedicated `JsonError` type.
-/// - `InvalidForm` / `InvalidMultipart` await PR #55, which introduces
-///   `UrlEncodedError` / `MultipartError`. After PR #55 merges, these variants
-///   should be replaced by `Form(UrlEncodedError)` / `Multipart(MultipartError)`.
+/// `InvalidJson(String)` is a placeholder awaiting a dedicated `JsonError`
+/// type — the only stringly variant left in this enum.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum BodyError {
@@ -78,14 +75,12 @@ pub enum BodyError {
     /// The body is not valid JSON. Details must not contain body contents.
     // TODO: replace with `Json(JsonError)` once a dedicated `JsonError` type exists.
     InvalidJson(String),
-    /// The body is not a valid URL-encoded form. Details must not contain body contents.
-    // TODO: replace with `Form(UrlEncodedError)` after PR #55 merges.
-    InvalidForm(String),
-    /// The body is not valid multipart form data. Details must not contain body contents.
-    // TODO: replace with `Multipart(MultipartError)` after PR #55 merges.
-    InvalidMultipart(String),
     /// The body ended before the declared representation was complete.
     IncompleteBody,
+    /// A URL-encoded form failed to parse.
+    Form(UrlEncodedError),
+    /// A multipart form failed to parse.
+    Multipart(MultipartError),
     /// A Transfer-Encoding / Content-Encoding header failed validation.
     Encoding(EncodingError),
     /// Applying a content coding to the body payload failed.
@@ -107,15 +102,9 @@ impl fmt::Display for BodyError {
             Self::InvalidJson(details) => {
                 write!(formatter, "request body contains invalid JSON: {details}")
             }
-            Self::InvalidForm(details) => write!(
-                formatter,
-                "request body contains an invalid form: {details}"
-            ),
-            Self::InvalidMultipart(details) => write!(
-                formatter,
-                "request body contains invalid multipart data: {details}"
-            ),
             Self::IncompleteBody => formatter.write_str("request body is incomplete"),
+            Self::Form(error) => fmt::Display::fmt(error, formatter),
+            Self::Multipart(error) => fmt::Display::fmt(error, formatter),
             Self::Encoding(error) => fmt::Display::fmt(error, formatter),
             Self::Compression(error) => fmt::Display::fmt(error, formatter),
             Self::Chunking(error) => fmt::Display::fmt(error, formatter),
@@ -126,11 +115,25 @@ impl fmt::Display for BodyError {
 impl std::error::Error for BodyError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::Form(error) => Some(error),
+            Self::Multipart(error) => Some(error),
             Self::Encoding(error) => Some(error),
             Self::Compression(error) => Some(error),
             Self::Chunking(error) => Some(error),
             _ => None,
         }
+    }
+}
+
+impl From<UrlEncodedError> for BodyError {
+    fn from(error: UrlEncodedError) -> Self {
+        Self::Form(error)
+    }
+}
+
+impl From<MultipartError> for BodyError {
+    fn from(error: MultipartError) -> Self {
+        Self::Multipart(error)
     }
 }
 
@@ -158,6 +161,8 @@ impl BodyError {
     /// the reader is mid-stream and next-request boundary is unknown.
     pub fn can_continue(&self) -> bool {
         match self {
+            Self::Form(error) => error.can_continue(),
+            Self::Multipart(error) => error.can_continue(),
             Self::Encoding(error) => error.can_continue(),
             Self::Compression(error) => error.can_continue(),
             Self::Chunking(error) => error.can_continue(),
@@ -174,6 +179,8 @@ impl BodyError {
 impl From<&BodyError> for StatusCode {
     fn from(error: &BodyError) -> Self {
         match error {
+            BodyError::Form(error) => StatusCode::from(error),
+            BodyError::Multipart(error) => StatusCode::from(error),
             BodyError::Encoding(error) => StatusCode::from(error),
             BodyError::Compression(error) => StatusCode::from(error),
             BodyError::Chunking(error) => StatusCode::from(error),
