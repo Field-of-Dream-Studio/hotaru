@@ -10,14 +10,14 @@ Most users should depend on the umbrella `hotaru` crate; this crate is the seam 
 
 ## Layout
 
-- `protocol/` — `Http1Protocol`, `HttpError`, helpers (keep-alive, error responses).
+- `protocol/` — `Http1Protocol`, `HttpError`, and protocol error responses.
 - `channel/` — `HttpChannel` trait + `Http1Channel<W>` (per-exchange wire wrapper).
 - `context/` — `HttpContext<TS>` (the `RequestContext` impl).
 - `message/` — `HttpRequest`, `HttpResponse`, `HttpBody`, `HttpMeta`, `HttpStartLine`, types.
 - `security/` — `HttpSafety` (size/limit knobs).
-- `util/` — cookies, encoding, form parsing.
+- `util/` — typed `Connection` options, cookies, encoding, and form parsing.
 
-## Version
+## Versioning
 
-`0.8.5`. Depends on `hotaru_core = 0.8.5`, `hotaru_io_tokio = 0.8.5`,
-`hotaru_lib = 0.8.5`, and optionally `hotaru_tls = 0.8.5`.
+Hotaru workspace crates are released in lockstep. The package version and
+exact sibling-crate dependency pins are declared in [`Cargo.toml`](Cargo.toml).

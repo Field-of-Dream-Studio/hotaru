@@ -4,6 +4,7 @@ version = "0.8.5"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "HTTP/1.1 implementation for the Hotaru web framework"
+readme = "readme.md"
 license = "MIT"
 repository = "https://github.com/Field-of-Dream-Studio/hotaru"
 homepage = "https://hotaru.rs"

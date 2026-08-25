@@ -5,6 +5,7 @@ use core::fmt;
 use crate::message::header::HeaderError;
 use crate::message::http_value::StatusCode;
 use crate::message::start_line::StartLineError;
+use crate::util::connection::ConnectionError;
 use crate::util::encoding::EncodingError;
 use crate::util::streamed::Streamed;
 
@@ -42,6 +43,9 @@ pub enum MetaError {
 
     /// A Transfer-Encoding or Content-Encoding header failed validation.
     Encoding(EncodingError),
+
+    /// A Connection header contained an invalid connection-option.
+    Connection(ConnectionError),
 }
 
 impl fmt::Display for MetaError {
@@ -57,6 +61,7 @@ impl fmt::Display for MetaError {
             Self::StartLine(error) => fmt::Display::fmt(error, formatter),
             Self::Header(error) => fmt::Display::fmt(error, formatter),
             Self::Encoding(error) => fmt::Display::fmt(error, formatter),
+            Self::Connection(error) => fmt::Display::fmt(error, formatter),
         }
     }
 }
@@ -67,6 +72,7 @@ impl std::error::Error for MetaError {
             Self::StartLine(error) => Some(error),
             Self::Header(error) => Some(error),
             Self::Encoding(error) => Some(error),
+            Self::Connection(error) => Some(error),
             _ => None,
         }
     }
@@ -90,6 +96,12 @@ impl From<EncodingError> for MetaError {
     }
 }
 
+impl From<ConnectionError> for MetaError {
+    fn from(error: ConnectionError) -> Self {
+        Self::Connection(error)
+    }
+}
+
 impl MetaError {
     /// Whether the connection can continue after this error. Header
     /// boundary-loss variants (owned by MetaError) force `false`; wrapped
@@ -99,6 +111,7 @@ impl MetaError {
             Self::StartLine(error) => error.can_continue(),
             Self::Header(error) => error.can_continue(),
             Self::Encoding(error) => error.can_continue(),
+            Self::Connection(error) => error.can_continue(),
             // Header block boundary lost or the parser desynchronised —
             // cannot trust where the next request starts.
             Self::HeaderLineTooLong
@@ -120,6 +133,7 @@ impl From<&MetaError> for StatusCode {
             MetaError::StartLine(error) => StatusCode::from(error),
             MetaError::Header(error) => StatusCode::from(error),
             MetaError::Encoding(error) => StatusCode::from(error),
+            MetaError::Connection(error) => StatusCode::from(error),
             MetaError::HeaderLineTooLong
             | MetaError::HeadersTooLarge
             | MetaError::TooManyHeaders => StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,

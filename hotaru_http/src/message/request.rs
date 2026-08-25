@@ -28,6 +28,11 @@ impl HttpRequest {
         &self.meta
     }
 
+    /// Check whether this request allows the connection to remain open.
+    pub fn is_keep_alive(&self) -> bool {
+        self.meta.is_keep_alive()
+    }
+
     /// Parses the HTTP request from a stream, returning an `HttpRequest` instance.
     /// The stream should implement AsyncBufRead (e.g., BufReader or TcpReader).
     /// Body will not be parsed.

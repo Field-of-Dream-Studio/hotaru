@@ -22,7 +22,7 @@ use crate::{
     context::HttpContext,
     protocol::{
         error::HttpError,
-        helpers::{error_response_from, is_keep_alive, is_response_keep_alive, not_found_response},
+        helpers::{error_response_from, not_found_response},
     },
     security::safety::HttpSafety,
 };
@@ -184,7 +184,7 @@ where
             }
             Err(error) => return Err(error),
         };
-        let keep_alive = is_keep_alive(&request);
+        let keep_alive = request.is_keep_alive();
 
         // 2. Walk URL tree.
         let path = request.meta.path();
@@ -266,7 +266,7 @@ where
         channel.send_request(request).await?;
 
         let response = channel.parse_response(&safety).await?;
-        let keep_alive = is_response_keep_alive(&response);
+        let keep_alive = response.is_keep_alive();
         ctx.set_response(response);
 
         if !keep_alive {
@@ -288,8 +288,6 @@ where
 mod tests {
     use super::*;
     use crate::message::http_value::StatusCode;
-    use crate::message::header::HeaderValue;
-    use crate::message::request::HttpRequest;
 
     #[test]
     fn test_http1_detection() {
@@ -298,27 +296,6 @@ mod tests {
         assert!(HTTP::detect(b"PUT /resource HTTP/1.1\r\n"));
         assert!(!HTTP::detect(b"INVALID REQUEST\r\n"));
         assert!(!HTTP::detect(b""));
-    }
-
-    #[test]
-    fn test_is_keep_alive() {
-        let mut request = HttpRequest::default();
-        // No Connection header -> HTTP/1.1 default keep-alive
-        assert!(is_keep_alive(&request));
-
-        // Connection: close
-        request.meta.header.insert(
-            "connection".to_string(),
-            HeaderValue::Single("close".to_string()),
-        );
-        assert!(!is_keep_alive(&request));
-
-        // Connection: keep-alive
-        request.meta.header.insert(
-            "connection".to_string(),
-            HeaderValue::Single("keep-alive".to_string()),
-        );
-        assert!(is_keep_alive(&request));
     }
 
     #[test]

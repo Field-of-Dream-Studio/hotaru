@@ -1,4 +1,5 @@
 mod attributes;
+mod connection;
 mod content_disposition;
 mod content_length;
 mod content_type;

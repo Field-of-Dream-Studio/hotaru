@@ -7,6 +7,7 @@ use crate::message::header::HeaderError;
 use crate::message::http_value::StatusCode;
 use crate::message::meta::MetaError;
 use crate::message::start_line::StartLineError;
+use crate::util::connection::ConnectionError;
 use crate::util::encoding::{CompressionError, EncodingError};
 use crate::util::streamed::Streamed;
 
@@ -103,6 +104,12 @@ impl From<StartLineError> for HttpError {
 
 impl From<EncodingError> for HttpError {
     fn from(error: EncodingError) -> Self {
+        Self::Meta(MetaError::from(error))
+    }
+}
+
+impl From<ConnectionError> for HttpError {
+    fn from(error: ConnectionError) -> Self {
         Self::Meta(MetaError::from(error))
     }
 }

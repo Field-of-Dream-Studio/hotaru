@@ -1,6 +1,7 @@
 use crate::message::header::HeaderMap;
 use crate::message::http_value::*;
 use crate::message::start_line::HttpStartLine;
+use crate::util::connection::ConnectionOptions;
 use crate::util::cookie::CookieMap;
 use crate::util::encoding::HttpEncoding;
 
@@ -31,6 +32,9 @@ pub struct HttpMeta {
     /// Transfer-Encoding header, used for chunked transfer encoding in responses
     pub(in crate::message::meta) encoding: Option<HttpEncoding>,
 
+    /// Parsed Connection header options.
+    pub(in crate::message::meta) connection: Option<ConnectionOptions>,
+
     // Host header, overrides the content length from the hashmap if present
     pub(in crate::message::meta) host: Option<String>,
 
@@ -56,6 +60,7 @@ impl HttpMeta {
             content_disposition: None,
             cookies: None,
             encoding: None,
+            connection: None,
             host: None,
             lang: None,
             location: None,
@@ -77,6 +82,7 @@ impl Default for HttpMeta {
             content_disposition: None,
             cookies: None,
             encoding: None,
+            connection: None,
             host: None,
             lang: None,
             location: None,
