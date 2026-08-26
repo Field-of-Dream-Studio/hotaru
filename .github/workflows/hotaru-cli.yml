@@ -2,9 +2,13 @@ name: hotaru-cli
 
 on:
   push:
-    branches: [master]
+    branches:
+      - master
+      - 'theme/**'
   pull_request:
-    branches: [master]
+    branches:
+      - master
+      - 'theme/**'
 
 concurrency:
   group: hotaru-cli-${{ github.workflow }}-${{ github.ref }}

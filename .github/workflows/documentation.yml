@@ -2,9 +2,13 @@ name: documentation
 
 on:
   push:
-    branches: [master]
+    branches:
+      - master
+      - 'theme/**'
   pull_request:
-    branches: [master]
+    branches:
+      - master
+      - 'theme/**'
 
 concurrency:
   group: documentation-${{ github.workflow }}-${{ github.ref }}
