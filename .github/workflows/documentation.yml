@@ -1,0 +1,29 @@
+name: documentation
+
+on:
+  push:
+    branches:
+      - master
+      - 'theme/**'
+  pull_request:
+    branches:
+      - master
+      - 'theme/**'
+
+concurrency:
+  group: documentation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  readme-sync:
+    name: root and crate README stay in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare README files
+        run: |
+          if ! cmp -s readme.md hotaru/readme.md; then
+            echo "::error title=README files differ::Keep readme.md and hotaru/readme.md identical."
+            diff -u readme.md hotaru/readme.md || true
+            exit 1
+          fi

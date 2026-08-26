@@ -1,6 +1,6 @@
 [package]
 name = "htmstd"
-version = "0.8.5"
+version = "0.8.6"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"] 
 description = "Standard middleware library for the Hotaru web framework"
@@ -11,10 +11,10 @@ categories = ["network-programming", "web-programming::http-server"]
 keywords = ["hotaru", "middleware", "session", "cors", "cookies"]
 
 [dependencies]
-hotaru_core = { path = "../hotaru_core", version = "=0.8.5" }
-hotaru_trans = { path = "../hotaru_trans", version = "=0.8.5", features = ["trans"], default-features = false }
-hotaru_http = { path = "../hotaru_http", version = "=0.8.5" }
-hotaru_lib = { path = "../hotaru_lib", version = "=0.8.5", features = ["ende", "url_encoding"] }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.6" }
+hotaru_trans = { path = "../hotaru_trans", version = "=0.8.6", features = ["trans"], default-features = false }
+hotaru_http = { path = "../hotaru_http", version = "=0.8.6" }
+hotaru_lib = { path = "../hotaru_lib", version = "=0.8.6", features = ["ende", "url_encoding"] }
 akari = "0.2.8"
 dashmap = "6.1.0"
 tokio = { version = "1.28", features = ["full"] }
@@ -23,4 +23,4 @@ lazy_static = "1.5.0"
 # facade path resolve inside this crate. The workspace unifies `hotaru_trans`
 # to `facade = on` because `hotaru` requires it; without this dep, htmstd's
 # own `middleware!` expansions cannot resolve their emitted paths.
-hotaru = { path = "../hotaru", version = "=0.8.5", default-features = false, features = ["trans", "tokio", "http"] }
+hotaru = { path = "../hotaru", version = "=0.8.6", default-features = false, features = ["trans", "tokio", "http"] }

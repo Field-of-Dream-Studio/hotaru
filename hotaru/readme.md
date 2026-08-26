@@ -2,9 +2,11 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.5-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.6-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
+
+<img width="1634" height="910" alt="7db7cf68-ebaa-476f-a306-4521ff4c1321" src="https://github.com/user-attachments/assets/6a8aae85-f14b-404b-8aa5-986f486eec3c" />
 
 ## Overview
 
@@ -21,29 +23,31 @@ MSRV: 1.88
 
 ### Stability in 0.8.x
 
-The **tokio + HTTP** stack (default features include `trans`, `auto-reg`, `http`, and `tokio`) is the tested, supported path and is safe for production use today.
+Hotaru 0.8.x is pre-1.0 and remains experimental. The default Tokio +
+HTTP/1.1 path (`trans`, `auto-reg`, `http`, and `tokio`) receives the broadest
+test coverage, while alternative runtimes, embedded targets, and non-default
+I/O adapters are still under active development.
 
-Everything else is **experimental** and will stabilize by 0.8.7:
+### Our Repos 
 
-- `RuntimeSpec` trait surface (`hotaru_rt_tokio` is the supported default; `hotaru_rt_embassy` is experimental)
-- `no_std` builds of `hotaru_core` (Cortex-M / RISC-V bare-metal, CI-verified and connected to experimental embedded backend crates, but not yet production-validated on hardware)
-- IO adapter crates: `hotaru_io_futures` ships as a standalone crate (limited real-world use). [`hotaru_io_embedded`](https://crates.io/crates/hotaru_io_embedded) is published on crates.io and remains experimental. The `hotaru` facade exposes `EmbeddedIo` through its optional `io_embedded` feature.
-- Embassy runtime backend (`hotaru_rt_embassy`, experimental)
+**[Hotaru](https://github.com/Field-of-Dream-Studio/hotaru)**: Hotaru Core and HTTP utils 
 
-If you are shipping something now, stick with the `tokio` default and revisit the experimental paths as they land.
+**[Hotaru MQTT](https://github.com/fds-pmine/hotaru_mqtt)**: Hotaru MQTT and broker 
+
+**[API Version](https://github.com/Field-of-Dream-Studio/api_version)**: API Version macro 
 
 ## Key Features
 
-<!--TODO: Make sure change this in 0.8.7-->
-
-- **Multi-Protocol**: HTTP/1.1 and HTTPS (TLS) ship out of the box. The `Protocol` trait is an open extension point for custom TCP-based protocols (WebSocket, MQTT, and other frames), though no non-HTTP protocol ships in this workspace today
-- **Server + Client**: Endpoints for inbound traffic, outpoints for outbound. Same protocol trait, same routing, same middleware
-- **Runtime-Neutral Core**: `hotaru_core` speaks to any async runtime through the `RuntimeSpec` trait. Tokio ships today via `hotaru_rt_tokio`; other runtimes can plug in via the same sibling-crate pattern. IO adapters are further along, with `hotaru_io_tokio`, `hotaru_io_futures`, and the experimental in-workspace `hotaru_io_embedded`
-- **`no_std`-Ready Core**: `hotaru_core` builds bare-metal on Cortex-M4/M7 and RISC-V (with atomics) under `alloc`. CI verified on `thumbv7em-none-eabihf` and `riscv32imac-unknown-none-elf`
-- **Sync main**: `fn main() { run_server!(APP); }`. No `async fn main`, no `#[tokio::main]`
-- **Endpoint Definition and Registration Choices**: use the `endpoint!` / `outpoint!` / `middleware!` DSL in three flavors (`trans`, `semi-trans`, `attr`) with default automatic registration, disable `auto-reg` and bind generated definitions explicitly, or construct endpoint definitions manually without the endpoint DSL
-- **Full-Stack**: Akari template rendering, form/URL-encoded body parsing, session cookies, HTTP body compression (gzip / deflate / brotli / zstd) all built in
-- **Flexible Routing**: Regex, literal, and pattern segments (`<int:id>`, `<uuid:token>`, `<**path>`) with a tree walker
+- **Multi-Protocol Design**: HTTP/1.1 and HTTPS ship in this workspace; the
+  `Protocol` trait remains the extension point for separate or custom protocols.
+- **Server + Client**: Endpoints and outpoints share the same protocol, routing,
+  and middleware model.
+- **Runtime- and I/O-Neutral Core**: Tokio is the default, while alternative
+  adapters and `no_std`/embedded paths remain experimental.
+- **Flexible Routing**: Literal, typed, wildcard, and regex-backed route
+  segments share one routing tree.
+- **Web Building Blocks**: Akari templates, forms, uploads, cookies, optional
+  compression, and `htmstd` middleware.
 
 ## Quick Start
 
@@ -75,6 +79,10 @@ endpoint! {
 
 `run_server!(APP)` builds a tokio runtime, blocks the current thread, and shuts down on Ctrl+C. No `async fn main`, no `#[tokio::main]`. See [Core Concepts](#core-concepts) for the sibling macros (`run_server_until!`, `run_server_no_block!`, `run_server_no_block_until!`) when you need a custom stop source or multi-server orchestration.
 
+The same tested path is available as the
+[`starter_trans` example](examples/starter_trans).
+For a guided first project, see the [Hotaru Quickstart](QUICK_TUTORIAL.md).
+
 ## Installation
 
 ### Using the CLI Tool (Recommended)
@@ -99,25 +107,25 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.8.5"
+hotaru = "0.8.6"
 ```
 
 ### Optional Features
 
-Default features: `trans`, `auto-reg`, `http`, `tokio`, `full_regex`, `template`, and `cli`. Cargo's additive feature unification means sub-features pull in their prerequisites automatically — you never have to enable a base feature by hand.
+Default features: `trans`, `auto-reg`, `http`, `tokio`, `full_regex`, `template`, and `cli`. Cargo's additive feature unification means sub-features pull in their prerequisites automatically. You never have to enable a base feature by hand.
 
 **Protocol stack**
 
-- **`http`** *(default-on)*: HTTP/1.1 stack (`hotaru_http` + `ahttpm`). Opt out with `default-features = false` for protocol-only builds (e.g. gRPC-only deployments) — `hotaru::http::*`, `HTTP`, `HttpContext`, `HttpRequest`, `HttpResponse`, etc. then disappear from the crate surface.
-- **`tokio`** *(default-on)*: Tokio runtime + TCP/IO defaults for the umbrella crate (`Server`, `Client`, `Url`, `S*` aliases, `TcpTransport`, `TokioRuntime`). If you disable default features but still use those defaults, re-enable `tokio`.
-- **`https`**: TLS/HTTPS support — surfaces `HTTPS`, `TlsTransport`, `TlsOutboundTarget`, `TlsClientConfig`. Implies `http`.
-- **`http_compression`**: HTTP body codecs for `Content-Encoding` (gzip / deflate / brotli / zstd). Off by default because `brotli` + `zstd` together add ~7 s to a clean build. Implies `http`. Without this feature, `ContentCoding::decode_compressed` / `encode_compressed` return `io::ErrorKind::Unsupported` for compressed bodies.
+- **`http`** *(default)*: HTTP/1.1 server, client, and message types.
+- **`tokio`** *(default)*: Tokio runtime and TCP I/O.
+- **`https`**: TLS/HTTPS support; enables `http`.
+- **`http_compression`**: Optional gzip, deflate, brotli, and zstd body codecs; enables `http`.
 
-**Endpoint macro flavor** — pick one (see Core Concepts):
+**Endpoint macro flavor:** Pick one (see Core Concepts).
 
-- **`trans`** *(default)* — bang macro with hotaru-blocks body
-- **`semi-trans`** — stacked attributes above an `fn`
-- **`attr`** — single attribute with args
+- **`trans`** *(default)*: bang macro with hotaru-blocks body
+- **`semi-trans`**: stacked attributes above an `fn`
+- **`attr`**: single attribute with args
 
 **Registration**
 
@@ -125,39 +133,24 @@ Default features: `trans`, `auto-reg`, `http`, `tokio`, `full_regex`, `template`
 
 **Misc**
 
-- **`debug`**: Enable debug logging for development and troubleshooting.
-- **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation. When enabling, you must also add `ctor` to your dependencies:
-  ```toml
-  [dependencies]
-  hotaru = { version = "0.8.5", features = ["external-ctor"] }
-  ctor = "0.4.0"
-  ```
-
-**Example — HTTPS server with body compression:**
-
-```toml
-[dependencies]
-hotaru = { version = "0.8.5", features = ["https", "http_compression"] }
-```
-
-**Example — gRPC-only (no HTTP):**
-
-```toml
-[dependencies]
-hotaru = { version = "0.8.5", default-features = false, features = ["trans", "tokio"] }
-hotaru_grpc = "..."
-```
+- **`debug`**: Development and troubleshooting logs.
+- **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) implementation; add `ctor` as a direct dependency.
 
 ## Binary Commands
 
-Use the CLI to scaffold projects — it generates `build.rs` for asset copying and `src/resource.rs` for runtime template/static lookup, which are non-trivial to wire up by hand.
+Use the CLI to scaffold projects. `hotaru new` writes the manifest, starter,
+asset directories, and `build.rs`; the first build then generates
+`src/resource.rs` for runtime template/static lookup.
 
 ```bash
 cargo install hotaru                   # install the CLI (see Installation above)
 hotaru new my_app                      # scaffold a new project
-hotaru init                            # or scaffold into the current Cargo crate
+hotaru init                            # add starter files to an existing Cargo crate
 cd my_app && cargo run                 # serves http://127.0.0.1:3003
 ```
+
+`hotaru init` does not edit an existing `Cargo.toml`; it prints the package and
+dependency entries that you must add manually.
 
 ### Project Structure
 
@@ -167,7 +160,7 @@ my_app/
 ├── build.rs                # Asset copying build script
 ├── src/
 │   ├── main.rs            # Application entry point with LServer! + endpoint!
-│   └── resource.rs        # Resource locator helpers
+│   └── resource.rs        # Generated by build.rs on the first build
 ├── templates/             # Akari HTML templates
 └── programfiles/          # Static assets (CSS, JS, images)
 ```
@@ -180,7 +173,7 @@ The build script copies `templates/` and `programfiles/` to the target directory
 
 Three macro flavors are enabled by the `trans` / `semi-trans` / `attr` cargo features. Pick one per project; **`trans` is the default**. All three produce the same route definition; the separate `auto-reg` feature controls whether that definition binds during startup.
 
-**`trans` (default) — bang macro with hotaru-blocks body:**
+**`trans` (default): bang macro with hotaru-blocks body**
 
 ```rust
 endpoint! {
@@ -198,7 +191,7 @@ endpoint! {
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.5", default-features = false, features = [
+hotaru = { version = "0.8.6", default-features = false, features = [
     "trans", "auto-reg", "http", "tokio", "full_regex", "template"
 ] }
 ```
@@ -260,7 +253,7 @@ fn main() {
 This path does not enable `trans`, `semi-trans`, `attr`, or `auto-reg`. See
 [`examples/starter_manual`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_manual).
 
-**`semi-trans` — stacked attributes above an `fn`:**
+**`semi-trans`: stacked attributes above an `fn`**
 
 ```rust
 #[endpoint]
@@ -271,7 +264,7 @@ pub fn get_user<HTTP>() {
 }
 ```
 
-**`attr` — single attribute with args:**
+**`attr`: single attribute with args**
 
 ```rust
 #[endpoint("/users/<int:id>")]
@@ -287,12 +280,12 @@ pub fn get_user<HTTP>() {
 
 - With the default `auto-reg` feature, generated endpoint/outpoint definitions bind during startup. Without it, bind their constructors explicitly with `App::bind` or `Blueprint::bind`.
 - `trans` form: brace syntax `{}` with doc comments inside the block; angle-bracket body defaults to `req`. Optional fn-style `pub fn name(req: HTTP) { ... }` is also accepted.
-- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.5", default-features = false, features = ["semi-trans", "auto-reg", "http", "tokio"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `auto-reg`, `http`, and `tokio` when those defaults are wanted.
+- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.6", default-features = false, features = ["semi-trans", "auto-reg", "http", "tokio"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `auto-reg`, `http`, and `tokio` when those defaults are wanted.
 - See `macro_ra.md` for syntax details. Analyzer support is planned.
 
 ### Middleware
 
-Attach a middleware to a protocol via the `ProtocolBuilder`. Add `htmstd = "0.8"` to your `Cargo.toml` for the bundled middleware library:
+Attach a middleware to a protocol via the `ProtocolBuilder`. Add `htmstd = "0.8.6"` to your `Cargo.toml` for the bundled middleware library:
 
 ```rust
 use htmstd::CookieSession;
@@ -333,11 +326,11 @@ LServer!(
 cookies, while `Development`/`Build` allow plain HTTP cookies. For production,
 also configure a stable `SessionSecret` so sessions survive process restarts.
 
-Middleware can also be attached per-endpoint via `middleware = [...]` inside the `endpoint!` block — see `example_hotaru` for the pattern.
+Middleware can also be attached per-endpoint via `middleware = [...]` inside the `endpoint!` block. See `example_hotaru` for the pattern.
 
 ### Templates
 
-Render HTML with Akari via `akari_render!` — the macro looks up the template file and substitutes the named bindings:
+Render HTML with Akari via `akari_render!`. The macro looks up the template file and substitutes the named bindings:
 
 ```rust
 endpoint! {
@@ -369,10 +362,10 @@ endpoint! {
 
 Use the examples maintained in this repository:
 
-- [`starter_trans`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_trans) — `trans` DSL with default `auto-reg`
-- [`starter_trans_no_auto_reg`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_trans_no_auto_reg) — the same DSL with explicit `App::bind`
-- [`starter_manual`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_manual) — manual `Endpoint::<HTTP>::endpoint` plus `App::insert`
-- [`tutorial_examples`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/tutorial_examples) — routing, middleware, multi-protocol, and TCP examples
+- [`starter_trans`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_trans): `trans` DSL with default `auto-reg`
+- [`starter_trans_no_auto_reg`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_trans_no_auto_reg): the same DSL with explicit `App::bind`
+- [`starter_manual`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/starter_manual): manual `Endpoint::<HTTP>::endpoint` plus `App::insert`
+- [`tutorial_examples`](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples/tutorial_examples): routing, middleware, multi-protocol, and TCP examples
 - [All repository examples](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples)
 
 ## Crate Ecosystem
@@ -383,100 +376,63 @@ Hotaru is built on a modular architecture:
 - **[hotaru_core](https://crates.io/crates/hotaru_core)** - Core protocol and routing engine
 - **[hotaru_trans](https://crates.io/crates/hotaru_trans)** - Procedural macros for endpoint! and middleware!
 - **[hotaru_http](https://crates.io/crates/hotaru_http)** - HTTP implementation for Hotaru
+- **[hotaru_mqtt](https://crates.io/crates/hotaru_mqtt)** - MQTT implementation for Hotaru and brokers. [Repo](https://github.com/fds-pmine/hotaru_mqtt) 
 - **[hotaru_tls](https://crates.io/crates/hotaru_tls)** - TLS/HTTPS implementation for Hotaru
 - **[hotaru_rt_tokio](https://crates.io/crates/hotaru_rt_tokio)** - Tokio runtime backend (`TokioRuntime`)
 - **[hotaru_io_tokio](https://crates.io/crates/hotaru_io_tokio)** - Tokio TCP/IO backend (`TcpTransport`, `TokioIo`)
-- **[hotaru_io_futures](https://crates.io/crates/hotaru_io_futures)** - `futures-io` adapter backend (`FuturesIo`, experimental)
-- **[hotaru_io_embedded](https://crates.io/crates/hotaru_io_embedded)** - `embedded-io-async` adapter backend (`EmbeddedIo`) — *experimental and re-exported by `hotaru` when `io_embedded` is enabled*
+- **[hotaru_io_futures](https://crates.io/crates/hotaru_io_futures)** - `futures-io` adapter backend (`FuturesIo`)
+- **[hotaru_io_embedded](https://crates.io/crates/hotaru_io_embedded)** - `embedded-io-async` adapter backend (`EmbeddedIo`) 
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
 ## Changelog
 
-### 0.8.5 (Current)
+### 0.8.6 (Current)
 
-- Made automatic endpoint/outpoint registration optional through the default-on `auto-reg` feature. Macro-generated constructors can be bound explicitly with `App::bind` or `Blueprint::bind` when it is disabled.
-- Added an experimental manual endpoint-definition path using `Endpoint::<P>::endpoint(...)` and `App::insert`, without requiring an endpoint DSL feature.
-- Added focused starters for default macro registration, macro syntax without `auto-reg`, and manual endpoint construction.
-- Updated CLI scaffolds to use synchronous `run_server!(APP)` and removed the redundant direct `tokio` dependency from generated manifests.
-- Refactored HTTP body processing around the typed `BodyError` model, including explicit missing, oversized, incomplete, invalid, unsupported, and backend-I/O failures.
-- Bounded HTTP line parsing and compressed-body expansion using configured `HttpSafety` limits, addressing unbounded line reads and decompression growth.
-- Added protocol-neutral `TransferOutcome` and `TransferTermination` types for reporting `ConditionReached`, `SourceEnded`, and `CapReached` without converting normal stopping events into backend errors.
-- Added bounded `read_to_end`, `read_until`, and `read_line` operations with explicitly named unbounded variants.
-- Added corresponding write-side count, delimiter, line, and capped helpers. `read_exact` and `write_all` remain strict operations that report incomplete backend transfers through `Self::Error`.
-- Removed the framework error-construction trait; concrete I/O implementations retain ownership of their associated `Self::Error`.
+- Rejects ambiguous HTTP/1 request framing, including conflicting `Content-Length` values and `Content-Length` combined with `Transfer-Encoding`.
+- Rejects oversized lengths and chunk-size accumulation overflow before they can cross configured `HttpSafety` limits.
+- Corrects chunk extension and trailer parsing, rejects unsupported transfer codings, and keeps trailer fields from replacing the request start line.
+- Parses `Connection` as a case-insensitive token list across repeated fields and applies the HTTP/1.0 and HTTP/1.1 persistence defaults, with `close` taking precedence.
+- Adds focused HTTP regression coverage for these boundary and persistence cases.
 
-The new manual-registration and transfer-outcome APIs remain experimental in 0.8.5.
+### 0.8.0–0.8.5
 
-### 0.8.4
-- Continued backend split work by moving Tokio-specific IO/runtime support out of `hotaru_core`.
-- Clarified platform and task-mobility feature modes.
-- Added explicit local-executor refinements: `spawn_local_atomic` and `spawn_local_no_atomic`.
-- Made sync primitive selection feature-based: `parking_lot`, `spin`, or Hotaru `RefCell` fallback.
-- Removed hidden `target_has_atomic` behavior from core feature selection.
-- Replaced the old `full`/`lite` regex names with additive `full_regex` / `lite_regex`; when neither is enabled, Hotaru drops the `regex` dependency and uses its regex-stub path.
-- Split facade regex style from template support: `full_regex` / `lite_regex` control routing regex, while `template` controls Akari template support.
-- Added `hotaru` facade re-exports for `EmbeddedIo` behind `io_embedded`, and exposed the experimental Embassy backend crate behind `embassy`.
-- Added CI coverage for the `hotaru` facade on a no-atomic bare-metal target, and deduplicated the core feature matrix so each feature combination is compiled once.
-- Updated repository metadata and documentation links for the transfer to `https://github.com/Field-of-Dream-Studio/hotaru`.
-- Continued preparation for a smaller backend-neutral core.
+- Split Tokio runtime and TCP I/O implementations from the protocol-neutral
+  core into sibling crates while keeping Tokio as the umbrella crate's default.
+- Added synchronous server entry macros, endpoint/outpoint flows, optional
+  automatic registration, and experimental explicit/manual registration paths.
+- Made HTTP an optional facade feature, moved its public re-exports to
+  `hotaru::http`, and made body compression opt-in.
+- Added bounded framework I/O, `HttpSafety` limits, and typed HTTP body and
+  transfer errors so malformed or incomplete input remains distinguishable.
+- Expanded `no_std` and embedded compile coverage with explicit platform,
+  task-mobility, and lock-backend feature selections.
+- Refined routing, regex selection, middleware inheritance, and the supporting
+  language and session middleware crates.
+- Updated CLI scaffolds and focused starter projects around the canonical
+  `trans` + `auto-reg` + Tokio + HTTP path.
 
-### 0.8.3
-- **Core/backend split**: `hotaru_core` is now backend-neutral at the public type layer. Concrete Tokio runtime and TCP/IO implementations moved into sibling crates (`hotaru_rt_tokio`, `hotaru_io_tokio`), while the umbrella `hotaru` crate keeps the familiar Tokio defaults.
-- **IO adapter crates**: futures-io and embedded-io-async adapters moved out of core into `hotaru_io_futures` and `hotaru_io_embedded`. Each backend uses local wrapper types (`TokioIo<T>`, `FuturesIo<T>`, `EmbeddedIo<T>`) so adapter impls stay additive and avoid trait-coherence conflicts.
-- **Simpler `hotaru_core` features**: core no longer owns `io_*`, `rt_*`, `tokio`, or `embassy` feature flags. It now keeps only the platform axis (`std` / `embedded`) and task-mobility axis (`spawn_send` / `spawn_local`); runtime and IO backends are selected through backend crates, or through optional facade features on `hotaru`.
-- **`hotaru` facade defaults to Tokio/std**: the umbrella keeps Tokio as the supported default path, while exposing experimental optional `embedded`, `embassy`, and `io_embedded` features for in-workspace backend work. `io_embedded` re-exports `EmbeddedIo`; at the time of the 0.8.3 release, the backend crate had not yet been published to crates.io.
-- **Runtime abstraction cleanup**: `RuntimeSpec` is the backend-neutral runtime trait, with Tokio implemented externally by `hotaru_rt_tokio::TokioRuntime`. Framework types (`Server`, `Client`, builders, and URL/protocol-entry types) now carry explicit transport/runtime parameters in core, while `hotaru` restores ergonomic defaults.
-- **`MaybeSend` task-mobility model**: async framework surfaces use `MaybeSend` so `spawn_send` builds keep real `Send` bounds and `spawn_local` builds can support local `!Send` futures. `hotaru_io_embedded` gates its actual embedded-io-async trait impls on `spawn_local`, not on the `embedded` platform flag.
-- **Framework-owned async IO traits**: `HotaruRead`, `HotaruWrite`, `HotaruBufRead`, `HotaruBufWrite`, `HotaruIOError`, `HotaruBufReader`, and `HotaruBufWriter` provide the common IO trait surface used by transports and protocols without hardcoding Tokio types in core.
-- **Native async trait surfaces**: core transport/protocol traits use return-position `impl Future` instead of `async-trait`, reducing proc-macro dependency surface and avoiding unnecessary boxed futures at trait boundaries.
-- **Protocol-agnostic endpoint outcomes**: `EndpointOutcome<C>` lets generated endpoints apply return values to any request context. HTTP keeps the existing `HttpResponse` endpoint style, while non-HTTP/inbound-only protocols can use `()` outcomes without placeholder responses.
-- **Per-protocol URL parsing hooks**: `Protocol` can customize URL tokenization/literal parsing, and URL parser internals such as `RawToken`, `TypeKind`, `tokenize`, and `tokens_to_patterns` are re-exported for protocol-specific routing work.
-- **Preferred-language middleware**: `htmstd` adds `PreferredLanguageMiddleware`, `PreferredLanguage`, settings, and request-extension helpers for parsing and negotiating the `Accept-Language` header.
-- **no_std preparation**: core continues moving toward `no_std` readiness with `alloc` usage, `core` imports, Akari `embedded`/`no_std` alignment, generic IO errors, and backend-neutral abstractions. Embassy and embedded backend work exists in-tree but remains experimental.
-- **Sync-main entry macros**: `run_server!` / `run_server_until!` (blocking) and `run_server_no_block!` / `run_server_no_block_until!` (fire-and-forget) let users run a server from an ordinary `fn main()` — no `#[tokio::main]`, no `async fn main`. Backed by a new `BlockingRuntimeCap` capability trait implemented by `TokioRuntime`.
-
-### 0.8.2
-- `http` and `http_compression` moved to optional features (compression default-off)
-- HTTP re-exports relocated to `hotaru::http`
-- Clean builds ~35% faster (dropped `tracing`, gated heavy codecs)
-- `regex` bumped 1.5.6 -> 1.12
-- `AccessPointTable` switched to `PRwLock` (no more poisoning)
-- `hotaru_trans` `..` middleware inheritance now honors the URL's app ident
-- `hotaru_trans` anonymous-fn `_` form fixed 
-- Client / outpoint runtime paired with `Client<TS>`, the `outpoint!` macro, and `run!` / `call!` invocation sugar
-- Protocol trait reshape: channel-based `open_channel` / `handle` / `send`; new `Channel` trait + `ProtocolFlow`
-- `RequestContext` rework: `Default` supertrait, `type Channel` anchor, `inject_request` / `into_response`; new `EmptyError`
-- Result-typed execution chain — no boxing at chain boundaries
-- Named access points with a single canonical registration funnel
-- Instance-based transports: `TransportSpec::Inbound` / `Outbound` replace `Accepter` / `Connector`
-- HTTPS feature: `HTTPS = Http1Protocol<TlsStream, TlsTransport>`
-- New `LServer!` / `LClient!` / `LUrl!` / `LPattern!` macros replace `LApp!`
+APIs introduced during these releases remain pre-1.0 and experimental.
 
 ### 0.7.x
-- Multi-protocol support (HTTP, WebSocket, custom TCP)
-- Enhanced security controls with HttpSafety
-- Improved middleware system with protocol inheritance
-- Performance optimizations in URL routing
-- Comprehensive security testing
-- `.worker()` method now properly configures dedicated worker threads per Server instance
-- Fixed `hotaru new` and `hotaru init` to generate correct `endpoint!` macro syntax
-- Built-in constructor implementation (no external `ctor` dependency required)
-- Fn-style blocks: New syntax `pub fn name(req: HTTP) { ... }` for `endpoint!` and `middleware!` macros (original hotaru blocks syntax preserved)
-- Bug fix for URL routing
+
+- Expanded routing, middleware inheritance, `HttpSafety`, and security tests.
+- Improved worker configuration, CLI scaffolding, and endpoint syntax.
+- Added the built-in constructor path and fn-style endpoint/middleware blocks.
 
 ### 0.6.x
-- Protocol abstraction layer
-- Request context improvements
-- Standard middleware library (htmstd)
-- Cookie-based session management
+
+- Introduced the protocol abstraction and improved request contexts.
+- Added the `htmstd` middleware library and cookie-based sessions.
 
 ### 0.4.x and earlier
-- Async/await support with Tokio
-- Akari templating integration
-- Cookie manipulation APIs
-- File upload handling
-- Form data processing improvements
+
+- Established the Tokio HTTP framework and Akari templating.
+- Added cookies, file uploads, and form-data processing.
+
+For the complete patch-by-patch history, see
+[GitHub Releases](https://github.com/Field-of-Dream-Studio/hotaru/releases) and
+[repository tags](https://github.com/Field-of-Dream-Studio/hotaru/tags).
 
 ## Learn More
 
@@ -497,6 +453,6 @@ Definitions and component declarations are maintained in
 
 ## 📄 License
 
-MIT License — see [LICENSE.txt](LICENSE.txt).
+MIT License. See [LICENSE.txt](LICENSE.txt).
 
 Copyright (c) 2024-2026 @ [Field of Dreams Studio (FDS)](https://fds.moe) & [Project-StarFall](https://sf.fds.moe) & [PMINE-FDS](https://pmine.rs)

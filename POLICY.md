@@ -1,6 +1,6 @@
 # FDS Code Governance Policy
 
-**Effective 2026.09.09**
+**Effective 2026.08.19**
 
 ## 1. Scope and purpose
 
@@ -35,21 +35,39 @@ No maintainer may solely approve their own change; every affected family must
 approve a cross-family change. Questions escalate through Component, Family,
 and Project Maintainers.
 
-### Live-QA assignment
+### Review assignment
 
-| PR owner | Questioner |
+| PR owner | Assigned reviewer |
 | --- | --- |
 | Contributor, Reviewer, or Steward | Responsible Component Maintainer |
 | Component Maintainer | Responsible Family Maintainer |
 | Family Maintainer | Project Maintainer |
 | Project Maintainer | A different Family Maintainer who did not author the change and understands the affected work |
 
+“Assigned reviewer” in this policy is a functional designation for one PR. It
+does not appoint the person to the formal Reviewer or Steward role.
+When the PR owner holds more than one role, apply the table using the highest
+role that is applicable to any affected scope of the PR.
+
 For project-level work without a Component assignment, the Project Maintainer
-is the authority and questioner; the final row applies when they own the PR.
-When several people qualify, their lowest common higher authority designates a
-non-author to lead and keep the record; others may co-question. This does not
+is the authority and assigned reviewer; the final row applies when they own the
+PR.
+If the standard assignee authored any reviewed work or otherwise cannot act
+independently, a qualified non-author Maintainer who understands the affected
+work must replace them. If the standard assignee is the Project Maintainer,
+apply the final row of the table and assign a different Family Maintainer;
+otherwise, the next higher eligible authority designates the replacement. Only
+a Maintainer may be the assigned reviewer. When several Maintainers qualify,
+their lowest common higher authority designates the reviewer. For Live QA, the
+assigned reviewer is the questioner and others may co-question. This does not
 replace affected-family approval or grant project authority to a Family
-Maintainer questioning the Project Maintainer.
+Maintainer reviewing the Project Maintainer.
+
+With the assigned reviewer's consent, a Maintainer or project Contributor may
+join as a co-reviewer to learn the QA process and prepare to conduct QA
+independently in the future. A co-reviewer need not yet be familiar with the
+repository. The assigned reviewer continues to lead the QA and remains
+responsible for the review and record.
 
 ### Branch definitions
 
@@ -72,7 +90,7 @@ policy exception.
 
 ### Applicability and required records
 
-| Source and target | Update Report | Live QA |
+| Source and target | Update Report | QA review record |
 | --- | --- | --- |
 | Personal working branch to `theme/xxx` | Required | Required |
 | Personal working branch to `master` | Required | Required |
@@ -80,10 +98,17 @@ policy exception.
 | `theme/xxx` directly to `master` | Not required; may be submitted voluntarily | Required |
 | `master` to `theme/xxx` for the permitted final sync | Required | Required |
 
+Each required QA review record uses exactly one review type: Live QA, or
+Trivial Update direct approval when the entire PR is eligible under this
+chapter. Trivial Update waives only the live session and supplementary question
+sheets. It does not waive an Update Report required by the table, independent
+review, applicable CI, affected-family approval, the completed and signed fixed
+QA record pages, or record retention.
+
 Personal-to-personal merges are outside this procedure. These routes never
 permit self-approval or waive affected-family approval.
 Using [GOVERNANCE.md](./GOVERNANCE.md) and Chapter 2, the PR owner identifies
-every scope, AI tier, questioner, and approval. A Contributor may transfer work
+every scope, AI tier, reviewer, and approval. A Contributor may transfer work
 to another Contributor's or Maintainer's personal branch; authorship remains,
 but PR and record responsibility transfers.
 
@@ -108,22 +133,28 @@ but PR and record responsibility transfers.
 
 The PR owner is responsible for the accuracy and judgment in every required or
 voluntary report, must understand its covered work, and completes it by hand in
-ink without AI assistance before giving it to the questioner. Ordinary and
-nested-theme entries cover the smallest independent design decision; units
+ink without AI assistance before giving it to the assigned reviewer. Ordinary
+and nested-theme entries cover the smallest independent design decision; units
 without one may be grouped. Voluntary final-theme reports and required final
 `master` sync reports cover integration decisions and risks without repeating
 previously reviewed entries. The
 [form specification](./governance/forms/README.md) defines units, grouping,
 fields, notation, and completion.
 
-### Independent review and live QA
+For a PR using Trivial Update direct approval, every Update Report required by
+the applicability table remains required. The report may group the entire PR as
+one unit and record only the essential material needed to identify the changed
+scope, classify the trivial work, explain why semantics and contracts are
+not altered, and state the relevant validation. It may not omit information
+needed to determine eligibility or understand the change.
 
-The assigned questioner must independently review the PR, its validation, and
-every required or voluntarily submitted report, then prepare questions
-privately. The questioner must understand the work covered by the QA record and
-is responsible for the accuracy and technical judgment recorded in it. For a
-final `theme/xxx`-to-`master` PR, the review must also establish all of the
-following:
+### Independent review and QA review types
+
+The assigned reviewer must independently review the PR, its validation, and
+every required or voluntarily submitted report. The reviewer must understand
+the work covered by the QA record and is responsible for the accuracy and
+technical judgment recorded in it. For a final
+`theme/xxx`-to-`master` PR, the review must also establish all of the following:
 
 1. **Record completeness:** the theme history contains no unaccounted-for
    direct commit, and every merge commit is traceable to its PR, required
@@ -133,9 +164,12 @@ following:
 3. **Integration seams:** interactions among staged changes have been reviewed,
    and the final theme state has passed full CI.
 
-The assigned questioner leads and keeps the QA record. Other affected
-maintainers may co-question within their areas under the designation rule in
-Chapter 2.
+The assigned reviewer leads the review and keeps every QA record. For Live QA,
+the reviewer prepares questions privately, acts as the questioner, and may be
+joined by affected maintainers co-questioning within their areas under the
+designation rule in Chapter 2.
+
+#### Live QA
 
 QA must occur live on a real-time meeting platform. The PR owner answers
 without AI assistance and must not complete the QA record. The questioner
@@ -145,28 +179,85 @@ question may cover several related units, and one unit may receive several
 questions. The questioner may probe any area, including understanding beyond
 doubts recorded by the PR owner, and signs the completed record.
 
+Each Live QA round uses a separate QA record containing both fixed pages and at
+least one supplementary question sheet. The questioner selects exactly one
+final decision:
+
+1. **Approve:** the Live QA requirement is satisfied for the reviewed PR state.
+   This does not waive any other merge condition.
+2. **Further QA required:** merge remains blocked. The PR owner resolves the
+   required changes or clarifications, and a later Live QA round uses a new
+   record. This is the non-final rejection outcome.
+3. **Do not approve; close PR:** the PR may not merge and must be closed by its
+   owner or the responsible authority. A later proposal requires a new PR and
+   new records.
+
+#### Trivial Update direct approval
+
+The assigned reviewer may use Trivial Update direct approval only when the
+entire PR consists exclusively of one or more of the following:
+
+1. Typo or editorial fixes that do not change meaning, public or stable
+   identifiers, interfaces, or observable behavior.
+2. Test-only additions or corrections, including local fixtures or helpers,
+   that verify existing behavior without changing production-compiled code,
+   shared test infrastructure, production build behavior, CI configuration,
+   dependencies, or any documented contract.
+3. Corrections to non-normative documentation that do not change an API,
+   behavior guarantee, requirement, security statement, release rule, or
+   governance rule.
+
+The PR must not alter program semantics, any existing public or internal
+contract, production build configuration, dependency resolution, security
+properties, release processes, governance requirements, or CI workflow
+configuration.
+Mixed trivial and non-trivial changes are ineligible. Trivial Update direct
+approval is unavailable for a final
+`theme/xxx`-to-`master` PR, the permitted final `master`-to-theme sync, or work
+subject to the final-theme review requirements above. Uncertainty requires Live
+QA.
+
+Trivial Update direct approval uses both fixed QA record pages without a live
+session or supplementary question sheets. The reviewer checks the entire diff
+and applicable validation, records the basis for classification, signs the
+record, and thereby directly approves the QA review. If the final PR state is
+not entirely eligible, it must use Live QA.
+
+Any change to the reviewed PR state after an approving Live QA or Trivial
+Update record invalidates that approval. This includes adding, removing,
+replacing, or rewriting commits, changing the target branch, or otherwise
+changing the reviewed diff. The PR owner updates or replaces affected Update
+Report coverage, reruns applicable validation and CI, and returns the PR to the
+assigned reviewer for a new independent review and applicable QA record.
+
+The assigned reviewer uploads the completed QA record through the pull
+request's review function. It must not be posted as an ordinary comment.
+
 The form specification defines the QA fields, question-entry semantics, and
-completion method. It may not limit the questioner's review scope or waive the
-independence and live-session requirements above.
+completion method. It may not limit the reviewer's scope, waive independent
+review, or expand Trivial Update eligibility beyond this policy.
 
 ### Findings, approval, and merge
 
 The PR owner must resolve every required finding and update any affected
-report; reviewers verify the result. Review, CI, or QA repeats as directed, and
-an unresolved finding blocks merge. Before merge, the responsible authorities
-confirm CI, independent and cross-family approval, and live QA.
+report; reviewers verify the result. Review, CI, or Live QA repeats as directed,
+and an unresolved finding blocks merge. Before merge, the responsible
+authorities confirm required reports, CI, independent and cross-family
+approval, and a completed QA record whose review type and outcome permit merge.
 
 Theme branches accept only authorship-preserving merge commits from personal
 or nested-theme PRs and one final PR-based merge commit from `master`; squash
-merges are forbidden. Merge follows completed review and QA.
+merges are forbidden. Merge follows completed review and an approving QA
+record.
 
 ### Record retention
 
-The PR owner keeps each original Update Report, and the questioner keeps each
-original QA record, for four months after merge. During the first three months,
-the Project Maintainer may request delivery by providing the address and
-service; the project shall pay all fees incurred by delivery. Otherwise
-delivery is unnecessary.
+The PR owner keeps each original Update Report, and the assigned reviewer keeps
+each original QA record, including superseded and further-QA records, for four
+months after merge or closure. During the first three months, the Project
+Maintainer may request delivery by providing the address and service; the
+project shall pay all fees incurred by delivery. Otherwise delivery is
+unnecessary.
 Failure to retain or produce a requested original may cause it to be treated as
 unverified or potentially false and referred for governance review.
 
@@ -174,9 +265,12 @@ unverified or potentially false and referred for governance review.
 
 A change that must reach `master` outside the theme cycle may bypass staging.
 The Project Maintainer coordinates with the responsible Component Maintainer;
-the direct-to-`master` records remain required, but review and QA may be
-expedited. QA covers every affected module, and its outcome controls merge.
-It need not contain a separate question for each module.
+the direct-to-`master` records remain required, but review may be expedited.
+Urgency does not qualify a change for Trivial Update direct approval. A hotfix
+may use that review type only when its entire final state independently meets
+the eligibility rules above. Otherwise Live QA covers every affected module,
+and its outcome controls merge. It need not contain a separate question for
+each module.
 
 ## 4. Project, release, and RFC governance
 
@@ -209,10 +303,10 @@ FDS does not scan code for an "AI rate," estimate the percentage of code
 generated by AI, or use such a percentage as a merge criterion. AI tiers
 describe the kind of collaboration, not the amount of generated text. Merge
 review instead uses every required or voluntarily submitted Update Report,
-live QA, technical review, and required CI to assess the design rationale,
-semantics, risks, compatibility, and the responsible human's command of the
-code. This careful process is how FDS makes human accountability and its
-engineering philosophy visible to other contributors.
+the applicable QA review type, technical review, and required CI to assess the
+design rationale, semantics, risks, compatibility, and the responsible human's
+command of the code. This careful process is how FDS makes human accountability
+and its engineering philosophy visible to other contributors.
 
 | Tier | Definition |
 | --- | --- |
