@@ -14,7 +14,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 > Small, sweet, easy framework with a protocol-neutral, no_std-ready core 
 
-**[Official Website](https://hotaru.rs)** | **[Examples](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples)**
+**[Official Website](https://hotaru.rs)** | **[Examples](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples)** | **[Twitter/X](https://x.com/FDS_2017)** 
 
 > Repository transfer notice: the Hotaru repository has moved to
 > `https://github.com/Field-of-Dream-Studio/hotaru`.
