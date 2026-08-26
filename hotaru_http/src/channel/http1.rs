@@ -9,10 +9,12 @@
 //! requiring `ConnMeta: Clone`. Addresses are forwarded through the meta.
 
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use hotaru_core::connection::{ConnMeta, ConnStream, HotaruRead, HotaruWrite};
+use hotaru_core::connection::{
+    ConnMeta, ConnStream, HotaruRead, HotaruWrite,
+};
 use hotaru_core::protocol::Channel;
 use tokio::sync::Mutex;
 
@@ -67,7 +69,13 @@ where
 {
     async fn parse_request(&self, safety: &HttpSafety) -> Result<HttpRequest, HttpError> {
         let mut reader = self.reader.lock().await;
-        let request = HttpRequest::parse_lazy(&mut *reader, safety, false).await;
+        let request = match HttpRequest::parse_lazy(&mut *reader, safety, false).await {
+            Ok(request) => request,
+            Err(error) => {
+                self.open.store(false, Ordering::Release);
+                return Err(error);
+            }
+        };
 
         // EOF / malformed: flip the channel closed and signal Io.
         if request.meta.path().is_empty() && request.meta.header.is_empty() {
@@ -82,7 +90,7 @@ where
 
     async fn send_response(&self, response: HttpResponse) -> Result<(), HttpError> {
         let mut writer = self.writer.lock().await;
-        response.send(&mut *writer).await.map_err(HttpError::Io)?;
+        response.send(&mut *writer).await?;
         writer.flush().await.map_err(HttpError::Io)?;
         Ok(())
     }
@@ -91,7 +99,7 @@ where
         let mut writer = self.writer.lock().await;
         if let Err(err) = request.send(&mut *writer).await {
             self.open.store(false, Ordering::Release);
-            return Err(HttpError::Io(err));
+            return Err(err);
         }
         if let Err(err) = writer.flush().await {
             self.open.store(false, Ordering::Release);
@@ -102,10 +110,15 @@ where
 
     async fn parse_response(&self, safety: &HttpSafety) -> Result<HttpResponse, HttpError> {
         let mut reader = self.reader.lock().await;
-        let response = HttpResponse::parse_lazy(&mut *reader, safety, false).await;
+        let response = match HttpResponse::parse_lazy(&mut *reader, safety, false).await {
+            Ok(response) => response,
+            Err(error) => {
+                self.open.store(false, Ordering::Release);
+                return Err(error);
+            }
+        };
 
-        // The current parser returns `HttpResponse::default()` on parse failure.
-        // Treat an empty default response as a closed/broken channel for now.
+        // Treat an empty default response as a closed/broken channel.
         if response.meta.start_line.status_code() == StatusCode::OK
             && response.meta.header.is_empty()
             && matches!(response.body, HttpBody::Unparsed)

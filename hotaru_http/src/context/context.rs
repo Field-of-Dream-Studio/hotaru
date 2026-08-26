@@ -1,7 +1,6 @@
 use akari::Value;
 use hotaru_core::app::common::{RunMode, RuntimeConfig};
 use hotaru_core::connection::TransportSpec;
-use hotaru_core::connection::error::ConnectionError;
 use hotaru_core::debug_log;
 use hotaru_core::extensions::{Locals, Params};
 use hotaru_core::protocol::{
@@ -10,7 +9,6 @@ use hotaru_core::protocol::{
 use hotaru_core::url::UrlNode;
 
 use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
-use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
@@ -223,16 +221,16 @@ impl<TS: TransportSpec> HttpContext<TS> {
     pub async fn read_request<R>(
         runtime: Arc<RuntimeConfig>,
         reader: &mut R,
-    ) -> Result<HttpRequest, ConnectionError>
+    ) -> Result<HttpRequest, HttpError>
     where
         R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
     {
-        Ok(HttpRequest::parse_lazy(
+        HttpRequest::parse_lazy(
             reader,
             &runtime.get_config::<HttpSafety>().unwrap_or_default(),
             runtime.mode() == RunMode::Build,
         )
-        .await)
+        .await
     }
 
     /// Sends the response
@@ -283,14 +281,18 @@ impl<TS: TransportSpec> HttpContext<TS> {
         if let Some(ep) = endpoint.get_params::<HttpSafety>() {
             config.update(&ep);
         }
-        if !config.check_body_size(self.request.meta.get_content_length().unwrap_or(0)) {
-            return Err(HttpError::PayloadTooLarge);
+        let content_length = self.request.meta.get_content_length()?.unwrap_or(0);
+        if content_length > config.effective_body_size() as u64 {
+            return Err(HttpError::Body(BodyError::TooLarge));
         }
         if !config.check_method(&self.request.meta.method()) {
             return Err(HttpError::MethodNotAllowed);
         }
-        if !config.check_content_type(&self.request.meta.get_content_type().unwrap_or_default()) {
-            return Err(HttpError::UnsupportedMediaType);
+        let content_type = self.request.meta.get_content_type().unwrap_or_default();
+        if !config.check_content_type(&content_type) {
+            return Err(HttpError::Body(BodyError::UnsupportedContentType(
+                content_type.to_string(),
+            )));
         }
         return Ok(());
     }
@@ -448,12 +450,12 @@ impl<TS: TransportSpec> HttpContext<TS> {
 
     /// Convenience method to get request headers directly.
     /// Avoids the long chain: req.request.meta.header
-    pub fn headers(&self) -> &HashMap<String, crate::message::meta::HeaderValue> {
+    pub fn headers(&self) -> &crate::message::header::HeaderMap {
         &self.request.meta.header
     }
 
     /// Convenience method to get a specific header value.
-    pub fn header(&self, key: &str) -> Option<&crate::message::meta::HeaderValue> {
+    pub fn header(&self, key: &str) -> Option<&crate::message::header::HeaderValue> {
         self.request.meta.header.get(key)
     }
 
@@ -461,8 +463,8 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// Returns the first value if multiple values exist.
     pub fn header_str(&self, key: &str) -> Option<&str> {
         self.request.meta.header.get(key).and_then(|hv| match hv {
-            crate::message::meta::HeaderValue::Single(s) => Some(s.as_str()),
-            crate::message::meta::HeaderValue::Multiple(v) => v.first().map(|s| s.as_str()),
+            crate::message::header::HeaderValue::Single(s) => Some(s.as_str()),
+            crate::message::header::HeaderValue::Multiple(v) => v.first().map(|s| s.as_str()),
         })
     }
 

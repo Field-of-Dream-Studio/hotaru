@@ -1,0 +1,259 @@
+use super::HttpMeta;
+use super::error::{MetaError, StreamedMetaError};
+use crate::message::header::{HeaderMap, HeaderValue};
+use crate::message::start_line::HttpStartLine;
+use crate::security::safety::HttpSafety;
+use crate::util::streamed::Streamed;
+use hotaru_core::connection::{HotaruBufRead, TransferTermination};
+use std::collections::HashMap;
+
+impl HttpMeta {
+    pub async fn from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
+        buf_reader: &mut R,
+        config: &HttpSafety,
+        print_raw: bool,
+        is_request: bool,
+    ) -> Result<HttpMeta, StreamedMetaError> {
+        let mut headers =
+            Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
+
+        if headers.is_empty() {
+            return Err(Streamed::Err(MetaError::from(
+                crate::message::start_line::StartLineError::Empty,
+            )));
+        }
+
+        // Parse the start line according to whether it's a request or response
+        let start_line = Self::parse_start_line(&headers.remove(0), is_request);
+
+        // Parse headers with special handling for specific header names
+        let header = Self::parse_headers(headers, is_request);
+
+        if print_raw {
+            println!("Parsed headers: {:?}", header);
+            println!("Parsed start line: {:?}", start_line);
+        }
+
+        let mut meta = HttpMeta::new(start_line, header);
+
+        if meta.header.contains_key("content-length")
+            && meta.header.contains_key("transfer-encoding")
+        {
+            return Err(Streamed::Err(MetaError::ConflictingFraming));
+        }
+
+        meta.parse_content_length().map_err(Streamed::Err)?;
+        meta.parse_connection()
+            .map_err(MetaError::from)
+            .map_err(Streamed::Err)?;
+
+        Ok(meta)
+    }
+
+    async fn header_lines_raw_from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
+        buf_reader: &mut R,
+        config: &HttpSafety,
+        print_raw: bool,
+    ) -> Result<Vec<String>, StreamedMetaError> {
+        let mut headers = Vec::new();
+        let mut total_header_size = 0;
+
+        // Try to fill the buffer with a single read first
+        let buffer = buf_reader.fill_buf().await?;
+
+        // Fast path: Check if we got all headers in one go
+        let fast_path_result = Self::extract_headers_from_buffer(buffer, config);
+
+        if let Some((header_lines, headers_end)) = fast_path_result {
+            // We found the complete headers in the buffer
+            if print_raw {
+                println!("Fast path: got all headers in single read");
+            }
+
+            // Process headers from buffer
+            for line in header_lines {
+                if !config.check_line_length(line.len()) {
+                    return Err(Streamed::Err(MetaError::HeaderLineTooLong));
+                }
+
+                total_header_size += line.len() + 2; // +2 for CRLF
+
+                if !config.check_header_size(total_header_size) {
+                    return Err(Streamed::Err(MetaError::HeadersTooLarge));
+                }
+
+                if !config.check_headers_count(headers.len()) {
+                    return Err(Streamed::Err(MetaError::TooManyHeaders));
+                }
+
+                // Strip CRLF injection and store
+                let safe_line = line.replace("\r", "");
+                headers.push(safe_line);
+            }
+
+            // Consume the processed data from the buffer
+            buf_reader.consume(headers_end);
+        } else {
+            // Slow path: read headers line by line
+            if print_raw {
+                println!("Slow path: reading headers line by line");
+            }
+
+            loop {
+                let mut line = String::new();
+                let outcome = buf_reader
+                    .read_line(&mut line, config.effective_line_length())
+                    .await?;
+                if outcome.termination == TransferTermination::CapReached {
+                    return Err(Streamed::Err(MetaError::HeaderLineTooLong));
+                }
+                let bytes_read = outcome.transferred;
+                if print_raw {
+                    println!("Read line: {}, buffer: {}", line, bytes_read);
+                }
+
+                if bytes_read == 0 || line.trim_end().is_empty() {
+                    break; // End of headers
+                }
+
+                total_header_size += line.len();
+
+                // Enforce max header size limit
+                if !config.check_header_size(total_header_size) {
+                    return Err(Streamed::Err(MetaError::HeadersTooLarge));
+                }
+
+                // Enforce max number of headers
+                if !config.check_headers_count(headers.len()) {
+                    return Err(Streamed::Err(MetaError::TooManyHeaders));
+                }
+
+                // Strip CRLF injection and store the header
+                let safe_line = line.trim_end().replace("\r", "");
+                headers.push(safe_line);
+            }
+        }
+
+        Ok(headers)
+    }
+
+    // Helper function to parse the start line
+    fn parse_start_line(line: &str, is_request: bool) -> HttpStartLine {
+        if is_request {
+            HttpStartLine::parse_request_or_default(line)
+        } else {
+            HttpStartLine::parse_response_or_default(line)
+        }
+    }
+
+    // Helper function to parse headers with special handling for specific header types
+    fn parse_headers(header_lines: Vec<String>, _is_response: bool) -> HeaderMap {
+        let mut headers: HashMap<String, HeaderValue> = HashMap::new();
+
+        for line in header_lines {
+            if let Some(colon_pos) = line.find(':') {
+                let (key, value) = line.split_at(colon_pos);
+
+                // Normalize the header name (case-insensitive in HTTP)
+                let header_name = key.trim().to_lowercase();
+
+                // Remove the colon and trim whitespace from the value
+                let header_value = value[1..].trim().to_string();
+
+                match headers.get_mut(&header_name) {
+                    Some(existing_value) => {
+                        existing_value.add_without_combining(header_value);
+                    }
+                    None => {
+                        // First occurrence of this header
+                        headers.insert(header_name, HeaderValue::new(header_value));
+                    }
+                }
+            }
+        }
+
+        headers.into()
+    }
+
+    // Expose the specific methods that call the shared implementation
+    pub async fn from_request_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
+        buf_reader: &mut R,
+        config: &HttpSafety,
+        print_raw: bool,
+    ) -> Result<HttpMeta, StreamedMetaError> {
+        Self::from_stream(buf_reader, config, print_raw, true).await
+    }
+
+    pub async fn from_response_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
+        buf_reader: &mut R,
+        config: &HttpSafety,
+        print_raw: bool,
+    ) -> Result<HttpMeta, StreamedMetaError> {
+        Self::from_stream(buf_reader, config, print_raw, false).await
+    }
+
+    /// Reads a bare header block and merges it into `self.header`.
+    /// No start line is parsed — every line is treated as a header.
+    /// Used for chunked trailers and any other header-only append.
+    pub async fn append_headers_from_stream<
+        R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
+    >(
+        &mut self,
+        buf_reader: &mut R,
+        config: &HttpSafety,
+        print_raw: bool,
+    ) -> Result<(), StreamedMetaError> {
+        let headers =
+            Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
+
+        if headers.is_empty() {
+            return Ok(());
+        }
+
+        let header = Self::parse_headers(headers, true);
+
+        if print_raw {
+            println!("Parsed trailers: {:?}", header);
+        }
+
+        if header.contains_key("connection") {
+            self.connection = None;
+        }
+        self.header.extend(header);
+        Ok(())
+    }
+
+    /// Helper function to extract complete headers from a buffer if possible
+    fn extract_headers_from_buffer<'a>(
+        buffer: &'a [u8],
+        config: &HttpSafety,
+    ) -> Option<(Vec<&'a str>, usize)> {
+        // Look for the end of headers marker (double CRLF)
+        let mut i = 0;
+        while i + 3 < buffer.len() {
+            if buffer[i] == b'\r'
+                && buffer[i + 1] == b'\n'
+                && buffer[i + 2] == b'\r'
+                && buffer[i + 3] == b'\n'
+            {
+                // Found end of headers
+                let headers_section = std::str::from_utf8(&buffer[..i + 2]).ok()?;
+
+                // Split into lines
+                let lines: Vec<&str> = headers_section
+                    .split("\r\n")
+                    .filter(|s| !s.is_empty())
+                    .collect();
+
+                if !config.check_headers_count(lines.len()) {
+                    return None; // Too many headers, fall back to slow path
+                }
+
+                return Some((lines, i + 4)); // +4 to include the final \r\n\r\n
+            }
+            i += 1;
+        }
+
+        None // Didn't find complete headers
+    }
+}

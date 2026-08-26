@@ -28,6 +28,11 @@ impl HttpRequest {
         &self.meta
     }
 
+    /// Check whether this request allows the connection to remain open.
+    pub fn is_keep_alive(&self) -> bool {
+        self.meta.is_keep_alive()
+    }
+
     /// Parses the HTTP request from a stream, returning an `HttpRequest` instance.
     /// The stream should implement AsyncBufRead (e.g., BufReader or TcpReader).
     /// Body will not be parsed.
@@ -35,11 +40,9 @@ impl HttpRequest {
         stream: &mut R,
         config: &HttpSafety,
         print_raw: bool,
-    ) -> Self {
-        match io::parse_lazy(stream, config, true, print_raw).await {
-            Ok((meta, body)) => Self::new(meta, body),
-            Err(_) => Self::default(),
-        }
+    ) -> Result<Self, crate::protocol::HttpError> {
+        let (meta, body) = io::parse_lazy(stream, config, true, print_raw).await?;
+        Ok(Self::new(meta, body))
     }
 
     /// Parses the HTTP Body from buffer
@@ -76,7 +79,7 @@ impl HttpRequest {
     pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(
         self,
         writer: &mut W,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), crate::protocol::HttpError> {
         io::send(self.meta, self.body, writer).await
     }
 }

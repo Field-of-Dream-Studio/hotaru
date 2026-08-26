@@ -9,8 +9,8 @@ Standard middleware collection for the Hotaru 0.8.x framework: CORS, cookie-base
 
 ```toml
 [dependencies]
-hotaru = "0.8.5"
-htmstd = "0.8.5"
+hotaru = "0.8.6"
+htmstd = "0.8.6"
 ```
 
 ## Available middleware

@@ -6,18 +6,25 @@ Most users should depend on the umbrella `hotaru` crate; this crate is the seam 
 
 ## Features
 
-- `tls` — pulls in [`hotaru_tls`](../hotaru_tls) and exposes `HTTPS = Http1Protocol<TlsStream, TlsTransport>` plus the TLS transport/config re-exports.
+- `tls` — pulls in [`hotaru_tls`](../hotaru_tls) and exposes HTTPS protocol and transport types.
+- `compression` — enables gzip, deflate, brotli, and zstd content coding through `hotaru_lib`; it is off by default.
+- `tokio` — enables the supported std/Tokio transport combination. The lower-level `std`, `io_tokio`, and `spawn_send` flags exist for feature-matrix validation.
 
 ## Layout
 
-- `protocol/` — `Http1Protocol`, `HttpError`, helpers (keep-alive, error responses).
+- `protocol/` — `Http1Protocol`, `HttpError`, and protocol error responses.
 - `channel/` — `HttpChannel` trait + `Http1Channel<W>` (per-exchange wire wrapper).
 - `context/` — `HttpContext<TS>` (the `RequestContext` impl).
 - `message/` — `HttpRequest`, `HttpResponse`, `HttpBody`, `HttpMeta`, `HttpStartLine`, types.
 - `security/` — `HttpSafety` (size/limit knobs).
-- `util/` — cookies, encoding, form parsing.
+- `util/` — typed `Connection` options, cookies, encoding, and form parsing.
 
-## Version
+## Guides
 
-`0.8.5`. Depends on `hotaru_core = 0.8.5`, `hotaru_io_tokio = 0.8.5`,
-`hotaru_lib = 0.8.5`, and optionally `hotaru_tls = 0.8.5`.
+- [Hotaru Quickstart](../QUICK_TUTORIAL.md) — create and run a default project.
+- [HTTP/1.1 guide](HOTARU_HTTP_DOC.md) — request, response, body, safety, cookie, and framing behavior for the current API.
+
+## Versioning
+
+Hotaru workspace crates are released in lockstep. The package version and
+exact sibling-crate dependency pins are declared in [`Cargo.toml`](Cargo.toml).

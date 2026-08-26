@@ -1,196 +1,182 @@
 use std::fmt;
 
-use hotaru_core::connection::error::ConnectionError;
 use hotaru_core::protocol::ProtocolError;
 
 use crate::message::body::BodyError;
+use crate::message::header::HeaderError;
 use crate::message::http_value::StatusCode;
+use crate::message::meta::MetaError;
+use crate::message::start_line::StartLineError;
+use crate::util::connection::ConnectionError;
+use crate::util::encoding::{CompressionError, EncodingError};
+use crate::util::streamed::Streamed;
 
-/// Comprehensive HTTP error type covering all standard error conditions.
+/// Aggregate HTTP error.
 ///
-/// This enum provides fine-grained error variants for HTTP protocol handling,
-/// including I/O errors, connection errors, parsing errors, security violations,
-/// and routing failures. Each variant carries contextual information where
-/// appropriate.
+/// Wraps component errors (`MetaError`, `BodyError`) and carries only the
+/// concerns that belong to no single component (transport, routing, timeout,
+/// user-thrown status).
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum HttpError {
-    // ── I/O & Connection ──────────────────────────────────────────────
-    /// Low-level I/O error (read/write failures, EOF, etc.)
+    /// A header or framing failure bubbled up from meta parsing.
+    Meta(MetaError),
+    /// A body-processing failure bubbled up from body parsing or serialization.
+    Body(BodyError),
+    /// A raw transport failure (usually from a read/write not yet inside a
+    /// `Streamed<E>` boundary).
     Io(std::io::Error),
-    /// Connection-level error (timeout, refused, TLS, etc.)
-    Connection(ConnectionError),
 
-    // ── Parsing ───────────────────────────────────────────────────────
-    /// Failed to parse the HTTP request/response start line.
-    ParseError(String),
-    /// Invalid or malformed HTTP header.
-    InvalidHeader(String),
-    /// Invalid or malformed URI in the request line.
-    InvalidUri(String),
-    /// Error in chunked transfer encoding parsing.
-    ChunkError(String),
-
-    // ── Security / Request Validation ─────────────────────────────────
-    /// Request entity is too large (413 Payload Too Large).
-    PayloadTooLarge,
-    /// HTTP method not allowed for this endpoint (405 Method Not Allowed).
+    /// The request's HTTP method is not permitted at the matched route.
     MethodNotAllowed,
-    /// Unsupported media type in request (415 Unsupported Media Type).
-    UnsupportedMediaType,
-    /// Header section exceeds configured size limits.
-    HeaderTooLarge,
-    /// Too many headers in the request.
-    TooManyHeaders,
-    /// Header line exceeds maximum allowed length.
-    HeaderLineTooLong,
-
-    // ── HTTP Status ───────────────────────────────────────────────────
-    /// Wraps a specific HTTP status code (for user-facing error responses).
-    Status(StatusCode),
-
-    // ── Routing ───────────────────────────────────────────────────────
     /// No route matched the request path.
     NoRoute(String),
-
-    // ── Timeout ───────────────────────────────────────────────────────
-    /// Request processing timed out.
+    /// The request exceeded its deadline.
     Timeout,
-
-    // ── Protocol ──────────────────────────────────────────────────────
-    /// HTTP version not supported.
-    VersionNotSupported,
-    /// Generic protocol violation.
-    ProtocolViolation(String),
-
-    // ── Catch-all ─────────────────────────────────────────────────────
-    /// Other / unspecified error.
-    Other(String),
+    /// The handler explicitly returned a status as an error.
+    Status(StatusCode),
 }
 
 impl fmt::Display for HttpError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            HttpError::Io(err) => write!(f, "I/O error: {}", err),
-            HttpError::Connection(err) => write!(f, "Connection error: {}", err),
-            HttpError::ParseError(msg) => write!(f, "Parse error: {}", msg),
-            HttpError::InvalidHeader(msg) => write!(f, "Invalid header: {}", msg),
-            HttpError::InvalidUri(uri) => write!(f, "Invalid URI: {}", uri),
-            HttpError::ChunkError(msg) => write!(f, "Chunked transfer error: {}", msg),
-            HttpError::PayloadTooLarge => write!(f, "Payload too large"),
-            HttpError::MethodNotAllowed => write!(f, "Method not allowed"),
-            HttpError::UnsupportedMediaType => write!(f, "Unsupported media type"),
-            HttpError::HeaderTooLarge => write!(f, "Header section too large"),
-            HttpError::TooManyHeaders => write!(f, "Too many headers"),
-            HttpError::HeaderLineTooLong => write!(f, "Header line too long"),
-            HttpError::Status(code) => write!(f, "HTTP status error: {:?}", code),
-            HttpError::NoRoute(path) => write!(f, "No route matched path: {}", path),
-            HttpError::Timeout => write!(f, "Request timed out"),
-            HttpError::VersionNotSupported => write!(f, "HTTP version not supported"),
-            HttpError::ProtocolViolation(msg) => write!(f, "Protocol violation: {}", msg),
-            HttpError::Other(msg) => write!(f, "HTTP error: {}", msg),
+            Self::Meta(error) => fmt::Display::fmt(error, formatter),
+            Self::Body(error) => fmt::Display::fmt(error, formatter),
+            Self::Io(error) => write!(formatter, "HTTP I/O error: {error}"),
+            Self::MethodNotAllowed => formatter.write_str("method not allowed"),
+            Self::NoRoute(path) => write!(formatter, "no route matched path: {path}"),
+            Self::Timeout => formatter.write_str("request timed out"),
+            Self::Status(code) => write!(formatter, "HTTP status error: {code:?}"),
         }
     }
 }
 
-impl std::error::Error for HttpError {}
-
-impl ProtocolError for HttpError {
-    /// Returns `true` if the connection can continue after this error.
-    ///
-    /// Recoverable errors (where a response can still be sent) return `true`:
-    /// - `Status` — user-defined status response
-    /// - `NoRoute` — 404, can send response and continue
-    /// - `PayloadTooLarge`, `MethodNotAllowed`, `UnsupportedMediaType` — security checks
-    /// - `HeaderTooLarge`, `TooManyHeaders`, `HeaderLineTooLong` — malformed request
-    /// - `ParseError`, `InvalidHeader`, `InvalidUri`, `ChunkError` — parsing failures
-    /// - `VersionNotSupported`, `ProtocolViolation` — protocol issues
-    /// - `Timeout` — timeout
-    /// - `Other` — catch-all
-    ///
-    /// Non-recoverable errors return `false`:
-    /// - `Io` — I/O errors usually mean the connection is broken
-    /// - `Connection` — connection-level failures
-    fn can_continue(&self) -> bool {
-        matches!(
-            self,
-            HttpError::Status(_)
-                | HttpError::NoRoute(_)
-                | HttpError::PayloadTooLarge
-                | HttpError::MethodNotAllowed
-                | HttpError::UnsupportedMediaType
-                | HttpError::HeaderTooLarge
-                | HttpError::TooManyHeaders
-                | HttpError::HeaderLineTooLong
-                | HttpError::ParseError(_)
-                | HttpError::InvalidHeader(_)
-                | HttpError::InvalidUri(_)
-                | HttpError::ChunkError(_)
-                | HttpError::VersionNotSupported
-                | HttpError::ProtocolViolation(_)
-                | HttpError::Timeout
-                | HttpError::Other(_)
-        )
+impl std::error::Error for HttpError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Meta(error) => Some(error),
+            Self::Body(error) => Some(error),
+            Self::Io(error) => Some(error),
+            _ => None,
+        }
     }
 }
 
-// ── From impls ────────────────────────────────────────────────────────
+// ── From: component → HttpError ───────────────────────────────────────
 
-impl From<std::io::Error> for HttpError {
-    fn from(err: std::io::Error) -> Self {
-        HttpError::Io(err)
+impl From<MetaError> for HttpError {
+    fn from(error: MetaError) -> Self {
+        Self::Meta(error)
     }
 }
 
 impl From<BodyError> for HttpError {
     fn from(error: BodyError) -> Self {
-        match error {
-            BodyError::TooLarge => HttpError::PayloadTooLarge,
-            BodyError::MissingContentType
-            | BodyError::UnsupportedContentType(_)
-            | BodyError::UnsupportedContentEncoding(_) => HttpError::UnsupportedMediaType,
-            BodyError::Io(error) => HttpError::Io(error),
-            error => HttpError::ParseError(error.to_string()),
-        }
+        Self::Body(error)
     }
 }
 
-impl From<ConnectionError> for HttpError {
-    fn from(err: ConnectionError) -> Self {
-        HttpError::Connection(err)
+impl From<std::io::Error> for HttpError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
     }
 }
 
 impl From<StatusCode> for HttpError {
     fn from(code: StatusCode) -> Self {
-        HttpError::Status(code)
+        Self::Status(code)
     }
 }
 
-/// Convert an `HttpError` into the most appropriate HTTP `StatusCode`.
-///
-/// This is useful when you need to map an `HttpError` to a response status
-/// code for error responses.
+// Sub-component conveniences: route to the natural aggregate.
+
+impl From<HeaderError> for HttpError {
+    fn from(error: HeaderError) -> Self {
+        Self::Meta(MetaError::from(error))
+    }
+}
+
+impl From<StartLineError> for HttpError {
+    fn from(error: StartLineError) -> Self {
+        Self::Meta(MetaError::from(error))
+    }
+}
+
+impl From<EncodingError> for HttpError {
+    fn from(error: EncodingError) -> Self {
+        Self::Meta(MetaError::from(error))
+    }
+}
+
+impl From<ConnectionError> for HttpError {
+    fn from(error: ConnectionError) -> Self {
+        Self::Meta(MetaError::from(error))
+    }
+}
+
+impl From<CompressionError> for HttpError {
+    fn from(error: CompressionError) -> Self {
+        Self::Body(BodyError::from(error))
+    }
+}
+
+impl From<crate::message::body::ChunkingError> for HttpError {
+    fn from(error: crate::message::body::ChunkingError) -> Self {
+        Self::Body(BodyError::from(error))
+    }
+}
+
+// ── From: Streamed<E> → HttpError ─────────────────────────────────────
+//
+// The load-bearing edge: any `Streamed<E>` where `E: Into<HttpError>`
+// converts via `?` at the aggregate boundary. Transport (`Streamed::Io`)
+// becomes `HttpError::Io`; the domain error takes its natural path.
+
+impl<E> From<Streamed<E>> for HttpError
+where
+    E: Into<HttpError>,
+{
+    fn from(streamed: Streamed<E>) -> Self {
+        match streamed {
+            Streamed::Io(error) => Self::Io(error),
+            Streamed::Err(error) => error.into(),
+        }
+    }
+}
+
+// ── ProtocolError: connection lifecycle policy ────────────────────────
+
+impl ProtocolError for HttpError {
+    /// Delegates component-level policy to `MetaError` / `BodyError`.
+    /// HttpError only decides for its own aggregate-level variants.
+    fn can_continue(&self) -> bool {
+        match self {
+            Self::Meta(error) => error.can_continue(),
+            Self::Body(error) => error.can_continue(),
+            // Transport is dead.
+            Self::Io(_) => false,
+            // Everything else: send a response and keep the socket.
+            _ => true,
+        }
+    }
+}
+
+// ── HttpError → StatusCode: response mapping ──────────────────────────
+//
+// Component wrappers delegate; the mapping for each component lives in
+// its own error file. HttpError only owns the mapping for its own
+// aggregate-level variants (transport, routing, timeout, user-thrown status).
+
 impl From<&HttpError> for StatusCode {
-    fn from(err: &HttpError) -> Self {
-        match err {
+    fn from(error: &HttpError) -> Self {
+        match error {
+            HttpError::Meta(meta) => StatusCode::from(meta),
+            HttpError::Body(body) => StatusCode::from(body),
             HttpError::Io(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            HttpError::Connection(_) => StatusCode::BAD_GATEWAY,
-            HttpError::ParseError(_) => StatusCode::BAD_REQUEST,
-            HttpError::InvalidHeader(_) => StatusCode::BAD_REQUEST,
-            HttpError::InvalidUri(_) => StatusCode::BAD_REQUEST,
-            HttpError::ChunkError(_) => StatusCode::BAD_REQUEST,
-            HttpError::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             HttpError::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
-            HttpError::UnsupportedMediaType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            HttpError::HeaderTooLarge => StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
-            HttpError::TooManyHeaders => StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
-            HttpError::HeaderLineTooLong => StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
-            HttpError::Status(code) => code.clone(),
             HttpError::NoRoute(_) => StatusCode::NOT_FOUND,
             HttpError::Timeout => StatusCode::REQUEST_TIMEOUT,
-            HttpError::VersionNotSupported => StatusCode::HTTP_VERSION_NOT_SUPPORTED,
-            HttpError::ProtocolViolation(_) => StatusCode::BAD_REQUEST,
-            HttpError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            HttpError::Status(code) => code.clone(),
         }
     }
 }

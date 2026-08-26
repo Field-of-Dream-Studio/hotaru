@@ -21,15 +21,18 @@ impl HttpResponse {
         Self { meta, body }
     }
 
+    /// Check whether this response allows the connection to remain open.
+    pub fn is_keep_alive(&self) -> bool {
+        self.meta.is_keep_alive()
+    }
+
     pub async fn parse_lazy<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         stream: &mut R,
         config: &HttpSafety,
         print_raw: bool,
-    ) -> Self {
-        match io::parse_lazy(stream, config, false, print_raw).await {
-            Ok((meta, body)) => Self::new(meta, body),
-            Err(_) => Self::default(),
-        }
+    ) -> Result<Self, crate::protocol::HttpError> {
+        let (meta, body) = io::parse_lazy(stream, config, false, print_raw).await?;
+        Ok(Self::new(meta, body))
     }
 
     /// Parses the HTTP Body from buffer
@@ -81,7 +84,7 @@ impl HttpResponse {
     pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(
         self,
         writer: &mut W,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), crate::protocol::HttpError> {
         io::send(self.meta, self.body, writer).await
     }
 
@@ -115,7 +118,9 @@ impl Default for HttpResponse {
 /// All functions return an `HttpResponse` that can be further customized if needed.
 pub mod response_templates {
     use std::collections::HashMap;
-    use std::path::Path;
+    use std::path::Component;
+use std::path::Path;
+use std::path::PathBuf;
 
     use akari::TemplateManager;
     use akari::Value;
@@ -126,6 +131,23 @@ pub mod response_templates {
     use crate::message::meta::HttpMeta;
     use crate::message::start_line::HttpStartLine;
 
+    fn resolve_template_file(file: &str) -> Option<PathBuf> {
+        let requested = Path::new(file);
+
+        if requested.components().any(|component| match component {
+            Component::Normal(_) | Component::CurDir => false,
+            _ => true,
+        }) {
+            return None;
+        }
+
+        let templates_root = Path::new("templates").canonicalize().ok()?;
+        let file_path = templates_root.join(requested).canonicalize().ok()?;
+
+        file_path
+            .starts_with(&templates_root)
+            .then_some(file_path)
+    }
     /// Creates a plain text HTTP response with status 200 OK.
     ///
     /// # Arguments
@@ -220,7 +242,10 @@ pub mod response_templates {
     pub fn plain_template_response(file: &str) -> HttpResponse {
         let start_line = HttpStartLine::new_response(HttpVersion::Http11, StatusCode::OK);
         let mut meta = HttpMeta::new(start_line, HashMap::new());
-        let file_path = Path::new("templates").join(file);
+        let file_path = match resolve_template_file(file) {
+            Some(file_path) => file_path,
+            None => return return_status(StatusCode::FORBIDDEN),
+        };
         // println!("[Response] Loading template: {}", file_path.display());
         let body = match std::fs::read(file_path) {
             Ok(content) => content,
@@ -233,7 +258,10 @@ pub mod response_templates {
     pub fn serve_static_file(file: &str) -> HttpResponse {
         let start_line = HttpStartLine::new_response(HttpVersion::Http11, StatusCode::OK);
         let mut meta = HttpMeta::new(start_line, HashMap::new());
-        let file_path = Path::new("templates").join(file);
+        let file_path = match resolve_template_file(file) {
+            Some(file_path) => file_path,
+            None => return return_status(StatusCode::FORBIDDEN),
+        };
 
         // Set the response content type based on the file extension
         meta.set_content_type(HttpContentType::from_file_name(

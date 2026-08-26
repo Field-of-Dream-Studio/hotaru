@@ -31,4 +31,4 @@ Enable on the `hotaru` umbrella with `features = ["https"]` (which forwards to `
 
 ## Version
 
-`0.8.5`. Depends on `hotaru_core = 0.8.5` and `hotaru_io_tokio = 0.8.5`.
+`0.8.6`. Depends on `hotaru_core = 0.8.6` and `hotaru_io_tokio = 0.8.6`.

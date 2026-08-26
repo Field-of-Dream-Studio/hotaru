@@ -310,7 +310,7 @@ required even when review is expedited. Urgency alone does not make a hotfix a
 Trivial Update.
 
 Internal Hotaru crate dependencies should use exact version pins such as
-`version = "=0.8.5"` during release-prep updates. Third-party dependencies
+`version = "=0.8.6"` during release-prep updates. Third-party dependencies
 should keep normal semver requirements unless there is a specific reason to
 pin them.
 
@@ -354,7 +354,7 @@ For framework code style and formatting requirements, see
 
 ## Project Roadmap
 
-### 0.8.5 (Current)
+### 0.8.6 (Current)
 - Core/backend split: Tokio runtime and IO backends live in sibling crates (`hotaru_rt_tokio`, `hotaru_io_tokio`, `hotaru_io_futures`, `hotaru_io_embedded`)
 - `hotaru_core` keeps only platform/sync (`std` / `embedded`) and task-mobility (`spawn_send` / `spawn_local`) feature axes
 - no_std / embedded groundwork (experimental; real Embassy wiring deferred)

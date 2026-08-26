@@ -9,6 +9,6 @@ publish = false
 [workspace]
 
 [dependencies]
-hotaru = { path = "../../../hotaru", version = "=0.8.5", default-features = false }
-hotaru_core = { path = "../../../hotaru_core", version = "=0.8.5" }
-hotaru_trans = { path = "../..", version = "=0.8.5", default-features = false }
+hotaru = { path = "../../../hotaru", version = "=0.8.6", default-features = false }
+hotaru_core = { path = "../../../hotaru_core", version = "=0.8.6" }
+hotaru_trans = { path = "../..", version = "=0.8.6", default-features = false }

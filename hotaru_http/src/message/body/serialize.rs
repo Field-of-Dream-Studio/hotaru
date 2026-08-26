@@ -2,13 +2,18 @@ use akari::Value;
 
 use crate::message::http_value::HttpContentType;
 use crate::message::meta::HttpMeta;
+use crate::protocol::HttpError;
 use crate::util::form::{MultiForm, UrlEncodedForm};
 
-use super::{BodyError, HttpBody};
+use super::HttpBody;
 
 impl HttpBody {
     /// Serializes an HTTP body and updates derived body metadata.
-    pub async fn into_static(self, meta: &mut HttpMeta) -> Result<Vec<u8>, BodyError> {
+    ///
+    /// Aggregates errors at this boundary: body-domain failures (`BodyError`),
+    /// meta lookups (`MetaError`), and compression I/O (`io::Error`) all flow
+    /// out as `HttpError`.
+    pub async fn into_static(self, meta: &mut HttpMeta) -> Result<Vec<u8>, HttpError> {
         fn serialize_from_json(json: Value) -> Vec<u8> {
             json.into_json().into_bytes()
         }
@@ -65,7 +70,7 @@ impl HttpBody {
             _ => (Vec::new(), None),
         };
 
-        if meta.get_content_length().is_none() {
+        if meta.get_content_length()?.is_none() {
             meta.set_content_length(bin.len());
         }
         if meta.get_content_type().is_none()
@@ -74,13 +79,8 @@ impl HttpBody {
             meta.set_content_type(content_type);
         }
 
-        let content_coding = meta
-            .get_encoding()
-            .map(|encoding| encoding.content().clone())
-            .unwrap_or_default();
-        content_coding
-            .encode_compressed(bin)
-            .map_err(|_| BodyError::InvalidEncoding)
+        let content_coding = meta.get_encoding()?.content().clone();
+        Ok(content_coding.encode_compressed(bin)?)
     }
 
     /// Returns the raw data from a binary HTTP body.
@@ -110,7 +110,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(body, b"hello");
-        assert_eq!(meta.get_content_length(), Some(5));
+        assert_eq!(meta.get_content_length().unwrap(), Some(5));
         assert!(matches!(
             meta.get_content_type(),
             Some(HttpContentType::Text { subtype, .. }) if subtype == "html"
@@ -120,15 +120,21 @@ mod tests {
     #[tokio::test]
     async fn returns_content_coding_failure() {
         let mut meta = HttpMeta::default();
-        meta.set_encoding(Some(HttpEncoding::from_headers(
-            None,
-            Some("compress".to_string()),
-        )));
+        meta.set_encoding(Some(
+            HttpEncoding::from_headers(None, Some("compress".to_string())).unwrap(),
+        ));
 
         let result = HttpBody::Text("hello".to_string())
             .into_static(&mut meta)
             .await;
 
-        assert!(matches!(result, Err(BodyError::InvalidEncoding)));
+        use crate::message::body::BodyError;
+        use crate::util::encoding::CompressionError;
+        assert!(matches!(
+            result,
+            Err(HttpError::Body(BodyError::Compression(
+                CompressionError::Unavailable("compress")
+            )))
+        ));
     }
 }

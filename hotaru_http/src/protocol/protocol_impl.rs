@@ -22,7 +22,7 @@ use crate::{
     context::HttpContext,
     protocol::{
         error::HttpError,
-        helpers::{error_response_from, is_keep_alive, is_response_keep_alive, not_found_response},
+        helpers::{error_response_from, not_found_response},
     },
     security::safety::HttpSafety,
 };
@@ -176,8 +176,15 @@ where
     ) -> Result<ProtocolFlow, <Self::Context as RequestContext>::Error> {
         // 1. Parse one request using the channel-stored safety baseline
         //    (no per-request HashMap lookup against RuntimeConfig).
-        let request = channel.parse_request(channel.safety()).await?;
-        let keep_alive = is_keep_alive(&request);
+        let request = match channel.parse_request(channel.safety()).await {
+            Ok(request) => request,
+            Err(error) if matches!(&error, HttpError::Meta(_) | HttpError::Body(_)) => {
+                channel.send_response(error_response_from(&error)).await?;
+                return Ok(ProtocolFlow::Close);
+            }
+            Err(error) => return Err(error),
+        };
+        let keep_alive = request.is_keep_alive();
 
         // 2. Walk URL tree.
         let path = request.meta.path();
@@ -247,7 +254,10 @@ where
         mut ctx: Self::Context,
     ) -> Result<Self::Context, <Self::Context as RequestContext>::Error> {
         let channel = ctx.channel().cloned().ok_or_else(|| {
-            HttpError::ProtocolViolation("outpoint channel is not installed".to_string())
+            HttpError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotConnected,
+                "outpoint channel is not installed",
+            ))
         })?;
 
         let safety = ctx.safety.clone();
@@ -256,7 +266,7 @@ where
         channel.send_request(request).await?;
 
         let response = channel.parse_response(&safety).await?;
-        let keep_alive = is_response_keep_alive(&response);
+        let keep_alive = response.is_keep_alive();
         ctx.set_response(response);
 
         if !keep_alive {
@@ -278,8 +288,6 @@ where
 mod tests {
     use super::*;
     use crate::message::http_value::StatusCode;
-    use crate::message::meta::HeaderValue;
-    use crate::message::request::HttpRequest;
 
     #[test]
     fn test_http1_detection() {
@@ -288,27 +296,6 @@ mod tests {
         assert!(HTTP::detect(b"PUT /resource HTTP/1.1\r\n"));
         assert!(!HTTP::detect(b"INVALID REQUEST\r\n"));
         assert!(!HTTP::detect(b""));
-    }
-
-    #[test]
-    fn test_is_keep_alive() {
-        let mut request = HttpRequest::default();
-        // No Connection header -> HTTP/1.1 default keep-alive
-        assert!(is_keep_alive(&request));
-
-        // Connection: close
-        request.meta.header.insert(
-            "connection".to_string(),
-            HeaderValue::Single("close".to_string()),
-        );
-        assert!(!is_keep_alive(&request));
-
-        // Connection: keep-alive
-        request.meta.header.insert(
-            "connection".to_string(),
-            HeaderValue::Single("keep-alive".to_string()),
-        );
-        assert!(is_keep_alive(&request));
     }
 
     #[test]

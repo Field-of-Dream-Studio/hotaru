@@ -22,8 +22,10 @@ use crate::config::server::TlsConfig;
 ///
 /// # async fn example() -> std::io::Result<()> {
 /// let tls_config = TlsConfig::builder()
-///     .cert_chain_file("server-cert.pem")?
-///     .private_key_file("server-key.pem")?
+///     .cert_chain_file("server-cert.pem")
+///     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+///     .private_key_file("server-key.pem")
+///     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
 ///     .alpn_protocols(&["h2", "http/1.1"])
 ///     .build()
 ///     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;

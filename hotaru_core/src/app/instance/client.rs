@@ -130,8 +130,7 @@ where
         };
 
         let segments = P::lit_parser(path);
-        root.walk(segments.iter())
-            .await
+        root.walk_segments(&segments)
             .ok_or_else(|| UrlError::InvalidPath(path.to_string()))
     }
 

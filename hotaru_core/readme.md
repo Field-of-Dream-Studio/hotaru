@@ -2,7 +2,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.5-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.6-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru_core)](https://crates.io/crates/hotaru_core)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
@@ -83,7 +83,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.8.5"
+hotaru = "0.8.6"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -109,7 +109,7 @@ Default features: `trans`, `http`. Cargo's additive feature unification means su
 - **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation. When enabling, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.8.5", features = ["external-ctor"] }
+  hotaru = { version = "0.8.6", features = ["external-ctor"] }
   ctor = "0.4.0"
   tokio = { version = "1", features = ["full"] }
   ```
@@ -118,7 +118,7 @@ Default features: `trans`, `http`. Cargo's additive feature unification means su
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.5", features = ["https", "http_compression"] }
+hotaru = { version = "0.8.6", features = ["https", "http_compression"] }
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -126,7 +126,7 @@ tokio = { version = "1", features = ["full"] }
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.5", default-features = false, features = ["trans"] }
+hotaru = { version = "0.8.6", default-features = false, features = ["trans"] }
 hotaru_grpc = "..."
 tokio = { version = "1", features = ["full"] }
 ```
@@ -212,7 +212,7 @@ pub fn get_user<HTTP>() {
 
 ### Middleware
 
-Attach a middleware to a protocol via the `ProtocolBuilder`. Add `htmstd = "0.8"` to your `Cargo.toml` for the bundled middleware library:
+Attach a middleware to a protocol via the `ProtocolBuilder`. Add `htmstd = "0.8.6"` to your `Cargo.toml` for the bundled middleware library:
 
 ```rust
 use htmstd::CookieSession;
@@ -308,7 +308,12 @@ Hotaru is built on a modular architecture:
 
 ## Changelog
 
-### 0.8.5 (Current)
+### 0.8.6 (Current)
+
+- Version-aligned with the Hotaru 0.8.6 workspace release and its exact internal dependency pins.
+- Bug fixes 
+
+### 0.8.5
 - Added protocol-neutral transfer outcomes and bounded read/write helpers.
 - Added explicit access-point definition and registration paths alongside default automatic registration.
 
