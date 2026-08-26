@@ -6,7 +6,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-<img width="1920" height="1080" alt="pict" src="https://github.com/user-attachments/assets/d04f39f0-1288-4452-9516-b430043fd081" />
+<img width="1920" alt="pict" src="https://github.com/user-attachments/assets/d04f39f0-1288-4452-9516-b430043fd081" />
 
 ## Overview
 
