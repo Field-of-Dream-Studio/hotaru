@@ -3,7 +3,7 @@
 //! The example validates generated code only; it does not run a server.
 
 use hotaru_core::{executable::middleware::AsyncMiddleware, marker::Arc};
-use hotaru_http::{context::HttpReqCtx, HTTP};
+use hotaru_http::{HTTP, context::HttpReqCtx};
 use hotaru_trans::middleware;
 
 pub mod public_boundary {
@@ -14,7 +14,6 @@ pub mod public_boundary {
             next(req).await
         }
     }
-
 }
 
 mod public_consumer {

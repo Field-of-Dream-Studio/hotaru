@@ -1,0 +1,14 @@
+[package]
+name = "hotaru-trans-example-params"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Keep this compile fixture isolated from the root workspace's additive
+# feature unification.
+[workspace]
+
+[dependencies]
+hotaru = { path = "../../../hotaru", version = "=0.8.6", default-features = false }
+hotaru_core = { path = "../../../hotaru_core", version = "=0.8.6" }
+hotaru_trans = { path = "../..", version = "=0.8.6", default-features = false }

@@ -1,0 +1,96 @@
+name: hotaru-cli
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: hotaru-cli-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  new-project-smoke:
+    name: hotaru new creates a runnable project
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Build Hotaru CLI
+        run: cargo build -p hotaru --bin hotaru
+      - name: Scaffold, build, and run a new project
+        env:
+          HOTARU_REPO: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          project_name="hotaru_new_smoke"
+          project_dir="$RUNNER_TEMP/$project_name"
+          server_pid=""
+
+          cleanup() {
+            if [ -n "$server_pid" ]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            rm -rf "$project_dir"
+          }
+          trap cleanup EXIT
+
+          rm -rf "$project_dir"
+          cd "$RUNNER_TEMP"
+          "$HOTARU_REPO/target/debug/hotaru" new "$project_name"
+          cd "$project_dir"
+
+          test -f Cargo.toml
+          test -f build.rs
+          test -f src/main.rs
+          test -d templates
+          test -d programfiles
+
+          version="$(
+            sed -n 's/^version = "\(.*\)"/\1/p' \
+              "$HOTARU_REPO/hotaru/Cargo.toml"
+          )"
+          test -n "$version"
+          grep -Fqx "hotaru = \"$version\"" Cargo.toml
+
+          # A branch under test may not have been published to crates.io yet.
+          # Keep checking the generated version above, then compile the
+          # scaffold against the exact checkout that produced it.
+          sed -i \
+            "s|^hotaru = \"$version\"$|hotaru = { path = \"$HOTARU_REPO/hotaru\" }|" \
+            Cargo.toml
+          cargo build
+
+          ./target/debug/"$project_name" >server.log 2>&1 &
+          server_pid=$!
+
+          response=""
+          for _ in $(seq 1 100); do
+            if response="$(
+              curl --silent --show-error --fail --max-time 1 \
+                http://127.0.0.1:3003/ 2>/dev/null
+            )"; then
+              break
+            fi
+
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              echo "Generated server exited before becoming ready." >&2
+              cat server.log >&2
+              exit 1
+            fi
+
+            sleep 0.1
+          done
+
+          if [ "$response" != "Hello, world!" ]; then
+            echo "Unexpected response: $response" >&2
+            cat server.log >&2
+            exit 1
+          fi
