@@ -3,6 +3,7 @@ use super::error::{MetaError, StreamedMetaError};
 use crate::message::header::{HeaderMap, HeaderValue};
 use crate::message::start_line::HttpStartLine;
 use crate::security::safety::HttpSafety;
+use crate::start_line::StartLineError;
 use crate::util::streamed::Streamed;
 use hotaru_core::connection::{HotaruBufRead, TransferTermination};
 use std::collections::HashMap;
@@ -24,7 +25,7 @@ impl HttpMeta {
         }
 
         // Parse the start line according to whether it's a request or response
-        let start_line = Self::parse_start_line(&headers.remove(0), is_request);
+        let start_line = Self::parse_start_line(&headers.remove(0), is_request)?;
 
         // Parse headers with special handling for specific header names
         let header = Self::parse_headers(headers, is_request);
@@ -138,13 +139,21 @@ impl HttpMeta {
     }
 
     // Helper function to parse the start line
-    fn parse_start_line(line: &str, is_request: bool) -> HttpStartLine {
+    pub fn parse_start_line_or_default(line: &str, is_request: bool) -> HttpStartLine {
         if is_request {
             HttpStartLine::parse_request_or_default(line)
         } else {
             HttpStartLine::parse_response_or_default(line)
         }
     }
+
+    pub fn parse_start_line(line: &str, is_request: bool) -> Result<HttpStartLine, StartLineError> {
+        if is_request {
+            HttpStartLine::parse_request(line)
+        } else {
+            HttpStartLine::parse_response(line)
+        }
+    } 
 
     // Helper function to parse headers with special handling for specific header types
     fn parse_headers(header_lines: Vec<String>, _is_response: bool) -> HeaderMap {
@@ -255,5 +264,43 @@ impl HttpMeta {
         }
 
         None // Didn't find complete headers
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::message::start_line::StartLineError;
+    use hotaru_io_tokio::TokioIo;
+    use std::io::Cursor;
+    use tokio::io::BufReader;
+
+    async fn parse_request_head(input: &[u8]) -> Result<HttpMeta, StreamedMetaError> {
+        let cursor = Cursor::new(input.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+
+        HttpMeta::from_request_stream(&mut reader, &HttpSafety::default(), false).await
+    }
+
+    #[tokio::test]
+    async fn malformed_request_line_is_not_defaulted_to_root_get() {
+        let result = parse_request_head(b"GET /\r\nHost: example.test\r\n\r\n").await;
+
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::StartLine(
+                StartLineError::Unrecognised
+            )))
+        ));
+    }
+
+    #[tokio::test]
+    async fn empty_request_head_returns_start_line_error() {
+        let result = parse_request_head(b"\r\n").await;
+
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::StartLine(StartLineError::Empty)))
+        ));
     }
 }
