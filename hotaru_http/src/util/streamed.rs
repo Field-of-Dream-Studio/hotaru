@@ -32,7 +32,7 @@ impl<E: core::error::Error + 'static> core::error::Error for Streamed<E> {
             Self::Err(error) => Some(error),
         }
     }
-} 
+}
 
 #[cfg(test)]
 mod tests {

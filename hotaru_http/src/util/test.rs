@@ -1,4 +1,4 @@
-﻿//! Security tests for HTTP parsing
+//! Security tests for HTTP parsing
 //!
 //! This module contains comprehensive security tests for:
 //! - Malformed start line parsing
@@ -69,11 +69,13 @@ mod security_tests {
 
     #[test]
     fn test_start_line_invalid_method_name() {
-        // HttpMethod::from_string accepts any string, converts to UNKNOWN
         let result = RequestStartLine::parse("INVALID_METHOD /index.html HTTP/1.1");
         assert!(result.is_ok());
         let line = result.unwrap();
-        assert_eq!(line.method, HttpMethod::UNKNOWN);
+        assert_eq!(
+            line.method,
+            HttpMethod::Extension("INVALID_METHOD".to_string())
+        );
     }
 
     #[test]
@@ -138,9 +140,24 @@ mod security_tests {
     #[test]
     fn test_start_line_unicode_method() {
         let result = RequestStartLine::parse("GÉT /index.html HTTP/1.1");
+        assert!(matches!(result, Err(StartLineError::InvalidMethodToken)));
+    }
+
+    #[test]
+    fn test_start_line_null_byte_in_method() {
+        let result = RequestStartLine::parse("GE\0T /index.html HTTP/1.1");
+        assert!(matches!(result, Err(StartLineError::InvalidMethodToken)));
+    }
+
+    #[test]
+    fn test_start_line_extension_method_is_preserved() {
+        let result = RequestStartLine::parse("BOGUSMETHOD /index.html HTTP/1.1");
         assert!(result.is_ok());
         let line = result.unwrap();
-        assert_eq!(line.method, HttpMethod::UNKNOWN);
+        assert_eq!(
+            line.method,
+            HttpMethod::Extension("BOGUSMETHOD".to_string())
+        );
     }
 
     // ============================================================================
@@ -667,15 +684,13 @@ mod security_tests {
             HttpMethod::POST,
             "/original/target".to_string(),
         );
-        let mut meta =
-            HttpMeta::new(start_line, crate::message::header::HeaderMap::new());
+        let mut meta = HttpMeta::new(start_line, crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
         let safety = HttpSafety::default();
 
         // Body: one chunk, then zero chunk, then two trailer headers.
-        let body_data =
-            b"5\r\nhello\r\n0\r\nX-Trailer-One: alpha\r\nX-Trailer-Two: beta\r\n\r\n";
+        let body_data = b"5\r\nhello\r\n0\r\nX-Trailer-One: alpha\r\nX-Trailer-Two: beta\r\n\r\n";
         let cursor = Cursor::new(body_data.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
 

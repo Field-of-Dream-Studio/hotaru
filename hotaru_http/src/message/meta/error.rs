@@ -204,8 +204,7 @@ mod tests {
             .is_some()
         );
         assert!(
-            std::error::Error::source(&MetaError::from(EncodingError::DuplicateChunked))
-                .is_some()
+            std::error::Error::source(&MetaError::from(EncodingError::DuplicateChunked)).is_some()
         );
         assert!(std::error::Error::source(&MetaError::HeadersTooLarge).is_none());
     }

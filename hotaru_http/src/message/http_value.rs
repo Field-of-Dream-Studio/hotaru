@@ -1,9 +1,9 @@
-﻿#![allow(non_snake_case)]
+#![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
+use crate::start_line::StartLineError;
 use hotaru_lib::url_encoding::*;
 use std::{collections::HashMap, hash::Hash};
-use crate::start_line::StartLineError;
 
 #[derive(Debug, Clone)]
 pub enum HttpVersion {
@@ -56,6 +56,7 @@ pub enum HttpMethod {
     PATCH,
     TRACE,
     CONNECT,
+    Extension(String),
     UNKNOWN,
 }
 
@@ -71,6 +72,7 @@ impl HttpMethod {
             HttpMethod::PATCH => "PATCH".to_string(),
             HttpMethod::TRACE => "TRACE".to_string(),
             HttpMethod::CONNECT => "CONNECT".to_string(),
+            HttpMethod::Extension(method) => method.clone(),
             _ => "UNKNOWN".to_string(),
         }
     }
@@ -91,12 +93,23 @@ impl HttpMethod {
     }
 
     pub fn parse(method: &str) -> Result<Self, StartLineError> {
-         if method.is_empty() || !method.bytes().all(is_http_token_byte) {
-             return Err(StartLineError::InvalidMethodToken);
-         }
+        if method.is_empty() || !method.bytes().all(is_http_token_byte) {
+            return Err(StartLineError::InvalidMethodToken);
+        }
 
-         Ok(Self::from_string(method))
-     }
+        Ok(match method {
+            "GET" => HttpMethod::GET,
+            "POST" => HttpMethod::POST,
+            "PUT" => HttpMethod::PUT,
+            "DELETE" => HttpMethod::DELETE,
+            "HEAD" => HttpMethod::HEAD,
+            "OPTIONS" => HttpMethod::OPTIONS,
+            "PATCH" => HttpMethod::PATCH,
+            "TRACE" => HttpMethod::TRACE,
+            "CONNECT" => HttpMethod::CONNECT,
+            other => HttpMethod::Extension(other.to_string()),
+        })
+    }
 
     pub fn get_full_list() -> Vec<HttpMethod> {
         vec![

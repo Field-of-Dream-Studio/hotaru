@@ -15,8 +15,7 @@ impl HttpMeta {
         print_raw: bool,
         is_request: bool,
     ) -> Result<HttpMeta, StreamedMetaError> {
-        let mut headers =
-            Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
+        let mut headers = Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
 
         if headers.is_empty() {
             return Err(Streamed::Err(MetaError::from(
@@ -51,7 +50,9 @@ impl HttpMeta {
         Ok(meta)
     }
 
-    async fn header_lines_raw_from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
+    async fn header_lines_raw_from_stream<
+        R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
+    >(
         buf_reader: &mut R,
         config: &HttpSafety,
         print_raw: bool,
@@ -153,7 +154,7 @@ impl HttpMeta {
         } else {
             HttpStartLine::parse_response(line)
         }
-    } 
+    }
 
     // Helper function to parse headers with special handling for specific header types
     fn parse_headers(header_lines: Vec<String>, _is_response: bool) -> HeaderMap {
@@ -212,8 +213,7 @@ impl HttpMeta {
         config: &HttpSafety,
         print_raw: bool,
     ) -> Result<(), StreamedMetaError> {
-        let headers =
-            Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
+        let headers = Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
 
         if headers.is_empty() {
             return Ok(());
