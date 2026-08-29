@@ -3,6 +3,7 @@
 
 use hotaru_lib::url_encoding::*;
 use std::{collections::HashMap, hash::Hash};
+use crate::start_line::StartLineError;
 
 #[derive(Debug, Clone)]
 pub enum HttpVersion {
@@ -89,6 +90,14 @@ impl HttpMethod {
         }
     }
 
+    pub fn parse(method: &str) -> Result<Self, StartLineError> {
+         if method.is_empty() || !method.bytes().all(is_http_token_byte) {
+             return Err(StartLineError::InvalidMethodToken);
+         }
+
+         Ok(Self::from_string(method))
+     }
+
     pub fn get_full_list() -> Vec<HttpMethod> {
         vec![
             HttpMethod::GET,
@@ -126,6 +135,17 @@ impl PartialEq<HttpMethod> for &HttpMethod {
     fn eq(&self, other: &HttpMethod) -> bool {
         **self == *other
     }
+}
+
+fn is_http_token_byte(byte: u8) -> bool {
+    matches!(
+        byte,
+        b'!' | b'#' | b'$' | b'%' | b'&' | b'\'' | b'*' | b'+'
+            | b'-' | b'.' | b'^' | b'_' | b'`' | b'|' | b'~'
+            | b'0'..=b'9'
+            | b'A'..=b'Z'
+            | b'a'..=b'z'
+    )
 }
 
 /// Represents HTTP status codes.

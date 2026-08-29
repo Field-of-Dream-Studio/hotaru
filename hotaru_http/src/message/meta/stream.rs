@@ -284,14 +284,22 @@ mod tests {
 
     #[tokio::test]
     async fn malformed_request_line_is_not_defaulted_to_root_get() {
-        let result = parse_request_head(b"GET /\r\nHost: example.test\r\n\r\n").await;
+        let cases: &[&[u8]] = &[
+            b"GE T / HTTP/1.1\r\nHost: example.test\r\n\r\n",
+            b" / HTTP/1.1\r\nHost: example.test\r\n\r\n",
+            b"GET /\r\nHost: example.test\r\n\r\n",
+        ];
 
-        assert!(matches!(
-            result,
-            Err(Streamed::Err(MetaError::StartLine(
-                StartLineError::Unrecognised
-            )))
-        ));
+        for case in cases {
+            let result = parse_request_head(case).await;
+
+            assert!(matches!(
+                result,
+                Err(Streamed::Err(MetaError::StartLine(
+                    StartLineError::Unrecognised
+                )))
+            ));
+        }
     }
 
     #[tokio::test]

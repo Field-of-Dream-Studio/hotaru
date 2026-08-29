@@ -75,7 +75,7 @@ impl RequestStartLine {
             return Err(StartLineError::Unrecognised);
         }
 
-        let method = HttpMethod::from_string(parts[0]);
+        let method = HttpMethod::parse(parts[0])?;
         let path = parts[1].to_string();
         let http_version = HttpVersion::from_string(parts[2]);
 
