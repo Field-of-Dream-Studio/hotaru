@@ -1,6 +1,7 @@
-﻿#![allow(non_snake_case)]
+#![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
+use crate::start_line::StartLineError;
 use hotaru_lib::url_encoding::*;
 use std::{collections::HashMap, hash::Hash};
 
@@ -36,6 +37,37 @@ impl HttpVersion {
             _ => HttpVersion::Unknown,
         }
     }
+
+    pub fn parse(version: &str) -> Result<Self, StartLineError> {
+        fn is_valid_http_version(version: &str) -> bool {
+            if version.is_empty() || !version.bytes().all(|byte| byte.is_ascii_graphic()) {
+                return false;
+            }
+
+            let Some(version_number) = version.strip_prefix("HTTP/") else {
+                return false;
+            };
+
+            let Some((major, minor)) = version_number.split_once('.') else {
+                return false;
+            };
+
+            !major.is_empty()
+                && !minor.is_empty()
+                && major.bytes().all(|byte| byte.is_ascii_digit())
+                && minor.bytes().all(|byte| byte.is_ascii_digit())
+        }
+
+        if !is_valid_http_version(version) {
+            return Err(StartLineError::MalformedHttpVersion);
+        }
+
+        let parsed_version = Self::from_string(version);
+        if let HttpVersion::Unknown = parsed_version {
+            return Err(StartLineError::UnsupportedHttpVersion);
+        }
+        Ok(parsed_version)
+    }
 }
 
 impl std::fmt::Display for HttpVersion {
@@ -55,6 +87,7 @@ pub enum HttpMethod {
     PATCH,
     TRACE,
     CONNECT,
+    Extension(String),
     UNKNOWN,
 }
 
@@ -70,6 +103,7 @@ impl HttpMethod {
             HttpMethod::PATCH => "PATCH".to_string(),
             HttpMethod::TRACE => "TRACE".to_string(),
             HttpMethod::CONNECT => "CONNECT".to_string(),
+            HttpMethod::Extension(method) => method.clone(),
             _ => "UNKNOWN".to_string(),
         }
     }
@@ -87,6 +121,29 @@ impl HttpMethod {
             "CONNECT" => HttpMethod::CONNECT,
             _ => HttpMethod::UNKNOWN,
         }
+    }
+
+    pub fn parse(method: &str) -> Result<Self, StartLineError> {
+        fn is_valid_http_method_token(method: &str) -> bool {
+            !method.is_empty() && method.bytes().all(is_http_token_byte)
+        }
+
+        if !is_valid_http_method_token(method) {
+            return Err(StartLineError::InvalidMethodToken);
+        }
+
+        Ok(match method {
+            "GET" => HttpMethod::GET,
+            "POST" => HttpMethod::POST,
+            "PUT" => HttpMethod::PUT,
+            "DELETE" => HttpMethod::DELETE,
+            "HEAD" => HttpMethod::HEAD,
+            "OPTIONS" => HttpMethod::OPTIONS,
+            "PATCH" => HttpMethod::PATCH,
+            "TRACE" => HttpMethod::TRACE,
+            "CONNECT" => HttpMethod::CONNECT,
+            other => HttpMethod::Extension(other.to_string()),
+        })
     }
 
     pub fn get_full_list() -> Vec<HttpMethod> {
@@ -126,6 +183,17 @@ impl PartialEq<HttpMethod> for &HttpMethod {
     fn eq(&self, other: &HttpMethod) -> bool {
         **self == *other
     }
+}
+
+fn is_http_token_byte(byte: u8) -> bool {
+    matches!(
+        byte,
+        b'!' | b'#' | b'$' | b'%' | b'&' | b'\'' | b'*' | b'+'
+            | b'-' | b'.' | b'^' | b'_' | b'`' | b'|' | b'~'
+            | b'0'..=b'9'
+            | b'A'..=b'Z'
+            | b'a'..=b'z'
+    )
 }
 
 /// Represents HTTP status codes.

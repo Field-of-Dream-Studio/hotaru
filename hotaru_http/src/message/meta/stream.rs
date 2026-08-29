@@ -3,6 +3,7 @@ use super::error::{MetaError, StreamedMetaError};
 use crate::message::header::{HeaderMap, HeaderValue};
 use crate::message::start_line::HttpStartLine;
 use crate::security::safety::HttpSafety;
+use crate::start_line::StartLineError;
 use crate::util::streamed::Streamed;
 use hotaru_core::connection::{HotaruBufRead, TransferTermination};
 use std::collections::HashMap;
@@ -14,8 +15,7 @@ impl HttpMeta {
         print_raw: bool,
         is_request: bool,
     ) -> Result<HttpMeta, StreamedMetaError> {
-        let mut headers =
-            Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
+        let mut headers = Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
 
         if headers.is_empty() {
             return Err(Streamed::Err(MetaError::from(
@@ -24,7 +24,7 @@ impl HttpMeta {
         }
 
         // Parse the start line according to whether it's a request or response
-        let start_line = Self::parse_start_line(&headers.remove(0), is_request);
+        let start_line = Self::parse_start_line(&headers.remove(0), is_request)?;
 
         // Parse headers with special handling for specific header names
         let header = Self::parse_headers(headers, is_request);
@@ -50,7 +50,9 @@ impl HttpMeta {
         Ok(meta)
     }
 
-    async fn header_lines_raw_from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
+    async fn header_lines_raw_from_stream<
+        R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
+    >(
         buf_reader: &mut R,
         config: &HttpSafety,
         print_raw: bool,
@@ -138,11 +140,19 @@ impl HttpMeta {
     }
 
     // Helper function to parse the start line
-    fn parse_start_line(line: &str, is_request: bool) -> HttpStartLine {
+    pub fn parse_start_line_or_default(line: &str, is_request: bool) -> HttpStartLine {
         if is_request {
             HttpStartLine::parse_request_or_default(line)
         } else {
             HttpStartLine::parse_response_or_default(line)
+        }
+    }
+
+    pub fn parse_start_line(line: &str, is_request: bool) -> Result<HttpStartLine, StartLineError> {
+        if is_request {
+            HttpStartLine::parse_request(line)
+        } else {
+            HttpStartLine::parse_response(line)
         }
     }
 
@@ -203,8 +213,7 @@ impl HttpMeta {
         config: &HttpSafety,
         print_raw: bool,
     ) -> Result<(), StreamedMetaError> {
-        let headers =
-            Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
+        let headers = Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
 
         if headers.is_empty() {
             return Ok(());
@@ -255,5 +264,51 @@ impl HttpMeta {
         }
 
         None // Didn't find complete headers
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::message::start_line::StartLineError;
+    use hotaru_io_tokio::TokioIo;
+    use std::io::Cursor;
+    use tokio::io::BufReader;
+
+    async fn parse_request_head(input: &[u8]) -> Result<HttpMeta, StreamedMetaError> {
+        let cursor = Cursor::new(input.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+
+        HttpMeta::from_request_stream(&mut reader, &HttpSafety::default(), false).await
+    }
+
+    #[tokio::test]
+    async fn malformed_request_line_is_not_defaulted_to_root_get() {
+        let cases: &[&[u8]] = &[
+            b"GE T / HTTP/1.1\r\nHost: example.test\r\n\r\n",
+            b" / HTTP/1.1\r\nHost: example.test\r\n\r\n",
+            b"GET /\r\nHost: example.test\r\n\r\n",
+        ];
+
+        for case in cases {
+            let result = parse_request_head(case).await;
+
+            assert!(matches!(
+                result,
+                Err(Streamed::Err(MetaError::StartLine(
+                    StartLineError::Unrecognised
+                )))
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn empty_request_head_returns_start_line_error() {
+        let result = parse_request_head(b"\r\n").await;
+
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::StartLine(StartLineError::Empty)))
+        ));
     }
 }
