@@ -92,17 +92,22 @@ mod security_tests {
         let result = RequestStartLine::parse("GET /index.html HTTP/3.0");
         assert!(result.is_ok());
         let line = result.unwrap();
-        // HttpVersion::from_string accepts any version
         assert_eq!(line.path, "/index.html");
     }
 
     #[test]
     fn test_start_line_malformed_http_version() {
         let result = RequestStartLine::parse("GET /index.html HTTPX");
-        assert!(result.is_ok());
-        let line = result.unwrap();
-        // HttpVersion doesn't have PartialEq, just check it parsed
-        assert_eq!(line.path, "/index.html");
+        assert!(matches!(result, Err(StartLineError::MalformedHttpVersion)));
+    }
+
+    #[test]
+    fn test_start_line_unsupported_http_version() {
+        let result = RequestStartLine::parse("GET /index.html HTTP/9.9");
+        assert!(matches!(
+            result,
+            Err(StartLineError::UnsupportedHttpVersion)
+        ));
     }
 
     #[test]

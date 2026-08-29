@@ -37,6 +37,37 @@ impl HttpVersion {
             _ => HttpVersion::Unknown,
         }
     }
+
+    pub fn parse(version: &str) -> Result<Self, StartLineError> {
+        fn is_valid_http_version(version: &str) -> bool {
+            if version.is_empty() || !version.bytes().all(|byte| byte.is_ascii_graphic()) {
+                return false;
+            }
+
+            let Some(version_number) = version.strip_prefix("HTTP/") else {
+                return false;
+            };
+
+            let Some((major, minor)) = version_number.split_once('.') else {
+                return false;
+            };
+
+            !major.is_empty()
+                && !minor.is_empty()
+                && major.bytes().all(|byte| byte.is_ascii_digit())
+                && minor.bytes().all(|byte| byte.is_ascii_digit())
+        }
+
+        if !is_valid_http_version(version) {
+            return Err(StartLineError::MalformedHttpVersion);
+        }
+
+        let parsed_version = Self::from_string(version);
+        if let HttpVersion::Unknown = parsed_version {
+            return Err(StartLineError::UnsupportedHttpVersion);
+        }
+        Ok(parsed_version)
+    }
 }
 
 impl std::fmt::Display for HttpVersion {
@@ -93,7 +124,11 @@ impl HttpMethod {
     }
 
     pub fn parse(method: &str) -> Result<Self, StartLineError> {
-        if method.is_empty() || !method.bytes().all(is_http_token_byte) {
+        fn is_valid_http_method_token(method: &str) -> bool {
+            !method.is_empty() && method.bytes().all(is_http_token_byte)
+        }
+
+        if !is_valid_http_method_token(method) {
             return Err(StartLineError::InvalidMethodToken);
         }
 
