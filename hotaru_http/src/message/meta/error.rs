@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use crate::message::header::HeaderError;
+use crate::message::header::{HeaderError, HeaderLineError};
 use crate::message::http_value::StatusCode;
 use crate::message::start_line::StartLineError;
 use crate::util::connection::ConnectionError;
@@ -32,6 +32,9 @@ pub enum MetaError {
     /// A header line was structurally invalid (no `:`, illegal name, etc.).
     InvalidHeader,
 
+    /// A raw header field-line failed syntax validation.
+    HeaderLine(HeaderLineError),
+
     /// Content-Length and Transfer-Encoding both present — smuggling risk.
     ConflictingFraming,
 
@@ -55,6 +58,7 @@ impl fmt::Display for MetaError {
             Self::HeadersTooLarge => formatter.write_str("header block too large"),
             Self::TooManyHeaders => formatter.write_str("too many headers"),
             Self::InvalidHeader => formatter.write_str("invalid header line"),
+            Self::HeaderLine(error) => fmt::Display::fmt(error, formatter),
             Self::ConflictingFraming => {
                 formatter.write_str("Content-Length cannot be combined with Transfer-Encoding")
             }
@@ -70,6 +74,7 @@ impl std::error::Error for MetaError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::StartLine(error) => Some(error),
+            Self::HeaderLine(error) => Some(error),
             Self::Header(error) => Some(error),
             Self::Encoding(error) => Some(error),
             Self::Connection(error) => Some(error),
@@ -87,6 +92,12 @@ impl From<StartLineError> for MetaError {
 impl From<HeaderError> for MetaError {
     fn from(error: HeaderError) -> Self {
         Self::Header(error)
+    }
+}
+
+impl From<HeaderLineError> for MetaError {
+    fn from(error: HeaderLineError) -> Self {
+        Self::HeaderLine(error)
     }
 }
 
@@ -120,6 +131,12 @@ impl From<HeaderError> for StreamedMetaError {
     }
 }
 
+impl From<HeaderLineError> for StreamedMetaError {
+    fn from(error: HeaderLineError) -> Self {
+        Streamed::Err(MetaError::from(error))
+    }
+}
+
 impl From<EncodingError> for StreamedMetaError {
     fn from(error: EncodingError) -> Self {
         Streamed::Err(MetaError::from(error))
@@ -147,7 +164,8 @@ impl MetaError {
             Self::HeaderLineTooLong
             | Self::HeadersTooLarge
             | Self::TooManyHeaders
-            | Self::InvalidHeader => false,
+            | Self::InvalidHeader
+            | Self::HeaderLine(_) => false,
             // Framing ambiguity — smuggling class.
             Self::ConflictingFraming => false,
         }
@@ -161,6 +179,7 @@ impl From<&MetaError> for StatusCode {
     fn from(error: &MetaError) -> Self {
         match error {
             MetaError::StartLine(error) => StatusCode::from(error),
+            MetaError::HeaderLine(_) => StatusCode::BAD_REQUEST,
             MetaError::Header(error) => StatusCode::from(error),
             MetaError::Encoding(error) => StatusCode::from(error),
             MetaError::Connection(error) => StatusCode::from(error),
@@ -187,6 +206,10 @@ mod tests {
             "multiple content-length header values",
         );
         assert_eq!(
+            MetaError::from(HeaderLineError::InvalidName).to_string(),
+            "header field name is invalid",
+        );
+        assert_eq!(
             MetaError::from(EncodingError::DuplicateChunked).to_string(),
             "`chunked` appeared more than once in Transfer-Encoding",
         );
@@ -204,6 +227,9 @@ mod tests {
             .is_some()
         );
         assert!(
+            std::error::Error::source(&MetaError::from(HeaderLineError::InvalidName)).is_some()
+        );
+        assert!(
             std::error::Error::source(&MetaError::from(EncodingError::DuplicateChunked)).is_some()
         );
         assert!(std::error::Error::source(&MetaError::HeadersTooLarge).is_none());
@@ -218,6 +244,10 @@ mod tests {
         assert!(matches!(
             StreamedMetaError::from(HeaderError::Missing("host".to_string())),
             Streamed::Err(MetaError::Header(HeaderError::Missing(ref name))) if name == "host"
+        ));
+        assert!(matches!(
+            StreamedMetaError::from(HeaderLineError::InvalidValue),
+            Streamed::Err(MetaError::HeaderLine(HeaderLineError::InvalidValue))
         ));
         assert!(matches!(
             StreamedMetaError::from(EncodingError::DuplicateChunked),

@@ -1,6 +1,6 @@
 use super::HttpMeta;
 use super::error::{MetaError, StreamedMetaError};
-use crate::message::header::{HeaderMap, HeaderValue};
+use crate::message::header::{HeaderLine, HeaderMap, HeaderValue};
 use crate::message::start_line::HttpStartLine;
 use crate::security::safety::HttpSafety;
 use crate::start_line::StartLineError;
@@ -27,7 +27,7 @@ impl HttpMeta {
         let start_line = Self::parse_start_line(&headers.remove(0), is_request)?;
 
         // Parse headers with special handling for specific header names
-        let header = Self::parse_headers(headers, is_request);
+        let header = Self::parse_headers(headers, is_request)?;
 
         if print_raw {
             println!("Parsed headers: {:?}", header);
@@ -88,9 +88,7 @@ impl HttpMeta {
                     return Err(Streamed::Err(MetaError::TooManyHeaders));
                 }
 
-                // Strip CRLF injection and store
-                let safe_line = line.replace("\r", "");
-                headers.push(safe_line);
+                headers.push(line.to_string());
             }
 
             // Consume the processed data from the buffer
@@ -114,11 +112,18 @@ impl HttpMeta {
                     println!("Read line: {}, buffer: {}", line, bytes_read);
                 }
 
-                if bytes_read == 0 || line.trim_end().is_empty() {
+                if bytes_read == 0 {
+                    break;
+                }
+
+                let line = line.strip_suffix('\n').unwrap_or(&line);
+                let line = line.strip_suffix('\r').unwrap_or(line);
+
+                if line.is_empty() {
                     break; // End of headers
                 }
 
-                total_header_size += line.len();
+                total_header_size += outcome.transferred;
 
                 // Enforce max header size limit
                 if !config.check_header_size(total_header_size) {
@@ -130,9 +135,7 @@ impl HttpMeta {
                     return Err(Streamed::Err(MetaError::TooManyHeaders));
                 }
 
-                // Strip CRLF injection and store the header
-                let safe_line = line.trim_end().replace("\r", "");
-                headers.push(safe_line);
+                headers.push(line.to_string());
             }
         }
 
@@ -157,32 +160,27 @@ impl HttpMeta {
     }
 
     // Helper function to parse headers with special handling for specific header types
-    fn parse_headers(header_lines: Vec<String>, _is_response: bool) -> HeaderMap {
+    fn parse_headers(
+        header_lines: Vec<String>,
+        _is_response: bool,
+    ) -> Result<HeaderMap, MetaError> {
         let mut headers: HashMap<String, HeaderValue> = HashMap::new();
 
         for line in header_lines {
-            if let Some(colon_pos) = line.find(':') {
-                let (key, value) = line.split_at(colon_pos);
+            let (header_name, header_value) = HeaderLine::parse(&line)?.into_parts();
 
-                // Normalize the header name (case-insensitive in HTTP)
-                let header_name = key.trim().to_lowercase();
-
-                // Remove the colon and trim whitespace from the value
-                let header_value = value[1..].trim().to_string();
-
-                match headers.get_mut(&header_name) {
-                    Some(existing_value) => {
-                        existing_value.add_without_combining(header_value);
-                    }
-                    None => {
-                        // First occurrence of this header
-                        headers.insert(header_name, HeaderValue::new(header_value));
-                    }
+            match headers.get_mut(&header_name) {
+                Some(existing_value) => {
+                    existing_value.add_without_combining(header_value);
+                }
+                None => {
+                    // First occurrence of this header
+                    headers.insert(header_name, HeaderValue::new(header_value));
                 }
             }
         }
 
-        headers.into()
+        Ok(headers.into())
     }
 
     // Expose the specific methods that call the shared implementation
@@ -219,7 +217,7 @@ impl HttpMeta {
             return Ok(());
         }
 
-        let header = Self::parse_headers(headers, true);
+        let header = Self::parse_headers(headers, true)?;
 
         if print_raw {
             println!("Parsed trailers: {:?}", header);
@@ -270,6 +268,7 @@ impl HttpMeta {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::message::http_value::StatusCode;
     use crate::message::start_line::StartLineError;
     use hotaru_io_tokio::TokioIo;
     use std::io::Cursor;
@@ -280,6 +279,16 @@ mod tests {
         let mut reader = TokioIo::new(BufReader::new(cursor));
 
         HttpMeta::from_request_stream(&mut reader, &HttpSafety::default(), false).await
+    }
+
+    fn assert_invalid_header(result: Result<HttpMeta, StreamedMetaError>) {
+        match result {
+            Err(Streamed::Err(error @ MetaError::HeaderLine(_))) => {
+                assert_eq!(StatusCode::from(&error), StatusCode::BAD_REQUEST);
+                assert!(!error.can_continue());
+            }
+            other => panic!("expected invalid header error, got {other:?}"),
+        }
     }
 
     #[tokio::test]
@@ -310,5 +319,50 @@ mod tests {
             result,
             Err(Streamed::Err(MetaError::StartLine(StartLineError::Empty)))
         ));
+    }
+
+    #[tokio::test]
+    async fn header_value_with_cr_is_invalid() {
+        let result =
+            parse_request_head(b"GET / HTTP/1.1\r\nHost: example.test\r\nX-Test: a\rb\r\n\r\n")
+                .await;
+
+        assert_invalid_header(result);
+    }
+
+    #[tokio::test]
+    async fn header_value_with_nul_is_invalid() {
+        let result =
+            parse_request_head(b"GET / HTTP/1.1\r\nHost: example.test\r\nX-Test: a\0b\r\n\r\n")
+                .await;
+
+        assert_invalid_header(result);
+    }
+
+    #[tokio::test]
+    async fn whitespace_before_colon_is_invalid() {
+        let result =
+            parse_request_head(b"GET / HTTP/1.1\r\nHost: example.test\r\nX : v\r\n\r\n").await;
+
+        assert_invalid_header(result);
+    }
+
+    #[tokio::test]
+    async fn obfuscated_transfer_encoding_is_invalid_before_framing() {
+        let result = parse_request_head(
+            b"POST / HTTP/1.1\r\nHost: example.test\r\nTransfer-Encoding : chunked\r\n\r\n0\r\n\r\n",
+        )
+        .await;
+
+        assert_invalid_header(result);
+    }
+
+    #[tokio::test]
+    async fn valid_header_is_parsed_normally() {
+        let meta = parse_request_head(b"GET / HTTP/1.1\r\nHost: example.test\r\nX-Test: v\r\n\r\n")
+            .await
+            .unwrap();
+
+        assert_eq!(meta.header.get("x-test").unwrap().first(), "v");
     }
 }

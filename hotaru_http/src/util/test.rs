@@ -171,6 +171,9 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_header_null_byte_injection() {
+        use crate::message::meta::MetaError;
+        use crate::util::streamed::Streamed;
+
         let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         let safety = HttpSafety::default();
 
@@ -181,22 +184,10 @@ mod security_tests {
         let result = meta
             .append_headers_from_stream(&mut reader, &safety, true)
             .await;
-        assert!(result.is_ok());
-
-        // Verify null byte is in the header value
-        if let Some(host) = meta.header.get("Host") {
-            match host {
-                crate::message::header::HeaderValue::Single(s) => {
-                    assert!(s.contains('\0'), "Header contains null byte");
-                }
-                crate::message::header::HeaderValue::Multiple(v) => {
-                    assert!(
-                        v.iter().any(|s| s.contains('\0')),
-                        "Header contains null byte"
-                    );
-                }
-            }
-        }
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::HeaderLine(_)))
+        ));
     }
 
     #[tokio::test]
@@ -349,22 +340,20 @@ mod security_tests {
     /// Line folding is deprecated and a security risk in modern HTTP/1.1
     #[tokio::test]
     async fn test_header_line_folding() {
+        use crate::message::meta::MetaError;
+        use crate::util::streamed::Streamed;
+
         let safety = HttpSafety::default();
 
         let request = b"GET / HTTP/1.1\r\nX-Long-Header: part1\r\n part2\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
-        let meta = HttpMeta::from_request_stream(&mut reader, &safety, false)
-            .await
-            .expect("parse should succeed");
+        let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
 
-        // Line folding should be rejected - the continuation line " part2"
-        // should not be parsed as part of X-Long-Header.
-        if let Some(header_value) = meta.header.get("x-long-header") {
-            assert_eq!(header_value.first(), "part1", "Line folding was rejected");
-        } else {
-            assert_eq!(meta.header.len(), 0, "Parser rejects line folded headers");
-        }
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::HeaderLine(_)))
+        ));
     }
 
     // ============================================================================
@@ -518,6 +507,9 @@ mod security_tests {
 
     #[tokio::test]
     async fn test_chunked_zero_size_not_last() {
+        use crate::message::meta::MetaError;
+        use crate::protocol::HttpError;
+
         let mut meta = HttpMeta::new(Default::default(), crate::message::header::HeaderMap::new());
         meta.header
             .insert("transfer-encoding".to_string(), "chunked".into());
@@ -528,8 +520,10 @@ mod security_tests {
         let cursor = Cursor::new(body_data.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
-        // Parser should stop at first zero chunk
-        assert!(result.is_ok());
+        assert!(matches!(
+            result,
+            Err(HttpError::Meta(MetaError::HeaderLine(_)))
+        ));
     }
 
     #[tokio::test]
