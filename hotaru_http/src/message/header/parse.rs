@@ -48,7 +48,8 @@ impl HeaderMap {
         ))
     }
 
-    fn is_tchar(byte: u8) -> bool {
+    /// checks if a byte is a valid tchar according to RFC 9110 §5.6.1
+    fn is_tchar(byte: u8) -> bool {  
         matches!(
             byte,
             b'!' | b'#'
