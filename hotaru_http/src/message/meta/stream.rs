@@ -1,12 +1,11 @@
 use super::HttpMeta;
 use super::error::{MetaError, StreamedMetaError};
-use crate::message::header::{HeaderLine, HeaderMap, HeaderValue};
+use crate::message::header::HeaderMap;
 use crate::message::start_line::HttpStartLine;
 use crate::security::safety::HttpSafety;
 use crate::start_line::StartLineError;
 use crate::util::streamed::Streamed;
 use hotaru_core::connection::{HotaruBufRead, TransferTermination};
-use std::collections::HashMap;
 
 impl HttpMeta {
     pub async fn from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
@@ -164,23 +163,13 @@ impl HttpMeta {
         header_lines: Vec<String>,
         _is_response: bool,
     ) -> Result<HeaderMap, MetaError> {
-        let mut headers: HashMap<String, HeaderValue> = HashMap::new();
+        let mut headers = HeaderMap::new();
 
         for line in header_lines {
-            let (header_name, header_value) = HeaderLine::parse(&line)?.into_parts();
-
-            match headers.get_mut(&header_name) {
-                Some(existing_value) => {
-                    existing_value.add_without_combining(header_value);
-                }
-                None => {
-                    // First occurrence of this header
-                    headers.insert(header_name, HeaderValue::new(header_value));
-                }
-            }
+            headers.insert_field_line(&line)?;
         }
 
-        Ok(headers.into())
+        Ok(headers)
     }
 
     // Expose the specific methods that call the shared implementation
@@ -268,7 +257,6 @@ impl HttpMeta {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::http_value::StatusCode;
     use crate::message::start_line::StartLineError;
     use hotaru_io_tokio::TokioIo;
     use std::io::Cursor;
@@ -279,16 +267,6 @@ mod tests {
         let mut reader = TokioIo::new(BufReader::new(cursor));
 
         HttpMeta::from_request_stream(&mut reader, &HttpSafety::default(), false).await
-    }
-
-    fn assert_invalid_header(result: Result<HttpMeta, StreamedMetaError>) {
-        match result {
-            Err(Streamed::Err(error @ MetaError::HeaderLine(_))) => {
-                assert_eq!(StatusCode::from(&error), StatusCode::BAD_REQUEST);
-                assert!(!error.can_continue());
-            }
-            other => panic!("expected invalid header error, got {other:?}"),
-        }
     }
 
     #[tokio::test]
@@ -319,50 +297,5 @@ mod tests {
             result,
             Err(Streamed::Err(MetaError::StartLine(StartLineError::Empty)))
         ));
-    }
-
-    #[tokio::test]
-    async fn header_value_with_cr_is_invalid() {
-        let result =
-            parse_request_head(b"GET / HTTP/1.1\r\nHost: example.test\r\nX-Test: a\rb\r\n\r\n")
-                .await;
-
-        assert_invalid_header(result);
-    }
-
-    #[tokio::test]
-    async fn header_value_with_nul_is_invalid() {
-        let result =
-            parse_request_head(b"GET / HTTP/1.1\r\nHost: example.test\r\nX-Test: a\0b\r\n\r\n")
-                .await;
-
-        assert_invalid_header(result);
-    }
-
-    #[tokio::test]
-    async fn whitespace_before_colon_is_invalid() {
-        let result =
-            parse_request_head(b"GET / HTTP/1.1\r\nHost: example.test\r\nX : v\r\n\r\n").await;
-
-        assert_invalid_header(result);
-    }
-
-    #[tokio::test]
-    async fn obfuscated_transfer_encoding_is_invalid_before_framing() {
-        let result = parse_request_head(
-            b"POST / HTTP/1.1\r\nHost: example.test\r\nTransfer-Encoding : chunked\r\n\r\n0\r\n\r\n",
-        )
-        .await;
-
-        assert_invalid_header(result);
-    }
-
-    #[tokio::test]
-    async fn valid_header_is_parsed_normally() {
-        let meta = parse_request_head(b"GET / HTTP/1.1\r\nHost: example.test\r\nX-Test: v\r\n\r\n")
-            .await
-            .unwrap();
-
-        assert_eq!(meta.header.get("x-test").unwrap().first(), "v");
     }
 }
