@@ -1,12 +1,11 @@
 use super::HttpMeta;
 use super::error::{MetaError, StreamedMetaError};
-use crate::message::header::{HeaderMap, HeaderValue};
+use crate::message::header::HeaderMap;
 use crate::message::start_line::HttpStartLine;
 use crate::security::safety::HttpSafety;
 use crate::start_line::StartLineError;
 use crate::util::streamed::Streamed;
 use hotaru_core::connection::{HotaruBufRead, TransferTermination};
-use std::collections::HashMap;
 
 impl HttpMeta {
     pub async fn from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
@@ -27,7 +26,7 @@ impl HttpMeta {
         let start_line = Self::parse_start_line(&headers.remove(0), is_request)?;
 
         // Parse headers with special handling for specific header names
-        let header = Self::parse_headers(headers, is_request);
+        let header = Self::parse_headers(headers, is_request)?;
 
         if print_raw {
             println!("Parsed headers: {:?}", header);
@@ -88,9 +87,7 @@ impl HttpMeta {
                     return Err(Streamed::Err(MetaError::TooManyHeaders));
                 }
 
-                // Strip CRLF injection and store
-                let safe_line = line.replace("\r", "");
-                headers.push(safe_line);
+                headers.push(line.to_string());
             }
 
             // Consume the processed data from the buffer
@@ -114,11 +111,18 @@ impl HttpMeta {
                     println!("Read line: {}, buffer: {}", line, bytes_read);
                 }
 
-                if bytes_read == 0 || line.trim_end().is_empty() {
+                if bytes_read == 0 {
+                    break;
+                }
+
+                let line = line.strip_suffix('\n').unwrap_or(&line);
+                let line = line.strip_suffix('\r').unwrap_or(line);
+
+                if line.is_empty() {
                     break; // End of headers
                 }
 
-                total_header_size += line.len();
+                total_header_size += outcome.transferred;
 
                 // Enforce max header size limit
                 if !config.check_header_size(total_header_size) {
@@ -130,9 +134,7 @@ impl HttpMeta {
                     return Err(Streamed::Err(MetaError::TooManyHeaders));
                 }
 
-                // Strip CRLF injection and store the header
-                let safe_line = line.trim_end().replace("\r", "");
-                headers.push(safe_line);
+                headers.push(line.to_string());
             }
         }
 
@@ -157,32 +159,17 @@ impl HttpMeta {
     }
 
     // Helper function to parse headers with special handling for specific header types
-    fn parse_headers(header_lines: Vec<String>, _is_response: bool) -> HeaderMap {
-        let mut headers: HashMap<String, HeaderValue> = HashMap::new();
+    fn parse_headers(
+        header_lines: Vec<String>,
+        _is_response: bool,
+    ) -> Result<HeaderMap, MetaError> {
+        let mut headers = HeaderMap::new();
 
         for line in header_lines {
-            if let Some(colon_pos) = line.find(':') {
-                let (key, value) = line.split_at(colon_pos);
-
-                // Normalize the header name (case-insensitive in HTTP)
-                let header_name = key.trim().to_lowercase();
-
-                // Remove the colon and trim whitespace from the value
-                let header_value = value[1..].trim().to_string();
-
-                match headers.get_mut(&header_name) {
-                    Some(existing_value) => {
-                        existing_value.add_without_combining(header_value);
-                    }
-                    None => {
-                        // First occurrence of this header
-                        headers.insert(header_name, HeaderValue::new(header_value));
-                    }
-                }
-            }
+            headers.insert_field_line(&line)?;
         }
 
-        headers.into()
+        Ok(headers)
     }
 
     // Expose the specific methods that call the shared implementation
@@ -219,7 +206,7 @@ impl HttpMeta {
             return Ok(());
         }
 
-        let header = Self::parse_headers(headers, true);
+        let header = Self::parse_headers(headers, true)?;
 
         if print_raw {
             println!("Parsed trailers: {:?}", header);

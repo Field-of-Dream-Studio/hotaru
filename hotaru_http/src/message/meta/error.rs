@@ -175,6 +175,7 @@ impl From<&MetaError> for StatusCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::message::header::HeaderLineError;
 
     #[test]
     fn wrapping_variants_delegate_display_to_the_inner_error() {
@@ -185,6 +186,10 @@ mod tests {
         assert_eq!(
             MetaError::from(HeaderError::MultipleValues("content-length".to_string())).to_string(),
             "multiple content-length header values",
+        );
+        assert_eq!(
+            MetaError::from(HeaderError::from(HeaderLineError::InvalidName)).to_string(),
+            "header field name is invalid",
         );
         assert_eq!(
             MetaError::from(EncodingError::DuplicateChunked).to_string(),
@@ -200,6 +205,12 @@ mod tests {
         assert!(
             std::error::Error::source(&MetaError::from(HeaderError::MultipleValues(
                 "content-length".to_string()
+            )))
+            .is_some()
+        );
+        assert!(
+            std::error::Error::source(&MetaError::from(HeaderError::from(
+                HeaderLineError::InvalidName
             )))
             .is_some()
         );
@@ -220,6 +231,12 @@ mod tests {
             Streamed::Err(MetaError::Header(HeaderError::Missing(ref name))) if name == "host"
         ));
         assert!(matches!(
+            StreamedMetaError::from(HeaderError::from(HeaderLineError::InvalidValue)),
+            Streamed::Err(MetaError::Header(HeaderError::ParseError(
+                HeaderLineError::InvalidValue
+            )))
+        ));
+        assert!(matches!(
             StreamedMetaError::from(EncodingError::DuplicateChunked),
             Streamed::Err(MetaError::Encoding(EncodingError::DuplicateChunked))
         ));
@@ -228,4 +245,5 @@ mod tests {
             Streamed::Err(MetaError::Connection(ConnectionError::EmptyToken))
         ));
     }
+
 }
