@@ -52,9 +52,9 @@ impl HttpMeta {
                         "content-length".to_string(),
                     ));
                 }
-                value.parse::<u64>().map_err(|_| {
-                    HeaderError::HeaderValueOverflow("content-length".to_string())
-                })
+                value
+                    .parse::<u64>()
+                    .map_err(|_| HeaderError::HeaderValueOverflow("content-length".to_string()))
             })
             .map_err(MetaError::from)?;
 

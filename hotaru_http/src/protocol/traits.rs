@@ -8,12 +8,10 @@
 //! `HttpTransport` was removed; addresses now live on `Http1Channel` via
 //! `HttpChannel::local_addr` / `remote_addr`.
 
-pub use super::{
-    helpers::{error_response_from, not_found_response},
-    protocol_impl::{
-        DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol,
-    },
-};
-pub use crate::channel::{Http1Channel, HttpChannel};
 #[cfg(feature = "tls")]
 pub use super::protocol_impl::{HTTPS, Http1TlsProtocol};
+pub use super::{
+    helpers::{error_response_from, not_found_response},
+    protocol_impl::{DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol},
+};
+pub use crate::channel::{Http1Channel, HttpChannel};

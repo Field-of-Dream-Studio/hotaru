@@ -1,6 +1,7 @@
 use super::HttpMeta;
 use super::error::{MetaError, StreamedMetaError};
 use crate::message::header::{HeaderMap, HeaderValue};
+use crate::message::http_value::HttpVersion;
 use crate::message::start_line::HttpStartLine;
 use crate::security::safety::HttpSafety;
 use crate::util::streamed::Streamed;
@@ -36,6 +37,11 @@ impl HttpMeta {
 
         let mut meta = HttpMeta::new(start_line, header);
 
+        if is_request && matches!(meta.start_line.http_version(), HttpVersion::Http11) {
+            meta.require_valid_request_host()
+                .map_err(MetaError::from)
+                .map_err(Streamed::Err)?;
+        }
         if meta.header.contains_key("content-length")
             && meta.header.contains_key("transfer-encoding")
         {

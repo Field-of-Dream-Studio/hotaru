@@ -5,7 +5,10 @@ use super::*;
 #[test]
 fn parse_plus_decodes_to_space() {
     let form = UrlEncodedForm::parse(b"greeting=Hello+world").unwrap();
-    assert_eq!(form.get("greeting").map(String::as_str), Some("Hello world"));
+    assert_eq!(
+        form.get("greeting").map(String::as_str),
+        Some("Hello world")
+    );
 }
 
 /// `%20` must still decode to a space (the other accepted form-encoding
@@ -13,7 +16,10 @@ fn parse_plus_decodes_to_space() {
 #[test]
 fn parse_percent_twenty_decodes_to_space() {
     let form = UrlEncodedForm::parse(b"greeting=Hello%20world").unwrap();
-    assert_eq!(form.get("greeting").map(String::as_str), Some("Hello world"));
+    assert_eq!(
+        form.get("greeting").map(String::as_str),
+        Some("Hello world")
+    );
 }
 
 /// A literal `+` typed by the user is sent on the wire as `%2B` and must

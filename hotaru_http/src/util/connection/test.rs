@@ -131,7 +131,7 @@ fn connection_errors_integrate_with_meta_error() {
 #[tokio::test]
 async fn invalid_connection_option_is_rejected_from_wire() {
     let safety = HttpSafety::default();
-    let request = b"GET / HTTP/1.1\r\nConnection: keep alive\r\n\r\n";
+    let request = b"GET / HTTP/1.1\r\nHost: example.com\r\nConnection: keep alive\r\n\r\n";
     let cursor = Cursor::new(request.to_vec());
     let mut reader = TokioIo::new(BufReader::new(cursor));
     let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;

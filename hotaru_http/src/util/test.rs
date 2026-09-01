@@ -241,7 +241,8 @@ mod security_tests {
         use crate::protocol::HttpError;
 
         let safety = HttpSafety::default();
-        let request = b"POST / HTTP/1.1\r\nContent-Length: 10\r\nContent-Length: 20\r\n\r\n";
+        let request =
+            b"POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 10\r\nContent-Length: 20\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpRequest::parse_lazy(&mut reader, &safety, false).await;
@@ -260,7 +261,8 @@ mod security_tests {
         use crate::util::streamed::Streamed;
 
         let safety = HttpSafety::default();
-        let request = b"POST / HTTP/1.1\r\nContent-Length: 10\r\nContent-Length: 10\r\n\r\n";
+        let request =
+            b"POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 10\r\nContent-Length: 10\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
@@ -279,7 +281,7 @@ mod security_tests {
         use crate::util::streamed::Streamed;
 
         let safety = HttpSafety::default();
-        let request = b"POST / HTTP/1.1\r\nContent-Length: 10, 10\r\n\r\n";
+        let request = b"POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 10, 10\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
@@ -297,8 +299,7 @@ mod security_tests {
         use crate::util::streamed::Streamed;
 
         let safety = HttpSafety::default();
-        let request =
-            b"POST / HTTP/1.1\r\nContent-Length: 10\r\nTransfer-Encoding: chunked\r\n\r\n";
+        let request = b"POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 10\r\nTransfer-Encoding: chunked\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
         let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
@@ -307,6 +308,105 @@ mod security_tests {
             result,
             Err(Streamed::Err(MetaError::ConflictingFraming))
         ));
+    }
+
+    #[tokio::test]
+    async fn test_http11_request_missing_host() {
+        use crate::message::header::HeaderError;
+        use crate::message::meta::MetaError;
+        use crate::util::streamed::Streamed;
+
+        let safety = HttpSafety::default();
+        let request = b"GET / HTTP/1.1\r\n\r\n";
+        let cursor = Cursor::new(request.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+        let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
+
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::Header(HeaderError::Missing(ref name))))
+                if name == "host"
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_http11_request_empty_host() {
+        use crate::message::header::HeaderError;
+        use crate::message::meta::MetaError;
+        use crate::util::streamed::Streamed;
+
+        let safety = HttpSafety::default();
+        let request = b"GET / HTTP/1.1\r\nHost: \r\n\r\n";
+        let cursor = Cursor::new(request.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+        let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
+
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::Header(HeaderError::InvalidHeaderValue(ref name))))
+                if name == "host"
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_http11_request_duplicate_host() {
+        use crate::message::header::HeaderError;
+        use crate::message::meta::MetaError;
+        use crate::util::streamed::Streamed;
+
+        let safety = HttpSafety::default();
+        let request = b"GET / HTTP/1.1\r\nHost: example.com\r\nHost: other.example\r\n\r\n";
+        let cursor = Cursor::new(request.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+        let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
+
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::Header(HeaderError::MultipleValues(ref name))))
+                if name == "host"
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_http11_request_invalid_host() {
+        use crate::message::header::HeaderError;
+        use crate::message::meta::MetaError;
+        use crate::util::streamed::Streamed;
+
+        let safety = HttpSafety::default();
+        let request = b"GET / HTTP/1.1\r\nHost: example.com:bad\r\n\r\n";
+        let cursor = Cursor::new(request.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+        let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
+
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::Header(HeaderError::InvalidHeaderValue(ref name))))
+                if name == "host"
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_http11_request_valid_host() {
+        let safety = HttpSafety::default();
+        let request = b"GET / HTTP/1.1\r\nHost: example.com:8080\r\n\r\n";
+        let cursor = Cursor::new(request.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+        let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
+
+        let mut meta = result.expect("valid Host header should parse");
+        assert_eq!(meta.get_host(), Some("example.com:8080".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_http10_request_missing_host() {
+        let safety = HttpSafety::default();
+        let request = b"GET / HTTP/1.0\r\n\r\n";
+        let cursor = Cursor::new(request.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+        let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
+
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -329,7 +429,8 @@ mod security_tests {
     async fn test_header_line_folding() {
         let safety = HttpSafety::default();
 
-        let request = b"GET / HTTP/1.1\r\nX-Long-Header: part1\r\n part2\r\n\r\n";
+        let request =
+            b"GET / HTTP/1.1\r\nHost: example.com\r\nX-Long-Header: part1\r\n part2\r\n\r\n";
         let cursor = Cursor::new(request.to_vec());
         let mut reader = TokioIo::new(BufReader::new(cursor));
         let meta = HttpMeta::from_request_stream(&mut reader, &safety, false)
