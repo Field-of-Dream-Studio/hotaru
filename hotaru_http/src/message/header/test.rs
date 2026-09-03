@@ -231,7 +231,7 @@ async fn test_header_many_headers_exceeding_limit() {
 #[tokio::test]
 async fn test_header_duplicate_content_length() {
     let safety = HttpSafety::default();
-    let request = b"POST / HTTP/1.1\r\nContent-Length: 10\r\nContent-Length: 20\r\n\r\n";
+    let request = b"POST / HTTP/1.1\r\nHost: example.test\r\nContent-Length: 10\r\nContent-Length: 20\r\n\r\n";
     let cursor = Cursor::new(request.to_vec());
     let mut reader = TokioIo::new(BufReader::new(cursor));
     let result = HttpRequest::parse_lazy(&mut reader, &safety, false).await;
@@ -246,7 +246,7 @@ async fn test_header_duplicate_content_length() {
 #[tokio::test]
 async fn test_header_duplicate_identical_content_length() {
     let safety = HttpSafety::default();
-    let request = b"POST / HTTP/1.1\r\nContent-Length: 10\r\nContent-Length: 10\r\n\r\n";
+    let request = b"POST / HTTP/1.1\r\nHost: example.test\r\nContent-Length: 10\r\nContent-Length: 10\r\n\r\n";
     let cursor = Cursor::new(request.to_vec());
     let mut reader = TokioIo::new(BufReader::new(cursor));
     let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
@@ -261,7 +261,7 @@ async fn test_header_duplicate_identical_content_length() {
 #[tokio::test]
 async fn test_header_comma_separated_content_length() {
     let safety = HttpSafety::default();
-    let request = b"POST / HTTP/1.1\r\nContent-Length: 10, 10\r\n\r\n";
+    let request = b"POST / HTTP/1.1\r\nHost: example.test\r\nContent-Length: 10, 10\r\n\r\n";
     let cursor = Cursor::new(request.to_vec());
     let mut reader = TokioIo::new(BufReader::new(cursor));
     let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;
@@ -276,7 +276,7 @@ async fn test_header_comma_separated_content_length() {
 #[tokio::test]
 async fn test_header_content_length_with_transfer_encoding() {
     let safety = HttpSafety::default();
-    let request = b"POST / HTTP/1.1\r\nContent-Length: 10\r\nTransfer-Encoding: chunked\r\n\r\n";
+    let request = b"POST / HTTP/1.1\r\nHost: example.test\r\nContent-Length: 10\r\nTransfer-Encoding: chunked\r\n\r\n";
     let cursor = Cursor::new(request.to_vec());
     let mut reader = TokioIo::new(BufReader::new(cursor));
     let result = HttpMeta::from_request_stream(&mut reader, &safety, false).await;

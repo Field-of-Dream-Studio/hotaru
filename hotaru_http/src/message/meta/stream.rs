@@ -1,6 +1,7 @@
 use super::HttpMeta;
 use super::error::{MetaError, StreamedMetaError};
 use crate::message::header::HeaderMap;
+use crate::message::http_value::HttpVersion;
 use crate::message::start_line::HttpStartLine;
 use crate::security::safety::HttpSafety;
 use crate::start_line::StartLineError;
@@ -34,6 +35,12 @@ impl HttpMeta {
         }
 
         let mut meta = HttpMeta::new(start_line, header);
+
+        if is_request && matches!(meta.start_line.http_version(), HttpVersion::Http11) {
+            meta.require_valid_request_host()
+                .map_err(MetaError::from)
+                .map_err(Streamed::Err)?;
+        }
 
         if meta.header.contains_key("content-length")
             && meta.header.contains_key("transfer-encoding")
@@ -257,6 +264,7 @@ impl HttpMeta {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::message::header::HeaderError;
     use crate::message::start_line::StartLineError;
     use hotaru_io_tokio::TokioIo;
     use std::io::Cursor;
@@ -297,5 +305,57 @@ mod tests {
             result,
             Err(Streamed::Err(MetaError::StartLine(StartLineError::Empty)))
         ));
+    }
+
+    #[tokio::test]
+    async fn http_11_request_requires_host_header() {
+        let result = parse_request_head(b"GET / HTTP/1.1\r\n\r\n").await;
+
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::Header(HeaderError::Missing(ref name))))
+                if name == "host"
+        ));
+    }
+
+    #[tokio::test]
+    async fn http_11_request_rejects_empty_host_header() {
+        let result = parse_request_head(b"GET / HTTP/1.1\r\nHost:\r\n\r\n").await;
+
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::Header(HeaderError::InvalidHeaderValue(ref name))))
+                if name == "host"
+        ));
+    }
+
+    #[tokio::test]
+    async fn http_11_request_rejects_duplicate_host_header() {
+        let result =
+            parse_request_head(b"GET / HTTP/1.1\r\nHost: a.test\r\nHost: b.test\r\n\r\n").await;
+
+        assert!(matches!(
+            result,
+            Err(Streamed::Err(MetaError::Header(HeaderError::MultipleValues(ref name))))
+                if name == "host"
+        ));
+    }
+
+    #[tokio::test]
+    async fn http_11_request_rejects_invalid_host_header() {
+        let cases: &[&[u8]] = &[
+            b"GET / HTTP/1.1\r\nHost: example.test/path\r\n\r\n",
+            b"GET / HTTP/1.1\r\nHost: [::1]junk\r\n\r\n",
+        ];
+
+        for case in cases {
+            let result = parse_request_head(case).await;
+
+            assert!(matches!(
+                result,
+                Err(Streamed::Err(MetaError::Header(HeaderError::InvalidHeaderValue(ref name))))
+                    if name == "host"
+            ));
+        }
     }
 }

@@ -1,5 +1,71 @@
 use super::HttpMeta;
+use crate::message::header::HeaderError;
 use crate::message::http_value::AcceptLang;
+
+fn valid_port(port: Option<&str>) -> bool {
+    match port {
+        None => true,
+        Some("") => false,
+        Some(port) => port.parse::<u16>().is_ok(),
+    }
+}
+
+fn is_valid_host_header(host: &str) -> bool {
+    if host.is_empty()
+        || host
+            .chars()
+            .any(|c| c.is_ascii_control() || c.is_whitespace())
+    {
+        return false;
+    }
+
+    if let Some(rest) = host.strip_prefix('[') {
+        let Some(close) = rest.find(']') else {
+            return false;
+        };
+        let literal = &rest[..close];
+        if literal.is_empty()
+            || !literal
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() || matches!(b, b'.' | b':'))
+        {
+            return false;
+        }
+
+        let suffix = &rest[close + 1..];
+        if suffix.is_empty() {
+            return true;
+        }
+
+        let Some(port) = suffix.strip_prefix(':') else {
+            return false;
+        };
+        return valid_port(Some(port));
+    }
+
+    if host
+        .bytes()
+        .any(|b| matches!(b, b'/' | b'?' | b'#' | b'@' | b'[' | b']'))
+    {
+        return false;
+    }
+
+    let (name, port) = match host.rsplit_once(':') {
+        Some((name, port)) => {
+            if port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit()) {
+                return false;
+            }
+            (name, Some(port))
+        }
+        None => (host, None),
+    };
+
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-'))
+        && valid_port(port)
+}
 
 impl HttpMeta {
     /// Gets the host from the HTTP meta data.
@@ -56,6 +122,18 @@ impl HttpMeta {
 
         self.set_host(host.clone());
         host
+    }
+
+    /// Requires exactly one syntactically valid Host header for HTTP/1.1 requests.
+    pub fn require_valid_request_host(&mut self) -> Result<String, HeaderError> {
+        let host = self.header.require_only("host")?.to_string();
+
+        if !is_valid_host_header(&host) {
+            return Err(HeaderError::InvalidHeaderValue("host".to_string()));
+        }
+
+        self.set_host(Some(host.clone()));
+        Ok(host)
     }
 
     /// Sets the host field.
