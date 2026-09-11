@@ -14,6 +14,12 @@ pub enum StartLineError {
     Unrecognised,
     /// Response status code was not a parseable number.
     InvalidStatusCode,
+    /// The HTTP version field is not syntactically valid, for example `HTTPX`.
+    MalformedHttpVersion,
+    /// The HTTP version is syntactically valid but unsupported by this parser or protocol implementation.
+    UnsupportedHttpVersion,
+    /// The request method is not a valid HTTP token.
+    InvalidMethodToken,
 }
 
 impl fmt::Display for StartLineError {
@@ -21,8 +27,11 @@ impl fmt::Display for StartLineError {
         match self {
             Self::Empty => formatter.write_str("start line is empty"),
             Self::Unrecognised => formatter.write_str("start line could not be parsed"),
-            Self::InvalidStatusCode => {
-                formatter.write_str("response status code is not a number")
+            Self::InvalidStatusCode => formatter.write_str("response status code is not a number"),
+            Self::MalformedHttpVersion => formatter.write_str("HTTP version is malformed"),
+            Self::UnsupportedHttpVersion => formatter.write_str("HTTP version is not supported"),
+            Self::InvalidMethodToken => {
+                formatter.write_str("request method is not a valid HTTP token")
             }
         }
     }
@@ -39,7 +48,10 @@ impl StartLineError {
 }
 
 impl From<&StartLineError> for StatusCode {
-    fn from(_: &StartLineError) -> Self {
-        StatusCode::BAD_REQUEST
+    fn from(error: &StartLineError) -> Self {
+        match error {
+            StartLineError::UnsupportedHttpVersion => StatusCode::HTTP_VERSION_NOT_SUPPORTED,
+            _ => StatusCode::BAD_REQUEST,
+        }
     }
 }

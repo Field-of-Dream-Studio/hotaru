@@ -57,7 +57,7 @@ impl ResponseStartLine {
             return Err(StartLineError::Unrecognised);
         }
 
-        let http_version = HttpVersion::from_string(parts[0]);
+        let http_version = HttpVersion::parse(parts[0])?;
 
         let status_code = match parts[1].parse::<u16>() {
             Ok(code) => StatusCode::from(code),

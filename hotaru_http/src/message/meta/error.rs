@@ -102,6 +102,36 @@ impl From<ConnectionError> for MetaError {
     }
 }
 
+impl From<MetaError> for StreamedMetaError {
+    fn from(error: MetaError) -> Self {
+        Streamed::Err(error)
+    }
+}
+
+impl From<StartLineError> for StreamedMetaError {
+    fn from(error: StartLineError) -> Self {
+        Streamed::Err(MetaError::from(error))
+    }
+}
+
+impl From<HeaderError> for StreamedMetaError {
+    fn from(error: HeaderError) -> Self {
+        Streamed::Err(MetaError::from(error))
+    }
+}
+
+impl From<EncodingError> for StreamedMetaError {
+    fn from(error: EncodingError) -> Self {
+        Streamed::Err(MetaError::from(error))
+    }
+}
+
+impl From<ConnectionError> for StreamedMetaError {
+    fn from(error: ConnectionError) -> Self {
+        Streamed::Err(MetaError::from(error))
+    }
+}
+
 impl MetaError {
     /// Whether the connection can continue after this error. Header
     /// boundary-loss variants (owned by MetaError) force `false`; wrapped
@@ -145,6 +175,7 @@ impl From<&MetaError> for StatusCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::message::header::HeaderLineError;
 
     #[test]
     fn wrapping_variants_delegate_display_to_the_inner_error() {
@@ -155,6 +186,10 @@ mod tests {
         assert_eq!(
             MetaError::from(HeaderError::MultipleValues("content-length".to_string())).to_string(),
             "multiple content-length header values",
+        );
+        assert_eq!(
+            MetaError::from(HeaderError::from(HeaderLineError::InvalidName)).to_string(),
+            "header field name is invalid",
         );
         assert_eq!(
             MetaError::from(EncodingError::DuplicateChunked).to_string(),
@@ -174,9 +209,41 @@ mod tests {
             .is_some()
         );
         assert!(
-            std::error::Error::source(&MetaError::from(EncodingError::DuplicateChunked))
-                .is_some()
+            std::error::Error::source(&MetaError::from(HeaderError::from(
+                HeaderLineError::InvalidName
+            )))
+            .is_some()
+        );
+        assert!(
+            std::error::Error::source(&MetaError::from(EncodingError::DuplicateChunked)).is_some()
         );
         assert!(std::error::Error::source(&MetaError::HeadersTooLarge).is_none());
     }
+
+    #[test]
+    fn component_errors_convert_to_streamed_meta_error() {
+        assert!(matches!(
+            StreamedMetaError::from(StartLineError::Unrecognised),
+            Streamed::Err(MetaError::StartLine(StartLineError::Unrecognised))
+        ));
+        assert!(matches!(
+            StreamedMetaError::from(HeaderError::Missing("host".to_string())),
+            Streamed::Err(MetaError::Header(HeaderError::Missing(ref name))) if name == "host"
+        ));
+        assert!(matches!(
+            StreamedMetaError::from(HeaderError::from(HeaderLineError::InvalidValue)),
+            Streamed::Err(MetaError::Header(HeaderError::ParseError(
+                HeaderLineError::InvalidValue
+            )))
+        ));
+        assert!(matches!(
+            StreamedMetaError::from(EncodingError::DuplicateChunked),
+            Streamed::Err(MetaError::Encoding(EncodingError::DuplicateChunked))
+        ));
+        assert!(matches!(
+            StreamedMetaError::from(ConnectionError::EmptyToken),
+            Streamed::Err(MetaError::Connection(ConnectionError::EmptyToken))
+        ));
+    }
+
 }

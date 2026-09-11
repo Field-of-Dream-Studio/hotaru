@@ -25,7 +25,7 @@ impl<E: core::fmt::Display> core::fmt::Display for Streamed<E> {
     }
 }
 
-impl<E: std::error::Error + 'static> std::error::Error for Streamed<E> {
+impl<E: core::error::Error + 'static> core::error::Error for Streamed<E> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io(error) => Some(error),
