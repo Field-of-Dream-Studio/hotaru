@@ -10,9 +10,7 @@ use std::sync::Arc;
 use hotaru_core::{
     app::common::RuntimeConfig,
     connection::{ConnStream, HotaruRead, HotaruWrite, Outbound, TransportSpec},
-    protocol::{
-        Channel, CtxError, Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext,
-    },
+    protocol::{Channel, CtxError, Protocol, ProtocolFlow, ProtocolRole, RequestContext},
     url::UrlRoot,
 };
 use hotaru_io_tokio::TcpStream;
@@ -20,11 +18,8 @@ use hotaru_io_tokio::TcpStream;
 use crate::{
     channel::{Http1Channel, HttpChannel},
     context::HttpContext,
-    message::{http_value::HttpVersion, start_line::StartLineError},
-    protocol::{
-        error::HttpError,
-        helpers::{closing_error_response, error_response_from, not_found_response},
-    },
+    message::{http_value::HttpVersion, response::response_templates, start_line::StartLineError},
+    protocol::error::HttpError,
     security::safety::HttpSafety,
 };
 
@@ -192,31 +187,41 @@ where
         let request = match channel.parse_request(channel.safety()).await {
             Ok(request) => request,
             Err(error) if matches!(&error, HttpError::Meta(_) | HttpError::Body(_)) => {
-                channel
-                    .send_response(closing_error_response(&error))
-                    .await?;
-                return Ok(ProtocolFlow::Close);
+                let response = response_templates::error_response(&error);
+                let keep_alive = response.is_keep_alive();
+                channel.send_response(response).await?;
+                return Ok(if keep_alive {
+                    ProtocolFlow::Continue
+                } else {
+                    ProtocolFlow::Close
+                });
             }
             Err(error) => return Err(error),
         };
 
         if let Err(error) = ensure_http1_version(request.meta.start_line.http_version()) {
             let error: HttpError = error.into();
-            channel
-                .send_response(closing_error_response(&error))
-                .await?;
-            return Ok(ProtocolFlow::Close);
+            let response = response_templates::error_response(&error);
+            let keep_alive = request.is_keep_alive() && response.is_keep_alive();
+            channel.send_response(response).await?;
+            return Ok(if keep_alive {
+                ProtocolFlow::Continue
+            } else {
+                ProtocolFlow::Close
+            });
         }
 
-        let keep_alive = request.is_keep_alive();
+        let request_keep_alive = request.is_keep_alive();
 
         // 2. Walk URL tree.
         let path = request.meta.path();
         let endpoint = match root.walk_str(&path).await {
             Some(node) => node,
             None => {
-                // No route: send 404 and decide based on keep-alive.
-                channel.send_response(not_found_response()).await?;
+                let error = HttpError::NoRoute(path);
+                let response = response_templates::error_response(&error);
+                let keep_alive = request_keep_alive && response.is_keep_alive();
+                channel.send_response(response).await?;
                 return Ok(if keep_alive {
                     ProtocolFlow::Continue
                 } else {
@@ -240,23 +245,25 @@ where
 
         match endpoint.run(ctx).await {
             Ok(ctx) => {
-                channel.send_response(ctx.response).await?;
+                let response = ctx.response;
+                let keep_alive = request_keep_alive && response.is_keep_alive();
+                channel.send_response(response).await?;
                 Ok(if keep_alive {
                     ProtocolFlow::Continue
                 } else {
                     ProtocolFlow::Close
                 })
             }
-            Err(err) if err.can_continue() => {
-                // Recoverable: map error to a response and keep going.
-                channel.send_response(error_response_from(&err)).await?;
+            Err(error) => {
+                let response = response_templates::error_response(&error);
+                let keep_alive = request_keep_alive && response.is_keep_alive();
+                channel.send_response(response).await?;
                 Ok(if keep_alive {
                     ProtocolFlow::Continue
                 } else {
                     ProtocolFlow::Close
                 })
             }
-            Err(_) => Ok(ProtocolFlow::Close),
         }
     }
 

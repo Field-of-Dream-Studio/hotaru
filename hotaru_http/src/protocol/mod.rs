@@ -1,6 +1,5 @@
 pub mod traits;
 pub mod error;
-pub mod helpers;
 pub mod protocol_impl;
 #[cfg(test)]
 mod test;

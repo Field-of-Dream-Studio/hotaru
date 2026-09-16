@@ -40,10 +40,11 @@ impl fmt::Display for StartLineError {
 impl std::error::Error for StartLineError {}
 
 impl StartLineError {
-    /// A malformed start line means the request boundary is intact but the
-    /// contents are garbage — respond with 400 and keep the socket.
+    /// Start-line failures close the connection after the error response.
+    /// The request cannot be dispatched, and retaining the HTTP/1 stream would
+    /// make version negotiation and pipelined-request handling ambiguous.
     pub fn can_continue(&self) -> bool {
-        true
+        false
     }
 }
 

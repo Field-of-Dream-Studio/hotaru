@@ -124,12 +124,14 @@ use std::path::PathBuf;
 
     use akari::TemplateManager;
     use akari::Value;
+    use hotaru_core::protocol::ProtocolError;
 
     use super::HttpResponse;
     use crate::message::body::HttpBody;
     use crate::message::http_value::{HttpContentType, HttpVersion, StatusCode};
     use crate::message::meta::HttpMeta;
     use crate::message::start_line::HttpStartLine;
+    use crate::protocol::HttpError;
 
     fn resolve_template_file(file: &str) -> Option<PathBuf> {
         let requested = Path::new(file);
@@ -195,6 +197,35 @@ use std::path::PathBuf;
         let mut meta = HttpMeta::new(start_line, HashMap::new());
         meta.set_content_type(HttpContentType::TextHtml());
         HttpResponse::new(meta, HttpBody::Binary(body.into()))
+    }
+
+    /// Creates an HTML response for an HTTP error.
+    ///
+    /// The error determines both the response status and whether the response
+    /// advertises that the connection will close.
+    pub fn error_response(error: &HttpError) -> HttpResponse {
+        let status: StatusCode = error.into();
+        let code = status.as_u16();
+        let reason = status.reason_phrase();
+        let body = format!(
+            "<!DOCTYPE html>\n\
+             <html>\n\
+             <head><title>{code} {reason}</title></head>\n\
+             <body><h1>{code} {reason}</h1></body>\n\
+             </html>\n"
+        );
+
+        let response = html_response(body.into_bytes()).status(status);
+        if error.can_continue() {
+            response
+        } else {
+            response.add_header("connection", "close")
+        }
+    }
+
+    /// Creates a keep-alive-capable 404 response.
+    pub fn not_found_response() -> HttpResponse {
+        error_response(&HttpError::NoRoute(String::new()))
     }
 
     /// Creates a redirect response (302 Found).
@@ -398,6 +429,40 @@ use std::path::PathBuf;
     /// ```
     pub fn return_status(status_code: StatusCode) -> HttpResponse {
         normal_response(status_code, Vec::<u8>::new())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::message::start_line::StartLineError;
+
+        #[test]
+        fn non_recoverable_error_response_closes_the_connection() {
+            let error = HttpError::from(StartLineError::UnsupportedHttpVersion);
+            let response = error_response(&error);
+
+            assert_eq!(
+                response.meta.start_line.status_code(),
+                StatusCode::HTTP_VERSION_NOT_SUPPORTED
+            );
+            assert_eq!(
+                response.meta.get_header("connection").as_deref(),
+                Some("close")
+            );
+            assert!(!response.is_keep_alive());
+        }
+
+        #[test]
+        fn recoverable_error_response_keeps_the_connection_open() {
+            let response = error_response(&HttpError::MethodNotAllowed);
+
+            assert_eq!(
+                response.meta.start_line.status_code(),
+                StatusCode::METHOD_NOT_ALLOWED
+            );
+            assert_eq!(response.meta.get_header("connection"), None);
+            assert!(response.is_keep_alive());
+        }
     }
 }
 
