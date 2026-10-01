@@ -5,6 +5,11 @@ use crate::start_line::StartLineError;
 use hotaru_lib::url_encoding::*;
 use std::{collections::HashMap, hash::Hash};
 
+/// A parsed HTTP version identifier.
+///
+/// Recognising a version here does not imply that the active protocol
+/// implementation supports that version's wire format. Each protocol must
+/// enforce its own supported-version set before dispatching a message.
 #[derive(Debug, Clone)]
 pub enum HttpVersion {
     Http09,

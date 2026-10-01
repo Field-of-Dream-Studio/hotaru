@@ -546,7 +546,7 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
             Executable::Request { .. } => {
                 // Server: return a generic error response.
                 // The specific status code is determined by the error type
-                // in the protocol-level handle loop via error_response_from().
+                // in the protocol-level handle loop via response_templates::error_response().
                 self.response = response_templates::html_response(
                     "<h1>500 Internal Server Error</h1><br><p>An unexpected error occurred</p>",
                 )

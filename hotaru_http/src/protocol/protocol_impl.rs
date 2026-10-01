@@ -10,9 +10,7 @@ use std::sync::Arc;
 use hotaru_core::{
     app::common::RuntimeConfig,
     connection::{ConnStream, HotaruRead, HotaruWrite, Outbound, TransportSpec},
-    protocol::{
-        Channel, CtxError, Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext,
-    },
+    protocol::{Channel, CtxError, Protocol, ProtocolFlow, ProtocolRole, RequestContext},
     url::UrlRoot,
 };
 use hotaru_io_tokio::TcpStream;
@@ -20,10 +18,8 @@ use hotaru_io_tokio::TcpStream;
 use crate::{
     channel::{Http1Channel, HttpChannel},
     context::HttpContext,
-    protocol::{
-        error::HttpError,
-        helpers::{error_response_from, not_found_response},
-    },
+    message::{http_value::HttpVersion, response::response_templates, start_line::StartLineError},
+    protocol::error::HttpError,
     security::safety::HttpSafety,
 };
 
@@ -109,6 +105,18 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
     }
 }
 
+/// Require a version whose wire format is implemented by `Http1Protocol`.
+///
+/// `HttpVersion` also represents versions used by other protocol
+/// implementations. Recognising one of those versions while parsing must not
+/// allow it to enter the HTTP/1 router.
+fn ensure_http1_version(version: &HttpVersion) -> Result<(), StartLineError> {
+    match version {
+        HttpVersion::Http10 | HttpVersion::Http11 => Ok(()),
+        _ => Err(StartLineError::UnsupportedHttpVersion),
+    }
+}
+
 // ============================================================================
 // Protocol trait implementation
 // ============================================================================
@@ -179,20 +187,41 @@ where
         let request = match channel.parse_request(channel.safety()).await {
             Ok(request) => request,
             Err(error) if matches!(&error, HttpError::Meta(_) | HttpError::Body(_)) => {
-                channel.send_response(error_response_from(&error)).await?;
-                return Ok(ProtocolFlow::Close);
+                let response = response_templates::error_response(&error);
+                let keep_alive = response.is_keep_alive();
+                channel.send_response(response).await?;
+                return Ok(if keep_alive {
+                    ProtocolFlow::Continue
+                } else {
+                    ProtocolFlow::Close
+                });
             }
             Err(error) => return Err(error),
         };
-        let keep_alive = request.is_keep_alive();
+
+        if let Err(error) = ensure_http1_version(request.meta.start_line.http_version()) {
+            let error: HttpError = error.into();
+            let response = response_templates::error_response(&error);
+            let keep_alive = request.is_keep_alive() && response.is_keep_alive();
+            channel.send_response(response).await?;
+            return Ok(if keep_alive {
+                ProtocolFlow::Continue
+            } else {
+                ProtocolFlow::Close
+            });
+        }
+
+        let request_keep_alive = request.is_keep_alive();
 
         // 2. Walk URL tree.
         let path = request.meta.path();
         let endpoint = match root.walk_str(&path).await {
             Some(node) => node,
             None => {
-                // No route: send 404 and decide based on keep-alive.
-                channel.send_response(not_found_response()).await?;
+                let error = HttpError::NoRoute(path);
+                let response = response_templates::error_response(&error);
+                let keep_alive = request_keep_alive && response.is_keep_alive();
+                channel.send_response(response).await?;
                 return Ok(if keep_alive {
                     ProtocolFlow::Continue
                 } else {
@@ -216,23 +245,25 @@ where
 
         match endpoint.run(ctx).await {
             Ok(ctx) => {
-                channel.send_response(ctx.response).await?;
+                let response = ctx.response;
+                let keep_alive = request_keep_alive && response.is_keep_alive();
+                channel.send_response(response).await?;
                 Ok(if keep_alive {
                     ProtocolFlow::Continue
                 } else {
                     ProtocolFlow::Close
                 })
             }
-            Err(err) if err.can_continue() => {
-                // Recoverable: map error to a response and keep going.
-                channel.send_response(error_response_from(&err)).await?;
+            Err(error) => {
+                let response = response_templates::error_response(&error);
+                let keep_alive = request_keep_alive && response.is_keep_alive();
+                channel.send_response(response).await?;
                 Ok(if keep_alive {
                     ProtocolFlow::Continue
                 } else {
                     ProtocolFlow::Close
                 })
             }
-            Err(_) => Ok(ProtocolFlow::Close),
         }
     }
 
@@ -287,7 +318,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::http_value::StatusCode;
 
     #[test]
     fn test_http1_detection() {
@@ -299,9 +329,24 @@ mod tests {
     }
 
     #[test]
-    fn test_not_found_response() {
-        let resp = not_found_response();
-        assert_eq!(resp.meta.start_line.status_code(), StatusCode::NOT_FOUND);
+    fn http_10_and_11_are_supported() {
+        assert!(ensure_http1_version(&HttpVersion::Http10).is_ok());
+        assert!(ensure_http1_version(&HttpVersion::Http11).is_ok());
+    }
+
+    #[test]
+    fn non_http1_versions_are_rejected() {
+        for version in [
+            HttpVersion::Http09,
+            HttpVersion::Http20,
+            HttpVersion::Http30,
+            HttpVersion::Unknown,
+        ] {
+            assert!(matches!(
+                ensure_http1_version(&version),
+                Err(StartLineError::UnsupportedHttpVersion)
+            ));
+        }
     }
 
     #[test]
