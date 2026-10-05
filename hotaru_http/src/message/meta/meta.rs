@@ -3,6 +3,7 @@ use crate::message::http_value::*;
 use crate::message::start_line::HttpStartLine;
 use crate::util::connection::ConnectionOptions;
 use crate::util::cookie::CookieMap;
+use crate::util::date::HttpDate;
 use crate::util::encoding::HttpEncoding;
 
 /// RequestHeader is a struct that represents the headers of an HTTP request.
@@ -44,6 +45,10 @@ pub struct HttpMeta {
 
     /// Location header, used for redirects in responses
     pub(in crate::message::meta) location: Option<String>,
+
+    /// Date header (RFC 7231 §7.1.1.2). Origin servers stamp this on
+    /// outbound responses; inbound parsing promotes it from the header map.
+    pub(in crate::message::meta) date: Option<HttpDate>,
 }
 
 impl HttpMeta {
@@ -64,6 +69,7 @@ impl HttpMeta {
             host: None,
             lang: None,
             location: None,
+            date: None,
         }
     }
 }
@@ -86,6 +92,7 @@ impl Default for HttpMeta {
             host: None,
             lang: None,
             location: None,
+            date: None,
         }
     }
 }
