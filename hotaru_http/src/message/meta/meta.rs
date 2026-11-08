@@ -46,8 +46,7 @@ pub struct HttpMeta {
     /// Location header, used for redirects in responses
     pub(in crate::message::meta) location: Option<String>,
 
-    /// Date header (RFC 7231 §7.1.1.2). Origin servers stamp this on
-    /// outbound responses; inbound parsing promotes it from the header map.
+    /// Date header 
     pub(in crate::message::meta) date: Option<HttpDate>,
 }
 

@@ -1,19 +1,20 @@
 use akari::Value;
 
 use crate::message::http_value::HttpContentType;
-use crate::message::meta::HttpMeta;
 use crate::protocol::HttpError;
+use crate::util::encoding::HttpEncoding;
 use crate::util::form::{MultiForm, UrlEncodedForm};
 
 use super::HttpBody;
 
 impl HttpBody {
-    /// Serializes an HTTP body and updates derived body metadata.
-    ///
-    /// Aggregates errors at this boundary: body-domain failures (`BodyError`),
-    /// meta lookups (`MetaError`), and compression I/O (`io::Error`) all flow
-    /// out as `HttpError`.
-    pub async fn into_static(self, meta: &mut HttpMeta) -> Result<Vec<u8>, HttpError> {
+    /// Body → wire bytes + suggested `Content-Type`. Returned bin is the final
+    /// wire body (compressed per `encoding`), so `bin.len()` = `Content-Length`.
+    pub async fn into_static(
+        self,
+        encoding: &HttpEncoding,
+        multipart_boundary: Option<&str>,
+    ) -> Result<(Vec<u8>, Option<HttpContentType>), HttpError> {
         fn serialize_from_json(json: Value) -> Vec<u8> {
             json.into_json().into_bytes()
         }
@@ -30,8 +31,8 @@ impl HttpBody {
             form.to_string().into_bytes()
         }
 
-        fn serialize_from_files(files: MultiForm, boundary: &String) -> Vec<u8> {
-            files.to_string(boundary).into_bytes()
+        fn serialize_from_files(files: MultiForm, boundary: &str) -> Vec<u8> {
+            files.to_string(&boundary.to_string()).into_bytes()
         }
 
         let (bin, default_content_type) = match self {
@@ -49,38 +50,21 @@ impl HttpBody {
                 Some(HttpContentType::ApplicationUrlEncodedForm()),
             ),
             Self::Files(files) => {
-                let boundary = if let Some(HttpContentType::Multipart {
-                    subtype: _,
+                let boundary = multipart_boundary
+                    .unwrap_or("----DefaultBoundary7MA4YWxkTrZu0gW")
+                    .to_string();
+                let bin = serialize_from_files(files, &boundary);
+                let ct = HttpContentType::Multipart {
+                    subtype: "form-data".to_string(),
                     boundary: Some(boundary),
-                }) = meta.get_content_type()
-                {
-                    boundary
-                } else {
-                    "----DefaultBoundary7MA4YWxkTrZu0gW".to_string()
                 };
-
-                (
-                    serialize_from_files(files, &boundary),
-                    Some(HttpContentType::Multipart {
-                        subtype: "form-data".to_string(),
-                        boundary: Some(boundary),
-                    }),
-                )
+                (bin, Some(ct))
             }
             _ => (Vec::new(), None),
         };
 
-        if meta.get_content_length()?.is_none() {
-            meta.set_content_length(bin.len());
-        }
-        if meta.get_content_type().is_none()
-            && let Some(content_type) = default_content_type
-        {
-            meta.set_content_type(content_type);
-        }
-
-        let content_coding = meta.get_encoding()?.content().clone();
-        Ok(content_coding.encode_compressed(bin)?)
+        let compressed = encoding.content().clone().encode_compressed(bin)?;
+        Ok((compressed, default_content_type))
     }
 
     /// Returns the raw data from a binary HTTP body.
