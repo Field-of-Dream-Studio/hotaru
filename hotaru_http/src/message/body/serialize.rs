@@ -8,9 +8,15 @@ use crate::util::form::{MultiForm, UrlEncodedForm};
 use super::HttpBody;
 
 impl HttpBody {
-    /// Body → wire bytes + suggested `Content-Type`. Returned bin is the final
-    /// wire body (compressed per `encoding`), so `bin.len()` = `Content-Length`.
-    pub async fn into_static(
+    /// Serializes and content-encodes the body, returning bytes and a suggested
+    /// Content-Type. The sender handles metadata updates and transfer framing.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Renamed from into_static",
+        date = "2026-11-08"
+    )]
+    pub async fn encode(
         self,
         encoding: &HttpEncoding,
         multipart_boundary: Option<&str>,
@@ -67,6 +73,21 @@ impl HttpBody {
         Ok((compressed, default_content_type))
     }
 
+    /// Compatibility alias for [`HttpBody::encode`].
+    #[av::ver(
+        deprecated,
+        since = "0.8.6",
+        note = "Use HttpBody::encode instead",
+        date = "2026-11-08"
+    )]
+    pub async fn into_static(
+        self,
+        encoding: &HttpEncoding,
+        multipart_boundary: Option<&str>,
+    ) -> Result<(Vec<u8>, Option<HttpContentType>), HttpError> {
+        self.encode(encoding, multipart_boundary).await
+    }
+
     /// Returns the raw data from a binary HTTP body.
     ///
     /// A non-binary body must first be converted into binary form.
@@ -85,31 +106,25 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn serializes_text_and_sets_body_metadata() {
-        let mut meta = HttpMeta::default();
-
-        let body = HttpBody::Text("hello".to_string())
-            .into_static(&mut meta)
+    async fn serializes_text_and_suggests_content_type() {
+        let (body, content_type) = HttpBody::Text("hello".to_string())
+            .encode(&HttpEncoding::default(), None)
             .await
             .unwrap();
 
         assert_eq!(body, b"hello");
-        assert_eq!(meta.get_content_length().unwrap(), Some(5));
         assert!(matches!(
-            meta.get_content_type(),
+            content_type,
             Some(HttpContentType::Text { subtype, .. }) if subtype == "html"
         ));
     }
 
     #[tokio::test]
     async fn returns_content_coding_failure() {
-        let mut meta = HttpMeta::default();
-        meta.set_encoding(Some(
-            HttpEncoding::from_headers(None, Some("compress".to_string())).unwrap(),
-        ));
+        let encoding = HttpEncoding::from_headers(None, Some("compress".to_string())).unwrap();
 
         let result = HttpBody::Text("hello".to_string())
-            .into_static(&mut meta)
+            .encode(&encoding, None)
             .await;
 
         use crate::message::body::BodyError;

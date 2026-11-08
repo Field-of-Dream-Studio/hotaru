@@ -7,8 +7,14 @@ use crate::util::form::{MultiForm, MultipartError, UrlEncodedError, UrlEncodedFo
 use super::{BodyError, HttpBody};
 
 impl HttpBody {
-    /// Parses a buffered body according to its declared content type.
-    pub(crate) fn parse_buffer(self, safety: &HttpSafety) -> Result<Self, BodyError> {
+    /// Content-decodes and parses a buffered body according to its content type.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Renamed from parse_buffer",
+        date = "2026-11-08"
+    )]
+    pub(crate) fn decode(self, safety: &HttpSafety) -> Result<Self, BodyError> {
         fn parse_into_json(body: Vec<u8>) -> Result<HttpBody, BodyError> {
             let body = String::from_utf8(body).map_err(|_| BodyError::InvalidUtf8)?;
             let value = Value::from_json(&body)
@@ -86,6 +92,18 @@ impl HttpBody {
             _ => Ok(self),
         }
     }
+
+    /// Compatibility alias for [`HttpBody::decode`].
+    #[av::ver(
+        deprecated,
+        since = "0.8.6",
+        note = "Use HttpBody::decode instead",
+        date = "2026-11-08"
+    )]
+    #[allow(dead_code)] // Retained for compatibility while internal callers migrate.
+    pub(crate) fn parse_buffer(self, safety: &HttpSafety) -> Result<Self, BodyError> {
+        self.decode(safety)
+    }
 }
 
 #[cfg(test)]
@@ -126,7 +144,7 @@ mod tests {
     #[test]
     fn parses_valid_json() {
         let body = buffered_json(br#"{"name":"Hotaru"}"#.to_vec())
-            .parse_buffer(&HttpSafety::new())
+            .decode(&HttpSafety::new())
             .unwrap();
 
         assert!(matches!(body, HttpBody::Json(_)));
@@ -134,7 +152,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_utf8_json() {
-        let result = buffered_json(vec![0xff]).parse_buffer(&HttpSafety::new());
+        let result = buffered_json(vec![0xff]).decode(&HttpSafety::new());
 
         assert!(matches!(result, Err(BodyError::InvalidUtf8)));
     }
@@ -142,7 +160,7 @@ mod tests {
     #[test]
     fn json_error_does_not_expose_body_contents() {
         let error = buffered_json(b"secret-token".to_vec())
-            .parse_buffer(&HttpSafety::new())
+            .decode(&HttpSafety::new())
             .unwrap_err();
 
         assert!(matches!(&error, BodyError::InvalidJson(_)));
@@ -152,7 +170,7 @@ mod tests {
     #[test]
     fn parses_valid_form() {
         let body = buffered_form(b"name=Hotaru&version=1".to_vec())
-            .parse_buffer(&HttpSafety::new())
+            .decode(&HttpSafety::new())
             .unwrap();
 
         assert!(matches!(body, HttpBody::Form(_)));
@@ -161,14 +179,14 @@ mod tests {
     #[test]
     fn rejects_malformed_form() {
         let result = buffered_form(b"malformed_without_equals".to_vec())
-            .parse_buffer(&HttpSafety::new());
+            .decode(&HttpSafety::new());
 
         assert!(matches!(result, Err(BodyError::Form(_))));
     }
 
     #[test]
     fn rejects_invalid_utf8_form() {
-        let result = buffered_form(vec![0xff, 0xfe]).parse_buffer(&HttpSafety::new());
+        let result = buffered_form(vec![0xff, 0xfe]).decode(&HttpSafety::new());
 
         assert!(matches!(result, Err(BodyError::InvalidUtf8)));
     }
@@ -185,7 +203,7 @@ mod tests {
         .to_vec();
 
         let body = buffered_multipart(payload, Some("boundary".to_string()))
-            .parse_buffer(&HttpSafety::new())
+            .decode(&HttpSafety::new())
             .unwrap();
 
         assert!(matches!(body, HttpBody::Files(_)));
@@ -194,7 +212,7 @@ mod tests {
     #[test]
     fn rejects_multipart_missing_boundary_param() {
         let result = buffered_multipart(b"data".to_vec(), None)
-            .parse_buffer(&HttpSafety::new());
+            .decode(&HttpSafety::new());
 
         assert!(matches!(result, Err(BodyError::Multipart(_))));
     }
@@ -205,7 +223,7 @@ mod tests {
             b"no boundaries here".to_vec(),
             Some("boundary".to_string()),
         )
-        .parse_buffer(&HttpSafety::new());
+        .decode(&HttpSafety::new());
 
         assert!(matches!(result, Err(BodyError::Multipart(_))));
     }
@@ -215,7 +233,7 @@ mod tests {
         let mut safety = HttpSafety::new();
         safety.set_max_body_size(Some(1));
 
-        let result = buffered_json(b"{}".to_vec()).parse_buffer(&safety);
+        let result = buffered_json(b"{}".to_vec()).decode(&safety);
 
         assert!(matches!(result, Err(BodyError::TooLarge)));
     }
@@ -225,8 +243,8 @@ mod tests {
         let mut request = HttpRequest::new(HttpMeta::default(), buffered_json(b"{".to_vec()));
         let safety = HttpSafety::new();
 
-        let first = request.parse_body(&safety).await;
-        let second = request.parse_body(&safety).await;
+        let first = request.decode_body(&safety).await;
+        let second = request.decode_body(&safety).await;
 
         assert!(matches!(first, Err(BodyError::InvalidJson(_))));
         assert!(matches!(second, Err(BodyError::InvalidJson(_))));

@@ -11,7 +11,7 @@ pub mod protocol;
 /// [Channel] HttpChannel trait + Http1Channel impl (parallel to context)
 pub mod channel;
 
-/// [Runtime Context] HttpContext, parse_lazy(), send()
+/// [Runtime Context] HttpContext, receive(), send()
 pub mod context;
 
 /// [Message Model] HttpRequest, HttpResponse, HttpBody, HttpMeta, HttpStartLine, types

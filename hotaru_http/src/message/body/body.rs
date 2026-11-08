@@ -49,7 +49,7 @@ impl HttpBody {
         parse_config: &HttpSafety,
     ) -> Result<Self, crate::protocol::HttpError> {
         let buffer = Self::read_buffer(buf_reader, header, parse_config).await?;
-        Ok(buffer.parse_buffer(parse_config)?)
+        Ok(buffer.decode(parse_config)?)
     }
 
     pub async fn read_binary_info<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(

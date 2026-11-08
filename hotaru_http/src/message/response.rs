@@ -26,25 +26,65 @@ impl HttpResponse {
         self.meta.is_keep_alive()
     }
 
+    /// Reads the response headers and complete body into a buffer.
+    /// Content decoding is deferred until [`HttpResponse::decode_body`] is called.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Renamed from parse_lazy",
+        date = "2026-11-08"
+    )]
+    pub async fn receive<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
+        stream: &mut R,
+        config: &HttpSafety,
+        print_raw: bool,
+    ) -> Result<Self, crate::protocol::HttpError> {
+        let (meta, body) = io::receive(stream, config, false, print_raw).await?;
+        Ok(Self::new(meta, body))
+    }
+
+    /// Compatibility alias for [`HttpResponse::receive`].
+    #[av::ver(
+        deprecated,
+        since = "0.8.6",
+        note = "Use HttpResponse::receive instead",
+        date = "2026-11-08"
+    )]
     pub async fn parse_lazy<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         stream: &mut R,
         config: &HttpSafety,
         print_raw: bool,
     ) -> Result<Self, crate::protocol::HttpError> {
-        let (meta, body) = io::parse_lazy(stream, config, false, print_raw).await?;
-        Ok(Self::new(meta, body))
+        Self::receive(stream, config, print_raw).await
     }
 
-    /// Parses the HTTP Body from buffer
-    pub async fn parse_body(&mut self, safety_setting: &HttpSafety) -> Result<(), BodyError> {
-        let body = self.body.clone().parse_buffer(safety_setting)?;
+    /// Decodes and interprets the already-buffered response body.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Renamed from parse_body",
+        date = "2026-11-08"
+    )]
+    pub async fn decode_body(&mut self, safety_setting: &HttpSafety) -> Result<(), BodyError> {
+        let body = self.body.clone().decode(safety_setting)?;
         self.body = body;
         Ok(())
     }
 
+    /// Compatibility alias for [`HttpResponse::decode_body`].
+    #[av::ver(
+        deprecated,
+        since = "0.8.6",
+        note = "Use HttpResponse::decode_body instead",
+        date = "2026-11-08"
+    )]
+    pub async fn parse_body(&mut self, safety_setting: &HttpSafety) -> Result<(), BodyError> {
+        self.decode_body(safety_setting).await
+    }
+
     /// Get the parsed HTTP Body
     pub async fn get_parsed_body(&mut self, safety: HttpSafety) -> Result<HttpBody, BodyError> {
-        self.parse_body(&safety).await?;
+        self.decode_body(&safety).await?;
         Ok(self.body.clone())
     }
 

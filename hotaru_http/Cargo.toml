@@ -19,6 +19,7 @@ hotaru_lib = { path = "../hotaru_lib", version = "=0.8.6", features = ["url_enco
 hotaru_tls = { path = "../hotaru_tls", version = "=0.8.6", optional = true }
 
 akari = { version = "0.2.8", features = ["full"] }
+av = "0.1"
 once_cell = "1.19"
 bytes = "1"
 futures = "0.3"

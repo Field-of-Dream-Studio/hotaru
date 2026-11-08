@@ -69,7 +69,7 @@ where
 {
     async fn parse_request(&self, safety: &HttpSafety) -> Result<HttpRequest, HttpError> {
         let mut reader = self.reader.lock().await;
-        let request = match HttpRequest::parse_lazy(&mut *reader, safety, false).await {
+        let request = match HttpRequest::receive(&mut *reader, safety, false).await {
             Ok(request) => request,
             Err(error) => {
                 self.open.store(false, Ordering::Release);
@@ -110,7 +110,7 @@ where
 
     async fn parse_response(&self, safety: &HttpSafety) -> Result<HttpResponse, HttpError> {
         let mut reader = self.reader.lock().await;
-        let response = match HttpResponse::parse_lazy(&mut *reader, safety, false).await {
+        let response = match HttpResponse::receive(&mut *reader, safety, false).await {
             Ok(response) => response,
             Err(error) => {
                 self.open.store(false, Ordering::Release);

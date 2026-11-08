@@ -234,7 +234,7 @@ async fn test_header_duplicate_content_length() {
     let request = b"POST / HTTP/1.1\r\nHost: example.test\r\nContent-Length: 10\r\nContent-Length: 20\r\n\r\n";
     let cursor = Cursor::new(request.to_vec());
     let mut reader = TokioIo::new(BufReader::new(cursor));
-    let result = HttpRequest::parse_lazy(&mut reader, &safety, false).await;
+    let result = HttpRequest::receive(&mut reader, &safety, false).await;
 
     assert!(matches!(
         result,
