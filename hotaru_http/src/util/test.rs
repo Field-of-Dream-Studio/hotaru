@@ -7,9 +7,11 @@
 
 #[cfg(test)]
 mod security_tests {
+    use crate::HttpError;
     use crate::message::body::HttpBody;
     use crate::message::http_value::HttpMethod;
-    use crate::message::meta::HttpMeta;
+    use crate::message::meta::{HttpMeta, MetaError};
+    use crate::message::request::HttpRequest;
     use crate::message::start_line::{RequestStartLine, StartLineError};
     use crate::security::safety::HttpSafety;
     use hotaru_io_tokio::TokioIo;
@@ -87,17 +89,21 @@ mod security_tests {
     }
 
     #[test]
-    fn test_start_line_known_http_version_is_parsed() {
+    fn test_start_line_unsupported_known_http_version() {
         let result = RequestStartLine::parse("GET /index.html HTTP/3.0");
-        assert!(result.is_ok());
-        let line = result.unwrap();
-        assert_eq!(line.path, "/index.html");
+        assert!(matches!(
+            result,
+            Err(StartLineError::UnsupportedHttpVersion(version)) if version == "HTTP/3.0"
+        ));
     }
 
     #[test]
     fn test_start_line_malformed_http_version() {
         let result = RequestStartLine::parse("GET /index.html HTTPX");
-        assert!(matches!(result, Err(StartLineError::MalformedHttpVersion)));
+        assert!(matches!(
+            result,
+            Err(StartLineError::InvalidHttpVersion(version)) if version == "HTTPX"
+        ));
     }
 
     #[test]
@@ -105,7 +111,23 @@ mod security_tests {
         let result = RequestStartLine::parse("GET /index.html HTTP/9.9");
         assert!(matches!(
             result,
-            Err(StartLineError::UnsupportedHttpVersion)
+            Err(StartLineError::UnsupportedHttpVersion(version)) if version == "HTTP/9.9"
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_wire_parser_does_not_default_a_malformed_start_line() {
+        let request = b"GET /index.html HTTPX\r\nHost: localhost\r\n\r\n";
+        let cursor = Cursor::new(request.to_vec());
+        let mut reader = TokioIo::new(BufReader::new(cursor));
+
+        let result = HttpRequest::parse_lazy(&mut reader, &HttpSafety::default(), false).await;
+
+        assert!(matches!(
+            result,
+            Err(HttpError::Meta(MetaError::StartLine(
+                StartLineError::InvalidHttpVersion(version)
+            ))) if version == "HTTPX"
         ));
     }
 
@@ -331,7 +353,9 @@ mod security_tests {
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
         assert!(matches!(
             result,
-            Err(HttpError::Meta(MetaError::Header(HeaderError::ParseError(_))))
+            Err(HttpError::Meta(MetaError::Header(HeaderError::ParseError(
+                _
+            ))))
         ));
     }
 

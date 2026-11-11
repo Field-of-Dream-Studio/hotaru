@@ -18,7 +18,7 @@ use hotaru_io_tokio::TcpStream;
 use crate::{
     channel::{Http1Channel, HttpChannel},
     context::HttpContext,
-    message::{http_value::HttpVersion, response::response_templates, start_line::StartLineError},
+    message::response::response_templates,
     protocol::error::HttpError,
     security::safety::HttpSafety,
 };
@@ -105,18 +105,6 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
     }
 }
 
-/// Require a version whose wire format is implemented by `Http1Protocol`.
-///
-/// `HttpVersion` also represents versions used by other protocol
-/// implementations. Recognising one of those versions while parsing must not
-/// allow it to enter the HTTP/1 router.
-fn ensure_http1_version(version: &HttpVersion) -> Result<(), StartLineError> {
-    match version {
-        HttpVersion::Http10 | HttpVersion::Http11 => Ok(()),
-        _ => Err(StartLineError::UnsupportedHttpVersion),
-    }
-}
-
 // ============================================================================
 // Protocol trait implementation
 // ============================================================================
@@ -198,18 +186,6 @@ where
             }
             Err(error) => return Err(error),
         };
-
-        if let Err(error) = ensure_http1_version(request.meta.start_line.http_version()) {
-            let error: HttpError = error.into();
-            let response = response_templates::error_response(&error);
-            let keep_alive = request.is_keep_alive() && response.is_keep_alive();
-            channel.send_response(response).await?;
-            return Ok(if keep_alive {
-                ProtocolFlow::Continue
-            } else {
-                ProtocolFlow::Close
-            });
-        }
 
         let request_keep_alive = request.is_keep_alive();
 
@@ -326,27 +302,6 @@ mod tests {
         assert!(HTTP::detect(b"PUT /resource HTTP/1.1\r\n"));
         assert!(!HTTP::detect(b"INVALID REQUEST\r\n"));
         assert!(!HTTP::detect(b""));
-    }
-
-    #[test]
-    fn http_10_and_11_are_supported() {
-        assert!(ensure_http1_version(&HttpVersion::Http10).is_ok());
-        assert!(ensure_http1_version(&HttpVersion::Http11).is_ok());
-    }
-
-    #[test]
-    fn non_http1_versions_are_rejected() {
-        for version in [
-            HttpVersion::Http09,
-            HttpVersion::Http20,
-            HttpVersion::Http30,
-            HttpVersion::Unknown,
-        ] {
-            assert!(matches!(
-                ensure_http1_version(&version),
-                Err(StartLineError::UnsupportedHttpVersion)
-            ));
-        }
     }
 
     #[test]
