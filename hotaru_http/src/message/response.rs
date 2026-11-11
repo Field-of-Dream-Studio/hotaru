@@ -119,8 +119,8 @@ impl Default for HttpResponse {
 pub mod response_templates {
     use std::collections::HashMap;
     use std::path::Component;
-use std::path::Path;
-use std::path::PathBuf;
+    use std::path::Path;
+    use std::path::PathBuf;
 
     use akari::TemplateManager;
     use akari::Value;
@@ -146,9 +146,7 @@ use std::path::PathBuf;
         let templates_root = Path::new("templates").canonicalize().ok()?;
         let file_path = templates_root.join(requested).canonicalize().ok()?;
 
-        file_path
-            .starts_with(&templates_root)
-            .then_some(file_path)
+        file_path.starts_with(&templates_root).then_some(file_path)
     }
     /// Creates a plain text HTTP response with status 200 OK.
     ///
@@ -438,7 +436,9 @@ use std::path::PathBuf;
 
         #[test]
         fn non_recoverable_error_response_closes_the_connection() {
-            let error = HttpError::from(StartLineError::UnsupportedHttpVersion);
+            let error = HttpError::from(StartLineError::UnsupportedHttpVersion(
+                "HTTP/9.9".to_string(),
+            ));
             let response = error_response(&error);
 
             assert_eq!(

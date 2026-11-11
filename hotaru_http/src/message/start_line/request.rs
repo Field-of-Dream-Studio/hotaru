@@ -1,6 +1,6 @@
 use crate::message::http_value::*;
 
-use super::error::StartLineError;
+use super::{error::StartLineError, version::parse_http1_version};
 
 /// RequestStartLine is the first line of the HTTP request, which contains the method, path, and HTTP version.
 #[derive(Debug, Clone)]
@@ -77,7 +77,7 @@ impl RequestStartLine {
 
         let method = HttpMethod::parse(parts[0])?;
         let path = parts[1].to_string();
-        let http_version = HttpVersion::parse(parts[2])?;
+        let http_version = parse_http1_version(parts[2])?;
 
         Ok(Self::new(http_version, method, path))
     }
@@ -129,5 +129,43 @@ impl std::fmt::Display for RequestStartLine {
 impl Default for RequestStartLine {
     fn default() -> Self {
         Self::new(HttpVersion::Http11, HttpMethod::GET, "/".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_supported_http1_versions() {
+        assert!(matches!(
+            RequestStartLine::parse("GET / HTTP/1.0")
+                .unwrap()
+                .http_version,
+            HttpVersion::Http10
+        ));
+        assert!(matches!(
+            RequestStartLine::parse("GET / HTTP/1.1")
+                .unwrap()
+                .http_version,
+            HttpVersion::Http11
+        ));
+    }
+
+    #[test]
+    fn distinguishes_malformed_and_unsupported_versions() {
+        for version in ["HTTPX", "HTTP/1", "HTTP/a.b"] {
+            assert!(matches!(
+                RequestStartLine::parse(format!("GET / {version}")),
+                Err(StartLineError::InvalidHttpVersion(actual)) if actual == version
+            ));
+        }
+
+        for version in ["HTTP/0.9", "HTTP/2.0", "HTTP/3.0", "HTTP/9.9"] {
+            assert!(matches!(
+                RequestStartLine::parse(format!("GET / {version}")),
+                Err(StartLineError::UnsupportedHttpVersion(actual)) if actual == version
+            ));
+        }
     }
 }
