@@ -87,7 +87,7 @@ mod security_tests {
     }
 
     #[test]
-    fn test_start_line_invalid_http_version() {
+    fn test_start_line_known_http_version_is_parsed() {
         let result = RequestStartLine::parse("GET /index.html HTTP/3.0");
         assert!(result.is_ok());
         let line = result.unwrap();

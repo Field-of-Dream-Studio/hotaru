@@ -1,9 +1,10 @@
 pub mod traits;
 pub mod error;
-pub mod helpers;
 pub mod protocol_impl;
 pub mod safety;
 pub mod sync;
+#[cfg(test)]
+mod test;
 
 pub use error::HttpError;
 pub use safety::HttpSafety;
