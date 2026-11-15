@@ -1,9 +1,10 @@
-use crate::security::safety::HttpSafety;
+use crate::protocol::{HttpSafety, HttpSyncSettings};
 use crate::util::cookie::Cookie;
 
 use crate::context::io;
 use crate::message::body::{BodyError, HttpBody};
 use crate::message::http_value::*;
+use crate::util::content_type::HttpContentType;
 use crate::message::meta::HttpMeta;
 use crate::message::start_line::HttpStartLine;
 use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
@@ -26,6 +27,36 @@ impl HttpRequest {
 
     pub fn meta(&self) -> &HttpMeta {
         &self.meta
+    }
+
+    /// Consumes the request and returns it with a prepared body buffer and
+    /// matching metadata. Content types are reconciled with the body's generated
+    /// type; multipart boundaries come from the body. No stream I/O is performed.
+    #[av::ver(
+        unstable,
+        since = "0.8.6",
+        note = "Synchronize outgoing metadata with the prepared body",
+        date = "2026-11-12"
+    )]
+    pub fn sync(self) -> Result<Self, crate::protocol::HttpError> {
+        self.config_sync(&HttpSyncSettings::default())
+    }
+
+    /// Prepares the request body and updates metadata according to `settings`.
+    /// The flags control encoding, length, and content-type header updates.
+    /// Body preparation still runs.
+    #[av::ver(
+        unstable,
+        since = "0.8.6",
+        note = "Prepare an HTTP request with selective metadata synchronization",
+        date = "2026-11-12"
+    )]
+    pub fn config_sync(
+        self,
+        settings: &HttpSyncSettings,
+    ) -> Result<Self, crate::protocol::HttpError> {
+        let (meta, body) = super::sync::config_sync(self.meta, self.body, settings)?;
+        Ok(Self::new(meta, body))
     }
 
     /// Check whether this request allows the connection to remain open.
@@ -113,11 +144,19 @@ impl HttpRequest {
         self
     }
 
+    /// Sends the request after synchronizing it according to `settings`.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Send HTTP requests with explicit synchronization settings",
+        date = "2026-11-13"
+    )]
     pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(
         self,
         writer: &mut W,
+        settings: &HttpSyncSettings,
     ) -> Result<(), crate::protocol::HttpError> {
-        io::send(self.meta, self.body, writer).await
+        io::send(self.meta, self.body, writer, settings).await
     }
 }
 
@@ -127,7 +166,7 @@ impl Default for HttpRequest {
             HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::GET, "/".to_string()),
             HashMap::new(),
         );
-        let body = HttpBody::default();
+        let body = HttpBody::Empty;
         HttpRequest::new(meta, body)
     }
 }
@@ -139,7 +178,8 @@ pub mod request_templates {
     use akari::Value;
 
     use crate::message::body::HttpBody;
-    use crate::message::http_value::{HttpContentType, HttpMethod, HttpVersion};
+    use crate::message::http_value::{HttpMethod, HttpVersion};
+    use crate::util::content_type::HttpContentType;
     use crate::message::meta::HttpMeta;
     use crate::message::start_line::HttpStartLine;
     use crate::util::form::UrlEncodedForm;
@@ -151,7 +191,7 @@ pub mod request_templates {
             HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::GET, url.into()),
             HashMap::new(),
         );
-        let body = HttpBody::Unparsed;
+        let body = HttpBody::Empty;
         HttpRequest::new(meta, body)
     }
 
@@ -233,7 +273,7 @@ pub mod request_templates {
         let start_line =
             HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::DELETE, url.into());
         let meta = HttpMeta::new(start_line, HashMap::new());
-        HttpRequest::new(meta, HttpBody::Unparsed)
+        HttpRequest::new(meta, HttpBody::Empty)
     }
 
     /// Creates a HEAD request
@@ -241,6 +281,6 @@ pub mod request_templates {
         let start_line =
             HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::HEAD, url.into());
         let meta = HttpMeta::new(start_line, HashMap::new());
-        HttpRequest::new(meta, HttpBody::Unparsed)
+        HttpRequest::new(meta, HttpBody::Empty)
     }
 }

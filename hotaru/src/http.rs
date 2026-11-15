@@ -35,7 +35,7 @@ pub use hotaru_http::form::*;
 pub use hotaru_http::http_value::HttpMethod::*;
 pub use hotaru_http::http_value::*;
 pub use hotaru_http::meta::*;
-pub use hotaru_http::safety::HttpSafety;
+pub use hotaru_http::protocol::{HttpSafety, HttpSyncSettings};
 pub use hotaru_http::send_request;
 pub use hotaru_http::start_line::*;
 

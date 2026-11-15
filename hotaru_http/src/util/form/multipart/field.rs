@@ -1,5 +1,5 @@
-use super::error::MultiFormFieldError;
 use super::MultiFormFieldFile;
+use super::error::MultiFormFieldError;
 
 /// Represents a field in a multipart form.
 #[derive(Debug, Clone)]
@@ -18,9 +18,15 @@ impl MultiFormField {
     }
 
     /// Gets the text value from the `MultiFormField`.
-    pub fn get_text(&self) -> Result<&String, MultiFormFieldError> {
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Use the optional fallible multipart getter shape",
+        date = "2026-11-12"
+    )]
+    pub fn get_text(&self) -> Result<Option<&String>, MultiFormFieldError> {
         match self {
-            Self::Text(value) => Ok(value),
+            Self::Text(value) => Ok(Some(value)),
             Self::File(_) => Err(MultiFormFieldError::ContentTypeError),
         }
     }
@@ -40,10 +46,17 @@ impl MultiFormField {
     }
 
     /// Gets the file list from the `MultiFormField`.
-    pub fn get_files(&self) -> Result<&Vec<MultiFormFieldFile>, MultiFormFieldError> {
+    /// An existing empty list is returned as `Some`, not as an absent value.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Use the optional fallible multipart getter shape",
+        date = "2026-11-12"
+    )]
+    pub fn get_files(&self) -> Result<Option<&Vec<MultiFormFieldFile>>, MultiFormFieldError> {
         match self {
             Self::File(files) => {
-                return Ok(files);
+                return Ok(Some(files));
             }
             Self::Text(_) => {
                 return Err(MultiFormFieldError::ContentTypeError);
@@ -52,16 +65,30 @@ impl MultiFormField {
     }
 
     /// Gets the first file from the `MultiFormField`.
-    pub fn get_first_file(&self) -> Result<&MultiFormFieldFile, MultiFormFieldError> {
+    /// Returns `None` for an empty file list and an error for a text field.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Preserve an absent first multipart file as None",
+        date = "2026-11-12"
+    )]
+    pub fn get_first_file(&self) -> Result<Option<&MultiFormFieldFile>, MultiFormFieldError> {
         match self {
-            Self::File(files) => files.first().ok_or(MultiFormFieldError::NoFile),
+            Self::File(files) => Ok(files.first()),
             Self::Text(_) => Err(MultiFormFieldError::ContentTypeError),
         }
     }
 
     /// Gets the byte slice of the first file from the `MultiFormField`.
-    pub fn get_first_file_content(&self) -> Result<&[u8], MultiFormFieldError> {
-        self.get_first_file().map(MultiFormFieldFile::data)
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Preserve absent multipart file content as None",
+        date = "2026-11-12"
+    )]
+    pub fn get_first_file_content(&self) -> Result<Option<&[u8]>, MultiFormFieldError> {
+        self.get_first_file()
+            .map(|file| file.map(MultiFormFieldFile::data))
     }
 }
 

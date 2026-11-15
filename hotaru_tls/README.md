@@ -22,7 +22,10 @@ use hotaru::prelude::*;
 pub static CLIENT: Lazy<Arc<Client<TlsTransport>>> = Lazy::new(|| {
     Client::<TlsTransport>::new()
         .target(TlsOutboundTarget::new("example.com", 443, TlsClientConfig::default()))
-        .single_protocol(ProtocolBuilder::new(HTTPS::client(HttpSafety::default())))
+        .single_protocol(ProtocolBuilder::new(HTTPS::client(
+            HttpSafety::default(),
+            HttpSyncSettings::default(),
+        )))
         .build()
 });
 ```

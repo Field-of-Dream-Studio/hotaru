@@ -1,7 +1,22 @@
 use super::HttpMeta;
-use crate::message::http_value::HttpContentType;
+use crate::util::content_type::HttpContentType;
 
 impl HttpMeta {
+    /// Synchronizes Content-Type with the body's generated content type.
+    #[av::ver(
+        unstable,
+        since = "0.8.6",
+        note = "Apply content-type reconciliation to cached and raw metadata",
+        date = "2026-11-13"
+    )]
+    pub fn sync_content_type(&mut self, generated: Option<HttpContentType>) {
+        let content_type = HttpContentType::reconcile(self.get_content_type(), generated);
+        self.delete_content_type();
+        if let Some(content_type) = content_type {
+            self.set_content_type(content_type);
+        }
+    }
+
     /// Gets the content type from the HTTP meta data.
     ///
     /// Returns the cached content type if available, otherwise parses
@@ -16,7 +31,7 @@ impl HttpMeta {
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
     /// # use hotaru_http::header::HeaderValue;
-    /// # use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::util::content_type::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -43,7 +58,7 @@ impl HttpMeta {
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
     /// # use hotaru_http::header::HeaderValue;
-    /// # use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::util::content_type::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -72,7 +87,7 @@ impl HttpMeta {
     ///
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
-    /// # use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::util::content_type::HttpContentType;
     ///
     /// let mut meta = HttpMeta::default();
     /// meta.set_content_type(HttpContentType::ApplicationJson());
@@ -97,7 +112,7 @@ impl HttpMeta {
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
     /// # use hotaru_http::header::HeaderValue;
-    /// # use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::util::content_type::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -130,7 +145,7 @@ impl HttpMeta {
     /// ```rust
     /// # use hotaru_http::meta::HttpMeta;
     /// # use hotaru_http::header::HeaderValue;
-    /// # use hotaru_http::http_value::HttpContentType;
+    /// # use hotaru_http::util::content_type::HttpContentType;
     /// use std::collections::HashMap;
     ///
     /// let mut headers = HashMap::new();
@@ -149,5 +164,35 @@ impl HttpMeta {
     pub fn delete_content_type(&mut self) {
         self.content_type = None;
         self.header.remove("content-type");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn metadata_sync_clears_stale_raw_content_type_and_retains_cached_details() {
+        let mut meta = HttpMeta::default();
+        meta.set_attribute("content-type", "application/xml");
+        meta.set_content_type(HttpContentType::from_str(
+            "application/json; profile=example",
+        ));
+        meta.sync_content_type(Some(HttpContentType::from_str(
+            "application/json; charset=UTF-8",
+        )));
+        assert_eq!(
+            meta.get_content_type(),
+            Some(HttpContentType::from_str(
+                "application/json; profile=example; charset=UTF-8"
+            ))
+        );
+        let wire = meta.represent();
+        assert!(!wire.contains("application/xml"));
+        assert_eq!(wire.matches("content-type:").count(), 1);
+
+        meta.delete_content_type();
+        meta.sync_content_type(None);
+        assert_eq!(meta.get_content_type(), None);
     }
 }

@@ -3,7 +3,7 @@ use crate::message::http_value::StatusCode;
 use crate::message::meta::{HttpMeta, MetaError, StreamedMetaError};
 use crate::message::request::HttpRequest;
 use crate::protocol::HttpError;
-use crate::security::safety::HttpSafety;
+use crate::protocol::safety::HttpSafety;
 use crate::util::streamed::Streamed;
 use hotaru_io_tokio::TokioIo;
 use std::io::Cursor;

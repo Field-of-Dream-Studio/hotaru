@@ -77,6 +77,8 @@ pub enum BodyError {
     InvalidJson(String),
     /// The body ended before the declared representation was complete.
     IncompleteBody,
+    /// The body must be encoded into a buffer before it can be written.
+    NotBuffered,
     /// A URL-encoded form failed to parse.
     Form(UrlEncodedError),
     /// A multipart form failed to parse.
@@ -103,6 +105,7 @@ impl fmt::Display for BodyError {
                 write!(formatter, "request body contains invalid JSON: {details}")
             }
             Self::IncompleteBody => formatter.write_str("request body is incomplete"),
+            Self::NotBuffered => formatter.write_str("HTTP body must be encoded before writing"),
             Self::Form(error) => fmt::Display::fmt(error, formatter),
             Self::Multipart(error) => fmt::Display::fmt(error, formatter),
             Self::Encoding(error) => fmt::Display::fmt(error, formatter),
@@ -185,6 +188,7 @@ impl From<&BodyError> for StatusCode {
             BodyError::Compression(error) => StatusCode::from(error),
             BodyError::Chunking(error) => StatusCode::from(error),
             BodyError::TooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            BodyError::NotBuffered => StatusCode::INTERNAL_SERVER_ERROR,
             BodyError::MissingContentType | BodyError::UnsupportedContentType(_) => {
                 StatusCode::UNSUPPORTED_MEDIA_TYPE
             }

@@ -17,12 +17,13 @@ fn test_parse_valid_multipart() {
     .to_vec();
 
     let form = MultiForm::parse(body, boundary).unwrap();
+    assert_eq!(form.boundary(), boundary);
     assert_eq!(form.len(), 2);
     assert!(form.contains_key("field1"));
     assert!(form.contains_key("file1"));
-    assert_eq!(form.get_text("field1").unwrap(), "value1");
+    assert_eq!(form.get_text("field1").unwrap().unwrap(), "value1");
     assert_eq!(
-        form.get_first_file("file1").unwrap().filename(),
+        form.get_first_file("file1").unwrap().unwrap().filename(),
         Some("example.txt".to_string())
     );
     assert_eq!(
@@ -49,7 +50,7 @@ fn test_parse_multiple_files_same_field() {
 
     let form = MultiForm::parse(body, boundary).unwrap();
     assert_eq!(form.len(), 1);
-    let files = form.get_files("upload").unwrap();
+    let files = form.get_files("upload").unwrap().unwrap();
     assert_eq!(files.len(), 2);
     assert_eq!(files[0].filename(), Some("f1.txt".to_string()));
     assert_eq!(files[1].filename(), Some("f2.txt".to_string()));
@@ -59,6 +60,21 @@ fn test_parse_multiple_files_same_field() {
 fn test_parse_empty_boundary_fails() {
     let result = MultiForm::parse(b"--xyz--", "");
     assert_eq!(result.unwrap_err(), MultipartError::EmptyBoundary);
+}
+
+#[test]
+fn test_parse_rejects_invalid_boundary_syntax() {
+    for boundary in [
+        "bad\r\nboundary".to_string(),
+        "trailing-space ".to_string(),
+        "a".repeat(71),
+    ] {
+        let body = format!("--{boundary}--\r\n");
+        assert!(matches!(
+            MultiForm::parse(body.as_bytes(), &boundary),
+            Err(MultipartError::InvalidData(_))
+        ));
+    }
 }
 
 #[test]
@@ -123,7 +139,7 @@ fn test_parse_invalid_utf8_in_text_field_fails() {
 
 #[test]
 fn test_round_trip_serialization() {
-    let mut form = MultiForm::new();
+    let mut form = MultiForm::try_new("myboundary").unwrap();
     form.insert(
         "author".to_string(),
         MultiFormField::new_text("Hotaru".to_string()),
@@ -137,12 +153,13 @@ fn test_round_trip_serialization() {
         )),
     );
 
-    let serialized = form.to_string("myboundary");
+    let serialized = form.to_string();
     let parsed = MultiForm::parse(serialized.as_bytes(), "myboundary").unwrap();
 
-    assert_eq!(parsed.get_text("author").unwrap(), "Hotaru");
+    assert_eq!(parsed.boundary(), form.boundary());
+    assert_eq!(parsed.get_text("author").unwrap().unwrap(), "Hotaru");
     assert_eq!(
-        parsed.get_first_file("file").unwrap().filename(),
+        parsed.get_first_file("file").unwrap().unwrap().filename(),
         Some("doc.txt".to_string())
     );
     assert_eq!(

@@ -1,5 +1,6 @@
 use crate::message::header::HeaderMap;
 use crate::message::http_value::*;
+use crate::util::content_type::HttpContentType;
 use crate::message::start_line::HttpStartLine;
 use crate::util::connection::ConnectionOptions;
 use crate::util::cookie::CookieMap;

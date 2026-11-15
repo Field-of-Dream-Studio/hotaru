@@ -14,7 +14,7 @@ use hotaru_core::protocol::Channel;
 use crate::message::request::HttpRequest;
 use crate::message::response::HttpResponse;
 use crate::protocol::error::HttpError;
-use crate::security::safety::HttpSafety;
+use crate::protocol::safety::HttpSafety;
 
 /// HTTP-level channel — the I/O surface every HTTP version must provide.
 ///

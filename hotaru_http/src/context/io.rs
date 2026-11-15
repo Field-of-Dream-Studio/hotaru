@@ -1,12 +1,10 @@
-use std::fmt::Write;
-
 use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
 
 use crate::message::body::HttpBody;
-use crate::message::http_value::HttpContentType;
 use crate::message::meta::HttpMeta;
-use crate::protocol::HttpError;
-use crate::security::safety::HttpSafety;
+use crate::message::sync::config_sync;
+use crate::protocol::safety::HttpSafety;
+use crate::protocol::{HttpError, HttpSyncSettings};
 
 /// Reads metadata and the complete framed body, deferring content decoding.
 #[av::ver(
@@ -45,32 +43,28 @@ pub async fn parse_lazy<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>
     receive(stream, config, is_request, print_raw).await
 }
 
+/// Sends an HTTP message to a stream.
+///
+/// Synchronizes metadata and prepares the body before writing headers, then
+/// writes the prepared body with transfer framing and flushes the writer.
+#[av::ver(
+    update,
+    since = "0.8.6",
+    note = "Send messages through shared synchronization and body writing",
+    date = "2026-11-13"
+)]
 pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(
-    mut meta: HttpMeta,
+    meta: HttpMeta,
     body: HttpBody,
     writer: &mut W,
+    settings: &HttpSyncSettings,
 ) -> Result<(), HttpError> {
-    let mut headers = String::with_capacity(256);
-
+    let (mut meta, body) = config_sync(meta, body, settings)?;
     let encoding = meta.get_encoding()?;
-    let content_type = meta.get_content_type();
-    let boundary = match &content_type {
-        Some(HttpContentType::Multipart { boundary, .. }) => boundary.as_deref(),
-        _ => None,
-    };
-    let (bin, suggested_content_type) = body.encode(&encoding, boundary).await?;
-    if meta.get_content_length()?.is_none() {
-        meta.set_content_length(bin.len());
-    }
-    if content_type.is_none()
-        && let Some(content_type) = suggested_content_type
-    {
-        meta.set_content_type(content_type);
-    }
-    write!(&mut headers, "{}", meta.represent()).map_err(std::io::Error::other)?;
+    let headers = meta.represent();
 
     writer.write_all(headers.as_bytes()).await?;
-    writer.write_all(&bin).await?;
+    body.write_buffer(writer, encoding.transfer()).await?;
     writer.flush().await?;
 
     Ok(())

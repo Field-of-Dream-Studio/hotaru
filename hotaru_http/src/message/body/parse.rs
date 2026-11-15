@@ -1,56 +1,25 @@
-use akari::Value;
+//! Incoming body preparation: size checks, content decoding, and representation conversion.
 
-use crate::message::http_value::HttpContentType;
-use crate::security::safety::HttpSafety;
-use crate::util::form::{MultiForm, MultipartError, UrlEncodedError, UrlEncodedForm};
+use crate::util::content_type::HttpContentType;
+use crate::protocol::safety::HttpSafety;
+use crate::util::form::MultipartError;
 
+use super::convert::{
+    parse_into_binary, parse_into_files, parse_into_form, parse_into_json, parse_into_text,
+};
 use super::{BodyError, HttpBody};
 
 impl HttpBody {
-    /// Content-decodes and parses a buffered body according to its content type.
+    /// Converts a buffer into a body.
+    ///
+    /// The reverse operation is [`Self::encode`].
     #[av::ver(
         update,
         since = "0.8.6",
-        note = "Renamed from parse_buffer",
-        date = "2026-11-08"
+        note = "Public buffer-to-body decoding",
+        date = "2026-11-13"
     )]
-    pub(crate) fn decode(self, safety: &HttpSafety) -> Result<Self, BodyError> {
-        fn parse_into_json(body: Vec<u8>) -> Result<HttpBody, BodyError> {
-            let body = String::from_utf8(body).map_err(|_| BodyError::InvalidUtf8)?;
-            let value = Value::from_json(&body)
-                .map_err(|_| BodyError::InvalidJson("invalid JSON syntax".to_string()))?;
-            Ok(HttpBody::Json(value))
-        }
-
-        fn parse_into_text(body: Vec<u8>) -> Result<HttpBody, BodyError> {
-            String::from_utf8(body)
-                .map(HttpBody::Text)
-                .map_err(|_| BodyError::InvalidUtf8)
-        }
-
-        fn parse_into_binary(body: Vec<u8>) -> HttpBody {
-            HttpBody::Binary(body)
-        }
-
-        fn parse_into_form(body: Vec<u8>) -> Result<HttpBody, BodyError> {
-            UrlEncodedForm::parse(body)
-                .map(HttpBody::Form)
-                .map_err(|err| match err {
-                    // Fold UTF-8 into the shared BodyError::InvalidUtf8, same as JSON.
-                    UrlEncodedError::InvalidUtf8 => BodyError::InvalidUtf8,
-                    other => BodyError::Form(other),
-                })
-        }
-
-        fn parse_into_files(body: Vec<u8>, boundary: String) -> Result<HttpBody, BodyError> {
-            MultiForm::parse(body, boundary)
-                .map(HttpBody::Files)
-                .map_err(|err| match err {
-                    MultipartError::InvalidUtf8 => BodyError::InvalidUtf8,
-                    other => BodyError::Multipart(other),
-                })
-        }
-
+    pub fn decode(self, safety: &HttpSafety) -> Result<Self, BodyError> {
         match self {
             Self::Buffer {
                 data,
@@ -61,8 +30,7 @@ impl HttpBody {
                     return Err(BodyError::TooLarge);
                 }
 
-                let data = content_coding
-                    .decode_compressed(data, safety.effective_body_size())?;
+                let data = content_coding.decode_compressed(data, safety.effective_body_size())?;
                 if !safety.check_body_size(data.len()) {
                     return Err(BodyError::TooLarge);
                 }
@@ -178,8 +146,7 @@ mod tests {
 
     #[test]
     fn rejects_malformed_form() {
-        let result = buffered_form(b"malformed_without_equals".to_vec())
-            .decode(&HttpSafety::new());
+        let result = buffered_form(b"malformed_without_equals".to_vec()).decode(&HttpSafety::new());
 
         assert!(matches!(result, Err(BodyError::Form(_))));
     }
@@ -211,19 +178,16 @@ mod tests {
 
     #[test]
     fn rejects_multipart_missing_boundary_param() {
-        let result = buffered_multipart(b"data".to_vec(), None)
-            .decode(&HttpSafety::new());
+        let result = buffered_multipart(b"data".to_vec(), None).decode(&HttpSafety::new());
 
         assert!(matches!(result, Err(BodyError::Multipart(_))));
     }
 
     #[test]
     fn rejects_malformed_multipart_body() {
-        let result = buffered_multipart(
-            b"no boundaries here".to_vec(),
-            Some("boundary".to_string()),
-        )
-        .decode(&HttpSafety::new());
+        let result =
+            buffered_multipart(b"no boundaries here".to_vec(), Some("boundary".to_string()))
+                .decode(&HttpSafety::new());
 
         assert!(matches!(result, Err(BodyError::Multipart(_))));
     }

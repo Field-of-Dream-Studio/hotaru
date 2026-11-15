@@ -9,7 +9,7 @@ use crate::message::http_value::{HttpVersion, StatusCode};
 use crate::message::meta::{HttpMeta, MetaError};
 use crate::message::request::HttpRequest;
 use crate::message::response::HttpResponse;
-use crate::security::safety::HttpSafety;
+use crate::protocol::safety::HttpSafety;
 use crate::util::streamed::Streamed;
 
 #[test]

@@ -22,7 +22,7 @@ Install HTTP/1.1 with a shared safety baseline:
 LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3003")
-        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+        .single_protocol(ProtocolBuilder::new(HTTP::default()))
         .build()
 );
 
@@ -213,7 +213,8 @@ let safety = HttpSafety::default()
     .with_max_line_length(8 * 1024);
 ```
 
-Pass it to `HTTP::server(safety)`. A route can overlay method and content-type
+Pass it to `HTTP::server(safety, HttpSyncSettings::default())`. A route can overlay
+method and content-type
 rules:
 
 ```rust

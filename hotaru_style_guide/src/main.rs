@@ -22,7 +22,7 @@ pub static APP: SServer = Lazy::new(|| Server::new().binding("127.0.0.1:3000").b
 //         .binding("127.0.0.1:3001")
 //         .handle(
 //             HandlerBuilder::new()
-//                 .protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+//                 .protocol(ProtocolBuilder::new(HTTP::default()))
 //                 .protocol(ProtocolBuilder::new(h2per::prelude::HYPER1::new(ProtocolRole::Server)))
 //                 .protocol(ProtocolBuilder::new(h2per::prelude::HYPER2::new(ProtocolRole::Server)))
 //         )

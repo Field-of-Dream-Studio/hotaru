@@ -18,13 +18,13 @@ use hotaru::prelude::*;
 
 static BLUEPRINT_A: LazyLock<Blueprint<TcpTransport, InboundOnly>> = LazyLock::new(|| {
     Blueprint::new()
-        .with_protocol(HTTP::server(HttpSafety::default()))
+        .with_protocol(HTTP::default())
         .expect("blueprint A protocol")
 });
 
 static BLUEPRINT_B: LazyLock<Blueprint<TcpTransport, InboundOnly>> = LazyLock::new(|| {
     Blueprint::new()
-        .with_protocol(HTTP::server(HttpSafety::default()))
+        .with_protocol(HTTP::default())
         .expect("blueprint B protocol")
 });
 

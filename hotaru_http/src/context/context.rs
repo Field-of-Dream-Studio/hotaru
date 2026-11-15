@@ -18,8 +18,8 @@ use crate::message::http_value::{HttpMethod, StatusCode};
 use crate::message::meta::HttpMeta;
 use crate::message::request::HttpRequest;
 use crate::message::response::{HttpResponse, response_templates};
-use crate::protocol::HttpError;
-use crate::security::safety::HttpSafety;
+use crate::protocol::safety::HttpSafety;
+use crate::protocol::{HttpError, HttpSyncSettings};
 
 use crate::util::cookie::{Cookie, CookieMap};
 use crate::util::form::{MultiForm, UrlEncodedForm};
@@ -238,7 +238,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     where
         W: HotaruWrite<Error = std::io::Error> + Unpin + Send,
     {
-        let _ = response.send(writer).await;
+        let _ = response.send(writer, &HttpSyncSettings::default()).await;
     }
 
     /// Runs the endpoint and returns the context with the response set.

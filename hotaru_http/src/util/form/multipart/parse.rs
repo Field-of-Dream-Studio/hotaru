@@ -48,21 +48,18 @@ fn parse_headers(
 ///
 /// Returns [`MultipartError`] if the boundary is invalid, delimiters are missing,
 /// headers are malformed, required fields are absent, or text content is invalid UTF-8.
-pub fn parse_multipart(
+pub(super) fn parse_multipart(
     body: impl AsRef<[u8]>,
     boundary: impl AsRef<str>,
 ) -> Result<MultiForm, MultipartError> {
-    let boundary_str = boundary.as_ref();
-    if boundary_str.is_empty() {
-        return Err(MultipartError::EmptyBoundary);
-    }
+    let mut form = MultiForm::try_new(boundary.as_ref())?;
 
     let body = body.as_ref();
     if body.is_empty() {
         return Err(MultipartError::MissingBoundary);
     }
 
-    let delimiter = format!("--{}", boundary_str);
+    let delimiter = format!("--{}", form.boundary());
     let delimiter_bytes = delimiter.as_bytes();
 
     let mut parts: Vec<&[u8]> = Vec::new();
@@ -155,5 +152,6 @@ pub fn parse_multipart(
         }
     }
 
-    Ok(form_map.into())
+    form.data = form_map;
+    Ok(form)
 }
