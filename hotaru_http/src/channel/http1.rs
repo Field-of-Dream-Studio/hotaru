@@ -12,9 +12,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use hotaru_core::connection::{
-    ConnMeta, ConnStream, HotaruRead, HotaruWrite,
-};
+use hotaru_core::connection::{ConnMeta, ConnStream, HotaruRead, HotaruWrite};
 use hotaru_core::protocol::Channel;
 use tokio::sync::Mutex;
 
@@ -23,20 +21,21 @@ use crate::message::body::HttpBody;
 use crate::message::http_value::StatusCode;
 use crate::message::request::HttpRequest;
 use crate::message::response::HttpResponse;
+use crate::protocol::HttpSyncSettings;
 use crate::protocol::error::HttpError;
-use crate::security::safety::HttpSafety;
+use crate::protocol::safety::HttpSafety;
 
 /// HTTP/1 channel for the Protocol trait.
 ///
-/// Carries the per-connection safety baseline (`Arc<HttpSafety>`) injected
-/// at `open_channel` / `acquire_channel` time, so per-request I/O does not
-/// hit `RuntimeConfig`.
+/// Carries independent safety and synchronization settings injected at
+/// `open_channel` / `acquire_channel` time, without a runtime configuration lookup.
 pub struct Http1Channel<W: ConnStream> {
     reader: Arc<Mutex<<W::ReadHalf as HotaruRead>::Buffered>>,
     writer: Arc<Mutex<<W::WriteHalf as HotaruWrite>::Buffered>>,
     meta: Arc<W::Meta>,
     open: Arc<AtomicBool>,
     safety: Arc<HttpSafety>,
+    sync_settings: Arc<HttpSyncSettings>,
 }
 
 impl<W: ConnStream> Clone for Http1Channel<W> {
@@ -47,6 +46,7 @@ impl<W: ConnStream> Clone for Http1Channel<W> {
             meta: self.meta.clone(),
             open: self.open.clone(),
             safety: self.safety.clone(),
+            sync_settings: self.sync_settings.clone(),
         }
     }
 }
@@ -69,7 +69,7 @@ where
 {
     async fn parse_request(&self, safety: &HttpSafety) -> Result<HttpRequest, HttpError> {
         let mut reader = self.reader.lock().await;
-        let request = match HttpRequest::parse_lazy(&mut *reader, safety, false).await {
+        let request = match HttpRequest::receive(&mut *reader, safety, false).await {
             Ok(request) => request,
             Err(error) => {
                 self.open.store(false, Ordering::Release);
@@ -90,14 +90,14 @@ where
 
     async fn send_response(&self, response: HttpResponse) -> Result<(), HttpError> {
         let mut writer = self.writer.lock().await;
-        response.send(&mut *writer).await?;
+        response.send(&mut *writer, &self.sync_settings).await?;
         writer.flush().await.map_err(HttpError::Io)?;
         Ok(())
     }
 
     async fn send_request(&self, request: HttpRequest) -> Result<(), HttpError> {
         let mut writer = self.writer.lock().await;
-        if let Err(err) = request.send(&mut *writer).await {
+        if let Err(err) = request.send(&mut *writer, &self.sync_settings).await {
             self.open.store(false, Ordering::Release);
             return Err(err);
         }
@@ -110,7 +110,7 @@ where
 
     async fn parse_response(&self, safety: &HttpSafety) -> Result<HttpResponse, HttpError> {
         let mut reader = self.reader.lock().await;
-        let response = match HttpResponse::parse_lazy(&mut *reader, safety, false).await {
+        let response = match HttpResponse::receive(&mut *reader, safety, false).await {
             Ok(response) => response,
             Err(error) => {
                 self.open.store(false, Ordering::Release);
@@ -148,13 +148,19 @@ where
     W::ReadHalf: HotaruRead<Error = std::io::Error>,
     W::WriteHalf: HotaruWrite<Error = std::io::Error>,
 {
-    /// Creates a new HTTP/1 channel from a split wire, its meta, and the
-    /// per-connection safety baseline.
+    /// Creates a channel with explicit safety and synchronization settings.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Accept explicit channel safety and synchronization settings",
+        date = "2026-11-15"
+    )]
     pub fn new(
         reader: <W::ReadHalf as HotaruRead>::Buffered,
         writer: <W::WriteHalf as HotaruWrite>::Buffered,
         meta: W::Meta,
         safety: Arc<HttpSafety>,
+        sync_settings: Arc<HttpSyncSettings>,
     ) -> Self {
         Self {
             reader: Arc::new(Mutex::new(reader)),
@@ -162,6 +168,7 @@ where
             meta: Arc::new(meta),
             open: Arc::new(AtomicBool::new(true)),
             safety,
+            sync_settings,
         }
     }
 

@@ -167,7 +167,7 @@ impl ContentCoding {
 }
 
 /// A collection of content codings.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ContentCodings {
     codings: Vec<ContentCoding>,
 }

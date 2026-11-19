@@ -18,8 +18,8 @@ use crate::message::http_value::{HttpMethod, StatusCode};
 use crate::message::meta::HttpMeta;
 use crate::message::request::HttpRequest;
 use crate::message::response::{HttpResponse, response_templates};
-use crate::protocol::HttpError;
-use crate::security::safety::HttpSafety;
+use crate::protocol::safety::HttpSafety;
+use crate::protocol::{HttpError, HttpSyncSettings};
 
 use crate::util::cookie::{Cookie, CookieMap};
 use crate::util::form::{MultiForm, UrlEncodedForm};
@@ -75,7 +75,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     ///
     /// `safety` is the per-connection baseline supplied by the protocol;
     /// per-endpoint overrides overlay on top of it in `request_check` /
-    /// `parse_body`.
+    /// `decode_body`.
     pub fn new_server(
         runtime: Arc<RuntimeConfig>,
         endpoint: Arc<UrlNode<HttpContext<TS>, TS>>,
@@ -225,7 +225,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     where
         R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
     {
-        HttpRequest::parse_lazy(
+        HttpRequest::receive(
             reader,
             &runtime.get_config::<HttpSafety>().unwrap_or_default(),
             runtime.mode() == RunMode::Build,
@@ -238,7 +238,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     where
         W: HotaruWrite<Error = std::io::Error> + Unpin + Send,
     {
-        let _ = response.send(writer).await;
+        let _ = response.send(writer, &HttpSyncSettings::default()).await;
     }
 
     /// Runs the endpoint and returns the context with the response set.
@@ -318,11 +318,14 @@ impl<TS: TransportSpec> HttpContext<TS> {
         }
     }
 
-    /// Parses the body of the request, reading it into the `HttpBody` field of the request.
-    /// Note that request body will not be automatically parsed unless this function is called
-    /// The automatic parsing is not recommended, as it can lead to performance issues and security vulnerabilities.
-    /// If you didn't parse body, the body will be `HttpBody::Unparsed`.
-    pub async fn parse_body(&mut self) -> Result<(), BodyError> {
+    /// Decodes the buffered request body using protocol and endpoint safety settings.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Renamed from parse_body",
+        date = "2026-11-08"
+    )]
+    pub async fn decode_body(&mut self) -> Result<(), BodyError> {
         // Start from the protocol baseline (`self.safety`); overlay any
         // per-endpoint override on top. (The prior implementation fetched
         // `endpoint.get_params::<HttpSafety>()` twice — the second call was
@@ -334,9 +337,20 @@ impl<TS: TransportSpec> HttpContext<TS> {
             }
         }
 
-        let body = self.request.body.clone().parse_buffer(&settings)?;
+        let body = self.request.body.clone().decode(&settings)?;
         self.request.body = body;
         Ok(())
+    }
+
+    /// Compatibility alias for [`HttpContext::decode_body`].
+    #[av::ver(
+        deprecated,
+        since = "0.8.6",
+        note = "Use HttpContext::decode_body instead",
+        date = "2026-11-08"
+    )]
+    pub async fn parse_body(&mut self) -> Result<(), BodyError> {
+        self.decode_body().await
     }
 
     /// Parses and returns the URL-encoded request body.
@@ -346,7 +360,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
             .meta
             .get_content_type()
             .map(|value| value.to_string());
-        self.parse_body().await?;
+        self.decode_body().await?;
         if let HttpBody::Form(ref data) = self.request.body {
             Ok(data)
         } else if matches!(self.request.body, HttpBody::Empty | HttpBody::Unparsed) {
@@ -365,7 +379,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
             .meta
             .get_content_type()
             .map(|value| value.to_string());
-        self.parse_body().await?;
+        self.decode_body().await?;
         if let HttpBody::Files(ref data) = self.request.body {
             Ok(data)
         } else if matches!(self.request.body, HttpBody::Empty | HttpBody::Unparsed) {
@@ -384,7 +398,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
             .meta
             .get_content_type()
             .map(|value| value.to_string());
-        self.parse_body().await?;
+        self.decode_body().await?;
         if let HttpBody::Json(ref data) = self.request.body {
             Ok(data)
         } else if matches!(self.request.body, HttpBody::Empty | HttpBody::Unparsed) {

@@ -22,7 +22,7 @@ pub static APP: SServer = Lazy::new(|| {
                     CHAT_ROOM.clone(),
                 )))
                 // Add HTTP protocol
-                .protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default()))),
+                .protocol(ProtocolBuilder::new(HTTP::default())),
         )
         .build()
 });

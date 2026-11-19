@@ -1,4 +1,5 @@
-﻿use crate::message::http_value::{HttpContentType, HttpMethod};
+﻿use crate::message::http_value::HttpMethod;
+use crate::util::content_type::HttpContentType;
 
 /// Centralized HTTP safety configuration with explicit state tracking
 ///

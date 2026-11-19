@@ -71,7 +71,7 @@ use hotaru::http::*;
 LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3003")
-        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+        .single_protocol(ProtocolBuilder::new(HTTP::default()))
         .build()
 );
 
@@ -87,7 +87,7 @@ pub static APP: SApp = Lazy::new(|| {
         .binding("127.0.0.1:3003")
         .handle(
             HandlerBuilder::new()
-                .protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+                .protocol(ProtocolBuilder::new(HTTP::default()))
                 .protocol(ProtocolBuilder::new(TcpProtocol::new(ProtocolRole::Server)))
                 .protocol(ProtocolBuilder::new(HYPER1::new(ProtocolRole::Server)))
         )
@@ -411,7 +411,7 @@ pub static APP: SApp = Lazy::new(|| {
     App::new()
         .binding("127.0.0.1:3003")
         .single_protocol(
-            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+            ProtocolBuilder::new(HTTP::default())
                 .append_middleware::<GlobalLogger>()
                 .append_middleware::<GlobalMetrics>()
         )

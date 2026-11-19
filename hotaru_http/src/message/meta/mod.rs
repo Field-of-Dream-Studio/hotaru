@@ -4,6 +4,7 @@ mod content_disposition;
 mod content_length;
 mod content_type;
 mod cookie;
+mod date;
 mod encoding;
 mod error;
 mod host_language;

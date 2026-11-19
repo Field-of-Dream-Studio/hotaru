@@ -10,7 +10,7 @@ use hotaru::prelude::*;
 LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3013")
-        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+        .single_protocol(ProtocolBuilder::new(HTTP::default()))
         .build()
 );
 

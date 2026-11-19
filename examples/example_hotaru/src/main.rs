@@ -8,7 +8,7 @@ fn main() {
 LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3003")
-        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+        .single_protocol(ProtocolBuilder::new(HTTP::default()))
         .build()
 );
 
@@ -24,7 +24,10 @@ pub static CLIENT: Lazy<Arc<Client<TlsTransport>>> = Lazy::new(|| {
             443,
             TlsClientConfig::default(),
         ))
-        .single_protocol(ProtocolBuilder::new(HTTPS::client(HttpSafety::default())))
+        .single_protocol(ProtocolBuilder::new(HTTPS::client(
+            HttpSafety::default(),
+            HttpSyncSettings::default(),
+        )))
         .build()
 });
 

@@ -24,7 +24,7 @@ pub static APP: SServer = Lazy::new(|| {
         .binding("127.0.0.1:3003")
         .set_config("This is a String Config")
         .single_protocol(
-            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+            ProtocolBuilder::new(HTTP::default())
                 .append_middleware::<GlobalLogger>()
                 .append_middleware::<GlobalMetrics>(),
         )

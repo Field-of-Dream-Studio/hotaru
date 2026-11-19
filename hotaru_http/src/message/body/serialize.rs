@@ -1,86 +1,80 @@
-use akari::Value;
+//! Outgoing body preparation and compatibility wrappers.
 
-use crate::message::http_value::HttpContentType;
-use crate::message::meta::HttpMeta;
+use crate::util::content_type::HttpContentType;
 use crate::protocol::HttpError;
-use crate::util::form::{MultiForm, UrlEncodedForm};
+use crate::util::encoding::{ContentCodings, HttpEncoding};
 
-use super::HttpBody;
+use super::{BodyError, HttpBody};
 
 impl HttpBody {
-    /// Serializes an HTTP body and updates derived body metadata.
+    /// Converts a body into a buffer.
     ///
-    /// Aggregates errors at this boundary: body-domain failures (`BodyError`),
-    /// meta lookups (`MetaError`), and compression I/O (`io::Error`) all flow
-    /// out as `HttpError`.
-    pub async fn into_static(self, meta: &mut HttpMeta) -> Result<Vec<u8>, HttpError> {
-        fn serialize_from_json(json: Value) -> Vec<u8> {
-            json.into_json().into_bytes()
-        }
-
-        fn serialize_from_text(text: String) -> Vec<u8> {
-            text.into_bytes()
-        }
-
-        fn serialize_from_binary(binary: Vec<u8>) -> Vec<u8> {
-            binary
-        }
-
-        fn serialize_from_form(form: UrlEncodedForm) -> Vec<u8> {
-            form.to_string().into_bytes()
-        }
-
-        fn serialize_from_files(files: MultiForm, boundary: &String) -> Vec<u8> {
-            files.to_string(boundary).into_bytes()
-        }
-
-        let (bin, default_content_type) = match self {
-            Self::Text(text) => (serialize_from_text(text), Some(HttpContentType::TextHtml())),
-            Self::Binary(binary) => (
-                serialize_from_binary(binary),
-                Some(HttpContentType::ApplicationOctetStream()),
-            ),
-            Self::Json(json) => (
-                serialize_from_json(json),
-                Some(HttpContentType::ApplicationJson()),
-            ),
-            Self::Form(form) => (
-                serialize_from_form(form),
-                Some(HttpContentType::ApplicationUrlEncodedForm()),
-            ),
-            Self::Files(files) => {
-                let boundary = if let Some(HttpContentType::Multipart {
-                    subtype: _,
-                    boundary: Some(boundary),
-                }) = meta.get_content_type()
-                {
-                    boundary
-                } else {
-                    "----DefaultBoundary7MA4YWxkTrZu0gW".to_string()
-                };
-
-                (
-                    serialize_from_files(files, &boundary),
-                    Some(HttpContentType::Multipart {
-                        subtype: "form-data".to_string(),
-                        boundary: Some(boundary),
-                    }),
-                )
+    /// The reverse operation is [`Self::decode`].
+    ///
+    /// Content types come from the body, including stored multipart boundaries.
+    /// Existing buffers are returned unchanged, with their recorded content coding.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Encode bodies into prepared buffers",
+        date = "2026-11-13"
+    )]
+    pub fn encode(self, content_coding: ContentCodings) -> Result<Self, BodyError> {
+        let body = match self {
+            Self::Unparsed => return Err(BodyError::IncompleteBody),
+            Self::Buffer {
+                data,
+                content_type,
+                content_coding,
+            } => {
+                return Ok(Self::Buffer {
+                    data,
+                    content_type,
+                    content_coding,
+                });
             }
-            _ => (Vec::new(), None),
+            body => body,
         };
+        let (data, suggested_content_type) = body.into_bin();
+        let content_type =
+            suggested_content_type.unwrap_or_else(HttpContentType::ApplicationOctetStream);
+        let data = content_coding.encode_compressed(data)?;
 
-        if meta.get_content_length()?.is_none() {
-            meta.set_content_length(bin.len());
-        }
-        if meta.get_content_type().is_none()
-            && let Some(content_type) = default_content_type
-        {
-            meta.set_content_type(content_type);
-        }
+        Ok(Self::Buffer {
+            data,
+            content_type,
+            content_coding,
+        })
+    }
 
-        let content_coding = meta.get_encoding()?.content().clone();
-        Ok(content_coding.encode_compressed(bin)?)
+    /// Compatibility alias for [`Self::encode`].
+    #[av::ver(
+        deprecated,
+        since = "0.8.6",
+        note = "Use HttpBody::encode instead",
+        date = "2026-11-13"
+    )]
+    pub fn into_buf(self, content_coding: ContentCodings) -> Result<Self, BodyError> {
+        self.encode(content_coding)
+    }
+
+    /// Compatibility wrapper returning encoded bytes and their content type.
+    #[av::ver(
+        deprecated,
+        since = "0.8.6",
+        note = "Use HttpBody::encode instead",
+        date = "2026-11-08"
+    )]
+    pub async fn into_static(
+        self,
+        encoding: &HttpEncoding,
+    ) -> Result<(Vec<u8>, Option<HttpContentType>), HttpError> {
+        match self.encode(encoding.content().clone())? {
+            Self::Buffer {
+                data, content_type, ..
+            } => Ok((data, Some(content_type))),
+            _ => unreachable!("encode always returns a buffer on success"),
+        }
     }
 
     /// Returns the raw data from a binary HTTP body.
@@ -96,44 +90,53 @@ impl HttpBody {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::encoding::HttpEncoding;
+    use crate::util::encoding::{CompressionError, ContentCoding};
 
     use super::*;
 
-    #[tokio::test]
-    async fn serializes_text_and_sets_body_metadata() {
-        let mut meta = HttpMeta::default();
+    #[test]
+    fn encode_uses_generated_content_type_and_preserves_bytes() {
+        for (body, expected_type, expected_data) in [
+            (
+                HttpBody::Text("hello".to_string()),
+                HttpContentType::TextHtml(),
+                b"hello".to_vec(),
+            ),
+            (
+                HttpBody::Binary(vec![0, 0xff]),
+                HttpContentType::ApplicationOctetStream(),
+                vec![0, 0xff],
+            ),
+            (
+                HttpBody::Empty,
+                HttpContentType::ApplicationOctetStream(),
+                Vec::new(),
+            ),
+        ] {
+            let HttpBody::Buffer {
+                data,
+                content_type,
+                content_coding,
+            } = body.encode(ContentCodings::new()).unwrap()
+            else {
+                panic!("expected a buffered body");
+            };
 
-        let body = HttpBody::Text("hello".to_string())
-            .into_static(&mut meta)
-            .await
-            .unwrap();
-
-        assert_eq!(body, b"hello");
-        assert_eq!(meta.get_content_length().unwrap(), Some(5));
-        assert!(matches!(
-            meta.get_content_type(),
-            Some(HttpContentType::Text { subtype, .. }) if subtype == "html"
-        ));
+            assert_eq!(data, expected_data);
+            assert_eq!(content_type, expected_type);
+            assert!(content_coding.is_identity());
+        }
     }
 
-    #[tokio::test]
-    async fn returns_content_coding_failure() {
-        let mut meta = HttpMeta::default();
-        meta.set_encoding(Some(
-            HttpEncoding::from_headers(None, Some("compress".to_string())).unwrap(),
-        ));
+    #[test]
+    fn encode_propagates_compression_errors() {
+        let mut coding = ContentCodings::new();
+        coding.push(ContentCoding::Compress);
 
-        let result = HttpBody::Text("hello".to_string())
-            .into_static(&mut meta)
-            .await;
-
-        use crate::message::body::BodyError;
-        use crate::util::encoding::CompressionError;
         assert!(matches!(
-            result,
-            Err(HttpError::Body(BodyError::Compression(
-                CompressionError::Unavailable("compress")
+            HttpBody::Text("hello".to_string()).encode(coding),
+            Err(BodyError::Compression(CompressionError::Unavailable(
+                "compress"
             )))
         ));
     }

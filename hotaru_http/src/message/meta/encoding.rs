@@ -60,8 +60,8 @@ impl HttpMeta {
             .get("content-encoding")
             .map(|values| values.first());
 
-        let encoding = HttpEncoding::from_headers(transfer_header, content_header)
-            .map_err(MetaError::from)?;
+        let encoding =
+            HttpEncoding::from_headers(transfer_header, content_header).map_err(MetaError::from)?;
         self.encoding = Some(encoding.clone());
         Ok(encoding)
     }

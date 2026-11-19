@@ -22,16 +22,13 @@ use hotaru_core::{
 };
 use hotaru_http::{
     DefaultHttpTransport, HTTP, context::HttpReqCtx, response::response_templates::normal_response,
-    safety::HttpSafety,
 };
 use hotaru_rt_tokio::TokioRuntime;
 
 fn main() {
     let app = Server::<DefaultHttpTransport, TokioRuntime>::new()
         .binding("127.0.0.1:3010")
-        .single_protocol(ProtocolEntryBuilder::new(HTTP::server(
-            HttpSafety::default(),
-        )))
+        .single_protocol(ProtocolEntryBuilder::new(HTTP::default()))
         .build();
 
     app.insert(index_route()).expect("index route must bind");

@@ -37,7 +37,7 @@ LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3003")
         .single_protocol(
-            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+            ProtocolBuilder::new(HTTP::default())
                 .append_middleware::<CookieSession>(),
         )
         .build()
@@ -89,7 +89,7 @@ LServer!(
         .mode(RunMode::Development)
         .set_config(CookieSessionSettings::new().security(CookieSecurity::Auto))
         .single_protocol(
-            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+            ProtocolBuilder::new(HTTP::default())
                 .append_middleware::<CookieSession>(),
         )
         .build()
@@ -133,7 +133,7 @@ LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3003")
         .single_protocol(
-            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+            ProtocolBuilder::new(HTTP::default())
                 .append_middleware::<PreferredLanguageMiddleware>(),
         )
         .build()

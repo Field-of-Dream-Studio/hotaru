@@ -6,7 +6,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-<img width="1634" height="910" alt="7db7cf68-ebaa-476f-a306-4521ff4c1321" src="https://github.com/user-attachments/assets/6a8aae85-f14b-404b-8aa5-986f486eec3c" />
+<img width="1920" alt="pict" src="https://github.com/user-attachments/assets/d04f39f0-1288-4452-9516-b430043fd081" />
 
 ## Overview
 
@@ -14,7 +14,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 > Small, sweet, easy framework with a protocol-neutral, no_std-ready core 
 
-**[Official Website](https://hotaru.rs)** | **[Examples](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples)**
+**[Official Website](https://hotaru.rs)** | **[Examples](https://github.com/Field-of-Dream-Studio/hotaru/tree/master/examples)** | **[Twitter/X](https://x.com/FDS_2017)** 
 
 > Repository transfer notice: the Hotaru repository has moved to
 > `https://github.com/Field-of-Dream-Studio/hotaru`.
@@ -61,7 +61,7 @@ use hotaru::http::*;
 LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3003")
-        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+        .single_protocol(ProtocolBuilder::new(HTTP::default()))
         .build()
 );
 
@@ -294,7 +294,7 @@ LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3003")
         .single_protocol(
-            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+            ProtocolBuilder::new(HTTP::default())
                 .append_middleware::<CookieSession>(),
         )
         .build()
@@ -315,7 +315,7 @@ LServer!(
         .mode(RunMode::Development)
         .set_config(CookieSessionSettings::new().security(CookieSecurity::Auto))
         .single_protocol(
-            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+            ProtocolBuilder::new(HTTP::default())
                 .append_middleware::<CookieSession>(),
         )
         .build()

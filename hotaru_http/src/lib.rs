@@ -11,17 +11,21 @@ pub mod protocol;
 /// [Channel] HttpChannel trait + Http1Channel impl (parallel to context)
 pub mod channel;
 
-/// [Runtime Context] HttpContext, parse_lazy(), send()
+/// [Runtime Context] HttpContext, receive(), send()
 pub mod context;
 
 /// [Message Model] HttpRequest, HttpResponse, HttpBody, HttpMeta, HttpStartLine, types
 pub mod message;
 
-/// [One-shot request] `send_request(&outbound, request, safety)` over any `Outbound`
+/// [One-shot request] `send_request(&outbound, request, safety, sync_settings)` over any `Outbound`
 pub mod send_request;
 
-/// [Security] HttpSafety
-pub mod security;
+/// Compatibility paths for HTTP protocol safety settings.
+pub mod security {
+    pub mod safety {
+        pub use crate::protocol::{HttpSafety, HttpSyncSettings};
+    }
+}
 
 /// [Utilities] Cookie, encoding, form, security tests
 pub mod util;
@@ -93,8 +97,8 @@ pub mod response {
 }
 
 pub mod safety {
-    //! Re-exported from `security::safety`
-    pub use crate::security::safety::*;
+    //! Re-exported from `protocol` for compatibility.
+    pub use crate::protocol::{HttpSafety, HttpSyncSettings};
 }
 
 pub mod start_line {

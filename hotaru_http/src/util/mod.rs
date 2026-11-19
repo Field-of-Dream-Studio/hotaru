@@ -1,5 +1,7 @@
-﻿pub mod cookie;
+﻿pub mod content_type;
+pub mod cookie;
 pub mod connection;
+pub mod date;
 pub mod encoding;
 pub mod form;
 pub mod streamed;

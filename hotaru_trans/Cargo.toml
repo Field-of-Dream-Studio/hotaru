@@ -17,10 +17,6 @@ ctor = { version = "0.4.0", optional = true }
 
 [dev-dependencies]
 proc-macro2 = "1"
-hotaru_http = { path = "../hotaru_http", version = "=0.8.6" }
-# The root workspace enables `hotaru_trans/facade` through `hotaru`; keep the
-# downstream integration test's generated `::hotaru` paths resolvable.
-hotaru = { path = "../hotaru", version = "=0.8.6", default-features = false }
 
 [features]
 default = ["trans", "auto-reg"]

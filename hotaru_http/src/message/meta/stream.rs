@@ -3,7 +3,7 @@ use super::error::{MetaError, StreamedMetaError};
 use crate::message::header::HeaderMap;
 use crate::message::http_value::HttpVersion;
 use crate::message::start_line::HttpStartLine;
-use crate::security::safety::HttpSafety;
+use crate::protocol::safety::HttpSafety;
 use crate::start_line::StartLineError;
 use crate::util::streamed::Streamed;
 use hotaru_core::connection::{HotaruBufRead, TransferTermination};

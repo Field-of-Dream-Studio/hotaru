@@ -55,14 +55,15 @@ pub type HTTPS = Http1TlsProtocol;
 /// HTTP/1.1 protocol handler.
 ///
 /// Generic over the concrete wire stream type so the same logic serves TCP
-/// and TLS transports. Owns the per-instance `HttpSafety` baseline as an
-/// `Arc` so per-connection clones are an atomic bump.
+/// and TLS transports. Owns independent safety and synchronization settings
+/// shared with its channels through `Arc`.
 pub struct Http1Protocol<
     W: ConnStream = TcpStream,
     TS: TransportSpec<Wire = W> = DefaultHttpTransport,
 > {
     role: ProtocolRole,
     safety: Arc<HttpSafety>,
+    sync_settings: Arc<HttpSyncSettings>,
     _wire: PhantomData<fn() -> W>,
     _ts: PhantomData<fn() -> TS>,
 }
@@ -72,28 +73,56 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Clone for Http1Protocol<W, TS> 
         Self {
             role: self.role,
             safety: self.safety.clone(),
+            sync_settings: self.sync_settings.clone(),
             _wire: PhantomData,
             _ts: PhantomData,
         }
     }
 }
 
+impl<W: ConnStream, TS: TransportSpec<Wire = W>> Default for Http1Protocol<W, TS> {
+    /// Creates a server protocol with default safety and synchronization settings.
+    #[av::ver(
+        unstable,
+        since = "0.8.6",
+        note = "Default HTTP server safety and synchronization settings",
+        date = "2026-11-14"
+    )]
+    fn default() -> Self {
+        Self::server(HttpSafety::default(), HttpSyncSettings::default())
+    }
+}
+
 impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
-    /// Server role with `safety` as the per-connection baseline.
-    pub fn server(safety: HttpSafety) -> Self {
+    /// Server role with independent safety and synchronization settings.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Accept explicit server safety and synchronization settings",
+        date = "2026-11-14"
+    )]
+    pub fn server(safety: HttpSafety, sync_settings: HttpSyncSettings) -> Self {
         Self {
             role: ProtocolRole::Server,
             safety: Arc::new(safety),
+            sync_settings: Arc::new(sync_settings),
             _wire: PhantomData,
             _ts: PhantomData,
         }
     }
 
-    /// Client role with `safety` as the per-connection baseline.
-    pub fn client(safety: HttpSafety) -> Self {
+    /// Client role with independent safety and synchronization settings.
+    #[av::ver(
+        update,
+        since = "0.8.6",
+        note = "Accept explicit client safety and synchronization settings",
+        date = "2026-11-14"
+    )]
+    pub fn client(safety: HttpSafety, sync_settings: HttpSyncSettings) -> Self {
         Self {
             role: ProtocolRole::Client,
             safety: Arc::new(safety),
+            sync_settings: Arc::new(sync_settings),
             _wire: PhantomData,
             _ts: PhantomData,
         }
@@ -102,6 +131,17 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
     /// Borrows this protocol's safety baseline.
     pub fn safety(&self) -> &HttpSafety {
         &self.safety
+    }
+
+    /// Borrows this protocol's outgoing synchronization settings.
+    #[av::ver(
+        unstable,
+        since = "0.8.6",
+        note = "Inspect protocol-owned outgoing synchronization settings",
+        date = "2026-11-14"
+    )]
+    pub fn sync_settings(&self) -> &HttpSyncSettings {
+        &self.sync_settings
     }
 }
 
@@ -161,8 +201,7 @@ where
         writer: <<<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf as HotaruWrite>::Buffered,
         meta: <<Self::TS as TransportSpec>::Wire as ConnStream>::Meta,
     ) -> Self::Channel {
-        let safety = self.safety.clone();
-        Http1Channel::new(reader, writer, meta, safety)
+        Http1Channel::new(reader, writer, meta, self.safety, self.sync_settings)
     }
 
     async fn handle(
@@ -254,7 +293,13 @@ where
         let (read, write, meta) = wire.split();
         let reader = read.into_buf();
         let writer = write.into_buf_write();
-        Ok(Http1Channel::new(reader, writer, meta, self.safety.clone()))
+        Ok(Http1Channel::new(
+            reader,
+            writer,
+            meta,
+            self.safety.clone(),
+            self.sync_settings.clone(),
+        ))
     }
 
     async fn send(
@@ -294,6 +339,66 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::message::body::HttpBody;
+    use crate::message::http_value::StatusCode;
+    use crate::message::request::HttpRequest;
+    use crate::message::response::HttpResponse;
+
+    #[tokio::test]
+    async fn protocol_sync_settings_reach_server_and_client_channels() {
+        let server = HTTP::default();
+        assert_eq!(server.role(), ProtocolRole::Server);
+        assert_eq!(server.sync_settings(), &HttpSyncSettings::default());
+
+        let settings = HttpSyncSettings {
+            sync_content_type: false,
+            ..HttpSyncSettings::default()
+        };
+        let server = HTTP::server(HttpSafety::default(), settings);
+        let client = HTTP::client(HttpSafety::default(), settings);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let outbound = Arc::new(
+            hotaru_io_tokio::TcpOutbound::build(listener.local_addr().unwrap().to_string())
+                .await
+                .unwrap(),
+        );
+        let runtime = Arc::new(RuntimeConfig::default());
+        let client_clone = client.clone();
+        let (client_channel, accepted) = tokio::join!(
+            client_clone.acquire_channel(&runtime, outbound),
+            listener.accept(),
+        );
+        let client_channel = client_channel.unwrap();
+        let (read, write, meta) = TcpStream::new(accepted.unwrap().0).split();
+        let server_channel =
+            server
+                .clone()
+                .open_channel(read.into_buf(), write.into_buf_write(), meta);
+
+        let mut request = HttpRequest::default();
+        request.meta.set_host(Some("localhost".to_string()));
+        request.body = HttpBody::Binary(b"ping".to_vec());
+        client_channel.clone().send_request(request).await.unwrap();
+        let mut received = server_channel.parse_request(server.safety()).await.unwrap();
+        assert_eq!(received.meta.get_content_type(), None);
+        assert_eq!(received.meta.get_content_length().unwrap(), Some(4));
+        assert!(matches!(received.body, HttpBody::Buffer { data, .. } if data == b"ping"));
+
+        let mut response = HttpResponse::default();
+        response.body = HttpBody::Binary(b"pong".to_vec());
+        server_channel
+            .clone()
+            .send_response(response)
+            .await
+            .unwrap();
+        let mut received = client_channel
+            .parse_response(client.safety())
+            .await
+            .unwrap();
+        assert_eq!(received.meta.get_content_type(), None);
+        assert_eq!(received.meta.get_content_length().unwrap(), Some(4));
+        assert!(matches!(received.body, HttpBody::Buffer { data, .. } if data == b"pong"));
+    }
 
     #[test]
     fn test_http1_detection() {

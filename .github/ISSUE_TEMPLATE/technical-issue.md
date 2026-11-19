@@ -16,7 +16,7 @@ assignees: ""
 
 ### Affected code
 
-- `path/to/file.rs` — relevant responsibility or affected area
+- `path/to/file.rs`: relevant responsibility or affected area
 
 ### Impact
 

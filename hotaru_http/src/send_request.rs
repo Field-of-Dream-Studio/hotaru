@@ -11,13 +11,17 @@
 //! ```ignore
 //! // HTTP
 //! let outbound = TcpOutbound::build("example.com:80".into()).await?;
-//! let resp = send_request(&outbound, request, HttpSafety::default()).await?;
+//! let resp = send_request(
+//!     &outbound, request, HttpSafety::default(), HttpSyncSettings::default(),
+//! ).await?;
 //!
 //! // HTTPS (with the `tls` feature)
 //! let outbound = TlsOutbound::build(
 //!     TlsOutboundTarget::new("example.com", 443, TlsClientConfig::default()),
 //! ).await?;
-//! let resp = send_request(&outbound, request, HttpSafety::default()).await?;
+//! let resp = send_request(
+//!     &outbound, request, HttpSafety::default(), HttpSyncSettings::default(),
+//! ).await?;
 //! ```
 //!
 //! The caller is responsible for setting the `Host` header on `request` —
@@ -33,7 +37,8 @@ use crate::channel::HttpChannel;
 use crate::message::request::HttpRequest;
 use crate::message::response::HttpResponse;
 use crate::protocol::error::HttpError;
-use crate::security::safety::HttpSafety;
+use crate::protocol::safety::HttpSafety;
+use crate::protocol::HttpSyncSettings;
 
 /// Send one HTTP/1.1 request over a fresh wire from `outbound` and return
 /// the parsed response. The channel is closed after the roundtrip.
@@ -42,10 +47,17 @@ use crate::security::safety::HttpSafety;
 /// any future transport that implements `Outbound`. The function never
 /// touches scheme parsing; pick the right `Outbound` for the URL you're
 /// targeting before calling.
+#[av::ver(
+    update,
+    since = "0.8.6",
+    note = "Send one-shot requests with explicit safety and synchronization settings",
+    date = "2026-11-15"
+)]
 pub async fn send_request<O>(
     outbound: &O,
     request: HttpRequest,
     safety: HttpSafety,
+    sync_settings: HttpSyncSettings,
 ) -> Result<HttpResponse, HttpError>
 where
     O: Outbound,
@@ -60,6 +72,7 @@ where
         write.into_buf_write(),
         meta,
         Arc::new(safety),
+        Arc::new(sync_settings),
     );
 
     let result = async {
@@ -116,9 +129,14 @@ mod tests {
             HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::GET, "/ping".to_string());
         request.meta.set_host(Some(addr.to_string()));
 
-        let response = send_request(&outbound, request, HttpSafety::default())
-            .await
-            .expect("send_request");
+        let response = send_request(
+            &outbound,
+            request,
+            HttpSafety::default(),
+            HttpSyncSettings::default(),
+        )
+        .await
+        .expect("send_request");
 
         assert_eq!(response.meta.start_line.status_code(), StatusCode::OK);
         let body_bytes: Vec<u8> = match response.body {

@@ -3,7 +3,7 @@ use crate::message::http_value::ContentDisposition;
 use super::{MultiForm, MultiFormField};
 
 /// Serializes a [`MultiForm`] into a multipart string representation using the specified boundary.
-pub fn serialize_multipart(form: &MultiForm, boundary: &str) -> String {
+pub(super) fn serialize_multipart(form: &MultiForm, boundary: &str) -> String {
     let mut form_data = String::new();
 
     for (key, field) in &form.data {
@@ -49,5 +49,51 @@ pub fn serialize_multipart(form: &MultiForm, boundary: &str) -> String {
     }
 
     form_data.push_str(&format!("--{}--\r\n", boundary));
+    form_data
+}
+
+/// Serializes multipart payload bytes with one delimiter for each part.
+pub(super) fn serialize_multipart_bytes(form: &MultiForm) -> Vec<u8> {
+    let boundary = form.boundary();
+    let mut form_data = Vec::new();
+
+    for (key, field) in &form.data {
+        match field {
+            MultiFormField::Text(value) => {
+                let disposition = ContentDisposition::form_data::<_, String>(key, None);
+                form_data.extend_from_slice(
+                    format!(
+                        "--{boundary}\r\nContent-Disposition: {}\r\n\r\n",
+                        disposition.to_string()
+                    )
+                    .as_bytes(),
+                );
+                form_data.extend_from_slice(value.as_bytes());
+                form_data.extend_from_slice(b"\r\n");
+            }
+            MultiFormField::File(files) => {
+                for file in files {
+                    let disposition = ContentDisposition::form_data(key, file.filename.clone());
+                    form_data.extend_from_slice(
+                        format!(
+                            "--{boundary}\r\nContent-Disposition: {}\r\n",
+                            disposition.to_string()
+                        )
+                        .as_bytes(),
+                    );
+                    if let Some(content_type) = &file.content_type {
+                        form_data.extend_from_slice(
+                            format!("Content-Type: {content_type}\r\n").as_bytes(),
+                        );
+                    }
+                    form_data.extend_from_slice(b"\r\n");
+                    form_data.extend_from_slice(&file.data);
+                    form_data.extend_from_slice(b"\r\n");
+                }
+            }
+        }
+    }
+
+    form_data.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
     form_data
 }

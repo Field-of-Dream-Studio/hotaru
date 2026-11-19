@@ -11,7 +11,7 @@ use hotaru::prelude::*;
 LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3014")
-        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+        .single_protocol(ProtocolBuilder::new(HTTP::default()))
         .build()
 );
 

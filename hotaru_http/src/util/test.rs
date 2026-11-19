@@ -13,7 +13,7 @@ mod security_tests {
     use crate::message::meta::{HttpMeta, MetaError};
     use crate::message::request::HttpRequest;
     use crate::message::start_line::{RequestStartLine, StartLineError};
-    use crate::security::safety::HttpSafety;
+    use crate::protocol::safety::HttpSafety;
     use hotaru_io_tokio::TokioIo;
     use std::io::Cursor;
     use tokio::io::BufReader;

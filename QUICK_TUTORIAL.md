@@ -44,7 +44,7 @@ use hotaru::prelude::*;
 LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3003")
-        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+        .single_protocol(ProtocolBuilder::new(HTTP::default()))
         .build()
 );
 
@@ -63,7 +63,7 @@ endpoint! {
 The important pieces are:
 
 - `LServer!` declares the application server.
-- `HTTP::server(...)` installs HTTP/1.1 with a shared `HttpSafety` baseline.
+- `HTTP::default()` installs HTTP/1.1 with default safety and synchronization settings.
 - `run_server!(APP)` creates the Tokio runtime and blocks until shutdown.
 - `endpoint!` defines a route; the default `auto-reg` feature registers it.
 
@@ -151,7 +151,8 @@ LServer!(
     APP = Server::new()
         .binding("127.0.0.1:3003")
         .single_protocol(ProtocolBuilder::new(HTTP::server(
-            HttpSafety::default().with_max_body_size(1024 * 1024)
+            HttpSafety::default().with_max_body_size(1024 * 1024),
+            HttpSyncSettings::default(),
         )))
         .build()
 );
