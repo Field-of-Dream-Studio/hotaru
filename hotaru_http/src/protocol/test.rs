@@ -14,7 +14,6 @@ use tokio::{
 };
 
 use super::HTTP;
-use crate::security::safety::HttpSafety;
 
 struct ExchangeResult {
     response: Vec<u8>,
@@ -29,7 +28,7 @@ async fn exchange(raw_request: &[u8]) -> ExchangeResult {
         let (stream, _) = listener.accept().await.unwrap();
         let stream = HotaruTcpStream::new(stream);
         let (read, write, meta) = stream.split();
-        let protocol = HTTP::server(HttpSafety::default());
+        let protocol = HTTP::default();
         let channel = protocol.open_channel(read.into_buf(), write.into_buf_write(), meta);
 
         <HTTP as Protocol>::handle(

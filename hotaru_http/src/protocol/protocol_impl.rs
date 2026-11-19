@@ -19,7 +19,7 @@ use crate::{
     channel::{Http1Channel, HttpChannel},
     context::HttpContext,
     message::{http_value::HttpVersion, response::response_templates, start_line::StartLineError},
-    protocol::error::HttpError,
+    protocol::{error::HttpError, sync::HttpSyncSettings},
     security::safety::HttpSafety,
 };
 
