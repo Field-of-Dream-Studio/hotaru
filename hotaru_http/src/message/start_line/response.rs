@@ -1,7 +1,6 @@
-
 use crate::message::http_value::*;
 
-use super::error::StartLineError;
+use super::{error::StartLineError, version::parse_http1_version};
 
 /// ResponseStartLine is the first line of the HTTP response, which contains the HTTP version and status code.
 #[derive(Debug, Clone)]
@@ -57,7 +56,7 @@ impl ResponseStartLine {
             return Err(StartLineError::Unrecognised);
         }
 
-        let http_version = HttpVersion::parse(parts[0])?;
+        let http_version = parse_http1_version(parts[0])?;
 
         let status_code = match parts[1].parse::<u16>() {
             Ok(code) => StatusCode::from(code),

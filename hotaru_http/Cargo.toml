@@ -39,3 +39,4 @@ spawn_send = ["hotaru_core/spawn_send"]
 [dev-dependencies]
 tokio-test = "0.4"
 once_cell = "1.19" 
+hotaru_rt_tokio = { path = "../hotaru_rt_tokio", version = "=0.8.6" }
