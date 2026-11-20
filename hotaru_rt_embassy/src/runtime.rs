@@ -463,6 +463,11 @@ macro_rules! define_runtime_worker_pool {
                     $crate::__private::embassy_time::Instant::now()
                 }
 
+                fn unix_time() -> ::core::option::Option<::core::time::Duration> {
+                    // Embassy's monotonic clock has no Unix epoch reference.
+                    ::core::option::Option::None
+                }
+
                 fn instant_plus(
                     instant: Self::Instant,
                     dur: ::core::time::Duration,

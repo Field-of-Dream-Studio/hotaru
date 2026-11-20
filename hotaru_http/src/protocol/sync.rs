@@ -18,6 +18,8 @@ pub struct HttpSyncSettings {
     pub sync_length: bool,
     /// Reconcile Content-Type with the prepared body.
     pub sync_content_type: bool,
+    /// Add a Date header to outgoing messages when missing or unparseable.
+    pub sync_date: bool,
 }
 impl Default for HttpSyncSettings {
     fn default() -> Self {
@@ -25,6 +27,7 @@ impl Default for HttpSyncSettings {
             sync_encoding: true,
             sync_length: true,
             sync_content_type: true,
+            sync_date: true,
         }
     }
 }

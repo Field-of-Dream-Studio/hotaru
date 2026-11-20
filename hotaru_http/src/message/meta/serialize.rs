@@ -72,6 +72,12 @@ impl HttpMeta {
             handled_headers.insert("host".to_string());
         }
 
+        // Add date if present
+        if let Some(date) = self.date {
+            result.push_str(&format!("date: {}\r\n", date));
+            handled_headers.insert("date".to_string());
+        }
+
         // Add language if present
         if let Some(ref lang) = self.lang {
             if self.start_line.is_request() {

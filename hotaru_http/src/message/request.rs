@@ -43,8 +43,9 @@ impl HttpRequest {
     }
 
     /// Prepares the request body and updates metadata according to `settings`.
-    /// The flags control encoding, length, and content-type header updates.
-    /// Body preparation still runs.
+    /// The flags control encoding, length, content-type, and Date header updates.
+    /// Date synchronization fills missing or unparseable values when a clock value
+    /// is available. Body preparation still runs.
     #[av::ver(
         unstable,
         since = "0.8.6",

@@ -134,20 +134,29 @@ async fn send_respects_all_sync_flags() {
     let prepared = HttpBody::Text("hello".to_string())
         .encode(Default::default())
         .unwrap();
-    for (sync_encoding, sync_length, sync_content_type) in [
-        (false, false, false),
-        (false, false, true),
-        (false, true, false),
-        (false, true, true),
-        (true, false, false),
-        (true, false, true),
-        (true, true, false),
-        (true, true, true),
+    for (sync_encoding, sync_length, sync_content_type, sync_date) in [
+        (false, false, false, false),
+        (false, false, false, true),
+        (false, false, true, false),
+        (false, false, true, true),
+        (false, true, false, false),
+        (false, true, false, true),
+        (false, true, true, false),
+        (false, true, true, true),
+        (true, false, false, false),
+        (true, false, false, true),
+        (true, false, true, false),
+        (true, false, true, true),
+        (true, true, false, false),
+        (true, true, false, true),
+        (true, true, true, false),
+        (true, true, true, true),
     ] {
         let settings = HttpSyncSettings {
             sync_encoding,
             sync_length,
             sync_content_type,
+            sync_date,
         };
         let mut request_meta = HttpRequest::default().meta;
         let mut response_meta = HttpResponse::default().meta;
@@ -172,6 +181,13 @@ async fn send_respects_all_sync_flags() {
                 .position(|part| part == b"\r\n\r\n")
                 .unwrap();
             let headers = std::str::from_utf8(&wire[..split]).unwrap();
+            assert_eq!(
+                headers
+                    .lines()
+                    .filter(|line| line.starts_with("date: "))
+                    .count(),
+                usize::from(settings.sync_date)
+            );
             let length = if settings.sync_length { 5 } else { 999 };
             assert!(headers.contains(&format!("content-length: {length}")));
             assert_eq!(

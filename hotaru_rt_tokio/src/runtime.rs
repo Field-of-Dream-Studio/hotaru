@@ -36,6 +36,12 @@ impl RuntimeSpec for TokioRuntime {
         tokio::time::Instant::now()
     }
 
+    fn unix_time() -> Option<Duration> {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+    }
+
     fn instant_plus(instant: Self::Instant, dur: Duration) -> Self::Instant {
         instant + dur
     }

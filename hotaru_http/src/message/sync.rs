@@ -2,6 +2,7 @@
 
 use crate::protocol::HttpError;
 use crate::protocol::HttpSyncSettings;
+use crate::util::date::HttpDate;
 use crate::util::encoding::HttpEncoding;
 
 use super::body::HttpBody;
@@ -38,6 +39,11 @@ pub(crate) fn config_sync(
         let encoding = HttpEncoding::from_headers(transfer_header, content_header)?;
         meta.delete_encoding();
         meta.set_encoding(Some(encoding));
+    }
+
+    // get_date() treats missing and unparseable Date headers alike.
+    if settings.sync_date && meta.get_date().is_none() {
+        meta.set_date(HttpDate::now());
     }
 
     Ok((meta, body))

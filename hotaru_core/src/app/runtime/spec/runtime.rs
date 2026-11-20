@@ -71,6 +71,19 @@ pub trait RuntimeSpec: 'static {
     /// Current runtime instant. Cheap; must not perform blocking syscalls.
     fn now() -> Self::Instant;
 
+    // FIXME(0.9): Remove this default and require each runtime to implement unix_time().
+    /// Wall-clock duration since 1970-01-01 00:00:00 UTC; may move backwards.
+    /// Returns `None` by default or when the clock is unavailable, uninitialized, or pre-epoch.
+    #[av::ver(
+        unstable,
+        since = "0.8.6",
+        note = "Optional Unix wall-clock time without std",
+        date = "2026-11-20"
+    )]
+    fn unix_time() -> Option<Duration> {
+        None
+    }
+
     /// Advance `instant` by `dur`. Must **saturate** rather than wrap on
     /// overflow so callers can hand it user-derived deadlines safely.
     fn instant_plus(instant: Self::Instant, dur: Duration) -> Self::Instant;
