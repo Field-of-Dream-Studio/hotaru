@@ -12,7 +12,7 @@ middleware! {
     pub Cors<HTTP> {
         let cors_settings = req
             .runtime()
-            .and_then(|rt| rt.get_config::<AppCorsSettings>())
+            .get_config::<AppCorsSettings>()
             .unwrap_or_default()
             .merge(
                 &req.endpoint()

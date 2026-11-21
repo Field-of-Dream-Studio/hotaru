@@ -67,7 +67,7 @@ endpoint! {
     /// Get a value from app config
     pub get_secret_key <HTTP> {
         let key = req.runtime()
-            .and_then(|app| app.config.get::<String>().cloned())
+            .get_config::<String>()
             .unwrap_or("No key".to_string());
         text_response(key)
     }

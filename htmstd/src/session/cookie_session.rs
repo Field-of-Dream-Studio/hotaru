@@ -122,13 +122,9 @@ middleware!(
         let mut new_id_generated = false;
         let runtime = req.runtime();
         let cookie_settings = runtime
-            .as_ref()
-            .and_then(|rt| rt.get_config::<CookieSessionSettings>())
+            .get_config::<CookieSessionSettings>()
             .unwrap_or_default();
-        let run_mode = runtime
-            .as_ref()
-            .map(|rt| rt.mode())
-            .unwrap_or_default();
+        let run_mode = runtime.mode();
         let secure_cookie = cookie_settings.resolve_secure(run_mode.clone());
 
         if !secure_cookie && cookie_settings.same_site == SameSite::None {
@@ -151,7 +147,7 @@ middleware!(
             };
 
         let secret_key = runtime
-            .and_then(|rt| rt.get_config::<SessionSecret>())
+            .get_config::<SessionSecret>()
             .and_then(|s| s.0)
             .unwrap_or_else(fallback_secret);
         let password = format!("{}{}", secret_key, session_id);

@@ -274,12 +274,12 @@ where
         //    overlay on top of it instead of falling back to defaults.
         let mut ctx = HttpContext::new_server(
             runtime.clone(),
-            endpoint.clone(),
             request,
             channel.remote_addr(),
             channel.local_addr(),
             channel.safety().clone(),
         );
+        ctx.bind_endpoint(endpoint.clone())?;
         ctx.install_channel(channel.clone());
 
         match endpoint.run(ctx).await {

@@ -13,7 +13,7 @@ middleware! {
     pub PreferredLanguageMiddleware<HTTP> {
         let language_settings = req
             .runtime()
-            .and_then(|rt| rt.get_config::<PreferredLanguageSettings>())
+            .get_config::<PreferredLanguageSettings>()
             .unwrap_or_default()
             .merge(
                 &req.endpoint()

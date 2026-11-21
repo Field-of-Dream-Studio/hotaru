@@ -24,17 +24,6 @@ use crate::protocol::{HttpError, HttpSyncSettings};
 use crate::util::cookie::{Cookie, CookieMap};
 use crate::util::form::{MultiForm, UrlEncodedForm};
 
-/// Executable context - determines what's available for execution
-pub enum Executable<TS: TransportSpec = hotaru_io_tokio::TcpTransport> {
-    /// Server context with runtime config and matched endpoint.
-    Request {
-        runtime: Arc<RuntimeConfig>,
-        endpoint: Arc<UrlNode<HttpContext<TS>, TS>>,
-    },
-    /// Client context (empty for now, will be extended later)
-    Response,
-}
-
 /// Unified HTTP context for both server and client operations.
 ///
 /// This context flows through handlers and middleware, supporting both
@@ -43,8 +32,9 @@ pub struct HttpContext<TS: TransportSpec = hotaru_io_tokio::TcpTransport> {
     pub request: HttpRequest,
     pub response: HttpResponse,
 
-    // Execution context determines available operations
-    pub executable: Executable<TS>,
+    role: ProtocolRole,
+    runtime: Arc<RuntimeConfig>,
+    route: Option<Arc<UrlNode<HttpContext<TS>, TS>>>,
 
     // Additional fields
     pub host: Option<String>, // Used by client for target host
@@ -78,7 +68,6 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// `decode_body`.
     pub fn new_server(
         runtime: Arc<RuntimeConfig>,
-        endpoint: Arc<UrlNode<HttpContext<TS>, TS>>,
         request: HttpRequest,
         remote_addr: Option<SocketAddr>,
         local_addr: Option<SocketAddr>,
@@ -87,7 +76,9 @@ impl<TS: TransportSpec> HttpContext<TS> {
         Self {
             request,
             response: HttpResponse::default(),
-            executable: Executable::Request { runtime, endpoint },
+            role: ProtocolRole::Server,
+            runtime,
+            route: None,
             host: None,
             safety,
             remote_addr,
@@ -95,6 +86,19 @@ impl<TS: TransportSpec> HttpContext<TS> {
             params: Default::default(),
             locals: Default::default(),
             channel: None,
+        }
+    }
+
+    pub(crate) fn bind_endpoint(
+        &mut self,
+        endpoint: Arc<UrlNode<HttpContext<TS>, TS>>,
+    ) -> Result<(), HttpError> {
+        match self.role {
+            ProtocolRole::Server => {
+                self.route = Some(endpoint);
+                Ok(())
+            }
+            ProtocolRole::Client => Err(HttpError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
         }
     }
 
@@ -107,7 +111,9 @@ impl<TS: TransportSpec> HttpContext<TS> {
         Self {
             request: HttpRequest::default(),
             response: HttpResponse::default(),
-            executable: Executable::<TS>::Response,
+            role: ProtocolRole::Client,
+            runtime: Arc::new(RuntimeConfig::new()),
+            route: None,
             host: if host.is_empty() { None } else { Some(host) },
             safety,
             remote_addr: None,
@@ -115,6 +121,19 @@ impl<TS: TransportSpec> HttpContext<TS> {
             params: Default::default(),
             locals: Default::default(),
             channel: None,
+        }
+    }
+
+    pub(crate) fn bind_outpoint(
+        &mut self,
+        outpoint: Arc<UrlNode<HttpContext<TS>, TS>>,
+    ) -> Result<(), HttpError> {
+        match self.role {
+            ProtocolRole::Client => {
+                self.route = Some(outpoint);
+                Ok(())
+            }
+            ProtocolRole::Server => Err(HttpError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
         }
     }
 
@@ -261,9 +280,16 @@ impl<TS: TransportSpec> HttpContext<TS> {
             debug_log!("HTTP Context: Handler completed");
             result
         } else {
-            debug_log!("HTTP Context: No endpoint available (client context)");
-            // No endpoint available (client context)
-            Ok(self)
+            match self.role {
+                ProtocolRole::Server => {
+                    debug_log!("HTTP Context: Server context has no bound endpoint");
+                    Err(HttpError::NoRoute(self.path()).boxed())
+                }
+                ProtocolRole::Client => {
+                    debug_log!("HTTP Context: No endpoint available (client context)");
+                    Ok(self)
+                }
+            }
         }
     }
 
@@ -302,19 +328,26 @@ impl<TS: TransportSpec> HttpContext<TS> {
         &mut self.request.meta
     }
 
-    /// Returns the runtime config if this is a server context.
-    pub fn runtime(&self) -> Option<Arc<RuntimeConfig>> {
-        match &self.executable {
-            Executable::Request { runtime, .. } => Some(runtime.clone()),
-            Executable::<TS>::Response => None,
-        }
+    pub fn runtime(&self) -> Arc<RuntimeConfig> {
+        self.runtime.clone()
+    }
+
+    pub fn route(&self) -> Option<Arc<UrlNode<HttpContext<TS>, TS>>> {
+        self.route.clone()
     }
 
     /// Returns the endpoint URL if this is a server context
     pub fn endpoint(&self) -> Option<Arc<UrlNode<HttpContext<TS>, TS>>> {
-        match &self.executable {
-            Executable::Request { endpoint, .. } => Some(endpoint.clone()),
-            Executable::<TS>::Response => None,
+        match self.role {
+            ProtocolRole::Server => self.route.clone(),
+            ProtocolRole::Client => None,
+        }
+    }
+
+    pub fn outpoint(&self) -> Option<Arc<UrlNode<HttpContext<TS>, TS>>> {
+        match self.role {
+            ProtocolRole::Client => self.route.clone(),
+            ProtocolRole::Server => None,
         }
     }
 
@@ -556,8 +589,8 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
     type Channel = Http1Channel<TS::Wire>;
 
     fn handle_error(&mut self) {
-        match &self.executable {
-            Executable::Request { .. } => {
+        match self.role {
+            ProtocolRole::Server => {
                 // Server: return a generic error response.
                 // The specific status code is determined by the error type
                 // in the protocol-level handle loop via response_templates::error_response().
@@ -566,7 +599,7 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
                 )
                 .status(500);
             }
-            Executable::<TS>::Response => {
+            ProtocolRole::Client => {
                 // Client: set default error response
                 self.response = HttpResponse::default();
             }
@@ -574,10 +607,7 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
     }
 
     fn role(&self) -> ProtocolRole {
-        match &self.executable {
-            Executable::Request { .. } => ProtocolRole::Server,
-            Executable::<TS>::Response => ProtocolRole::Client,
-        }
+        self.role
     }
 
     fn inject_request(&mut self, request: Self::Request) {

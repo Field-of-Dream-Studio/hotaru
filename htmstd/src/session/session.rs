@@ -120,7 +120,7 @@ pub fn get_mut<'a>(id: u64) -> Result<SessionRW<'a>, &'static str> {
 middleware!(
     pub Session<HTTP>{
         let ttl = req.runtime()
-            .and_then(|rt| rt.get_config::<u64>())
+            .get_config::<u64>()
             .unwrap_or(DEFAULT_TTL);
         let mut session_id: u64 = req.get_cookie_or_default("session_id")
             .get_value()

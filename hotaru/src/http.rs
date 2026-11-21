@@ -20,7 +20,7 @@ pub use hotaru_http::HttpError;
 
 // Request / response / context
 pub use hotaru_http::context::HttpReqCtx;
-pub use hotaru_http::context::{Executable, HttpContext};
+pub use hotaru_http::context::HttpContext;
 /// Response-context alias kept for source compatibility with old
 /// Starberry-era code. Use [`HttpContext`] directly in new code.
 pub type HttpResCtx = HttpContext;
